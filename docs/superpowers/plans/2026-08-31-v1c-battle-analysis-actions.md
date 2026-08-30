@@ -120,10 +120,18 @@ Tables: `analysis_runs`, `business_signals`, `battle_state_versions`, `battle_st
 
 ### Task 6: Phase acceptance and continuity
 
-- [ ] Run frozen-lockfile install, public-boundary scan, lint, typecheck, all tests, production builds, `git diff --check`, and real PostgreSQL 18 CI.
-- [ ] Prove from the real Web app: confirmed fact → analysis version/evidence → current map point → pending proposal → separate human acceptance → one formal action; prove retry creates no duplicate.
-- [ ] Record exact counts, remote SHA, CI URL, implemented/deferred boundaries, and browser evidence in ignored `progress.md` and public living docs.
-- [ ] Mark V1-C complete only for this slice, then immediately plan/execute Outbox consumption, in-app/Feishu notification adapters, and reminders.
+- [x] Run frozen-lockfile install, public-boundary scan, lint, typecheck, all tests, production builds, `git diff --check`, and real PostgreSQL 18 CI.
+- [x] Prove from the real Web app: confirmed fact → analysis version/evidence → current map point → pending proposal → separate human acceptance → one formal action; prove retry creates no duplicate.
+- [x] Record exact counts, remote SHA, CI URL, implemented/deferred boundaries, and browser evidence in ignored `progress.md` and public living docs.
+- [x] Mark V1-C complete only for this slice, then immediately plan/execute Outbox consumption, in-app/Feishu notification adapters, and reminders.
+
+### Acceptance evidence
+
+- Commit `f109536baec781f9c9f8d3207b9acb708f3763b6` is present on public `main`.
+- Local final gate passed 206 tests: contracts 41, core 27, database 65, Web 53, and API E2E 20; lint, typecheck, public-boundary scan, production builds, and staged diff checks also passed.
+- [GitHub Actions CI 33341305979](https://github.com/ERICEPC/ai-customer-battlefield/actions/runs/33341305979) passed PostgreSQL 18 migrations/tenant queries, tests, and production builds in 2m27s.
+- Real Nest + PGlite + Next browser acceptance proved formal fact → analysis v1/evidence → map point → immutable proposal-source deep link → active-owner human acceptance → one formal action. At 1280px and 390px, document width equalled viewport width; the browser console had no warning or error.
+- This closes only V1-C. Reminder scheduling, Outbox consumption, inbox/Feishu delivery, reports, management queries, configuration management, and production authentication remain subsequent V1 slices.
 
 ## Acceptance gate
 
