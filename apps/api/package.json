@@ -4,10 +4,14 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "predev": "pnpm --filter @battlefield/contracts build && pnpm --filter @battlefield/core build",
     "dev": "tsx watch src/main.ts",
+    "prebuild": "pnpm --filter @battlefield/contracts build && pnpm --filter @battlefield/core build",
     "build": "tsc -p tsconfig.json",
+    "pretypecheck": "pnpm --filter @battlefield/contracts build && pnpm --filter @battlefield/core build",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "test": "pnpm test:e2e",
+    "pretest:e2e": "pnpm --filter @battlefield/contracts build && pnpm --filter @battlefield/core build",
     "test:e2e": "vitest run test/app.e2e.test.ts"
   },
   "dependencies": {

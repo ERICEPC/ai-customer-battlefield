@@ -1,0 +1,29 @@
+{
+  "name": "@battlefield/web",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "predev": "pnpm --filter @battlefield/contracts build",
+    "dev": "next dev",
+    "prebuild": "pnpm --filter @battlefield/contracts build",
+    "build": "next build",
+    "pretypecheck": "pnpm --filter @battlefield/contracts build",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "pretest": "pnpm --filter @battlefield/contracts build",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@battlefield/contracts": "workspace:*",
+    "next": "^16.3.3",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8"
+  },
+  "devDependencies": {
+    "@testing-library/jest-dom": "^7.0.1",
+    "@testing-library/react": "^16.3.3",
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.5",
+    "jsdom": "^30.0.1"
+  }
+}
