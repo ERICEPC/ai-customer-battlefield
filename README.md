@@ -78,6 +78,7 @@ The integration test refuses to reset a database whose name does not end in `_te
 - [V1-A implementation plan](docs/superpowers/plans/2026-08-31-v1a-data-identity-foundation.md)
 - [Follow-up confirmation implementation plan](docs/superpowers/plans/2026-08-31-v1b-followup-confirmation.md)
 - [Battle analysis and actions implementation plan](docs/superpowers/plans/2026-08-31-v1c-battle-analysis-actions.md)
+- [Reminders and notifications implementation plan](docs/superpowers/plans/2026-08-31-v1d-reminders-notifications.md)
 
 ## Current scope
 
