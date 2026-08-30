@@ -285,7 +285,7 @@ Enable/force the tenant policy on all eight tables. Add list index `(tenant_id, 
 
 Run all database tests twice using fresh database handles. Both runs must pass independently, proving no test depends on prior state.
 
-- [ ] **Step 6: Commit and push**
+- [x] **Step 6: Commit and push**
 
 ```bash
 git add packages/database
@@ -332,19 +332,19 @@ export class ListBusinessEntities {
 }
 ```
 
-- [ ] **Step 1: Write contract tests that reject malformed filters and rows**
+- [x] **Step 1: Write contract tests that reject malformed filters and rows**
 
 Cover trimmed search up to 100 characters, limit 1–100, allowed statuses, strict unknown-key rejection, ISO timestamps, UUID IDs, decimal stage progress as string, and opaque nullable `nextCursor`.
 
-- [ ] **Step 2: Verify contract RED, then implement schemas and verify GREEN**
+- [x] **Step 2: Verify contract RED, then implement schemas and verify GREEN**
 
 Run: `pnpm --filter @battlefield/contracts test -- business-entities.test.ts`.
 
-- [ ] **Step 3: Write core use-case tests**
+- [x] **Step 3: Write core use-case tests**
 
 Use a specific in-memory reader and assert observable inputs/results: default limit 20, whitespace search normalization, maximum limit rejection, and unchanged propagation of an opaque cursor. Do not assert mock call existence without a returned business result.
 
-- [ ] **Step 4: Verify core RED, implement minimal use case, verify GREEN**
+- [x] **Step 4: Verify core RED, implement minimal use case, verify GREEN**
 
 Run: `pnpm --filter @battlefield/core test -- list-business-entities.test.ts`.
 
