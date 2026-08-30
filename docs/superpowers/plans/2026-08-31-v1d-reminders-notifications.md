@@ -192,7 +192,7 @@ Commit: `feat: define reminder and notification contracts`
 - Produces tenant-safe persistence for `reminder_policy_versions`, `reminder_instances`, `notification_template_versions`, `notification_events`, and `notification_deliveries`.
 - Extends `outbox_messages.status` with terminal `dead_lettered` without changing existing published records.
 
-- [ ] **Step 1: Write migration tests before SQL exists**
+- [x] **Step 1: Write migration tests before SQL exists**
 
 Test cross-tenant FK rejection, forced RLS, one published policy/template version per key, immutable published rows, JSON-array policy nodes, one reminder per dedupe key, one notification per dedupe key, one delivery per event/channel, read timestamp coherence, provider/error terminal-state coherence, and exclusion of `dead_lettered` rows from claim indexes.
 
@@ -212,13 +212,13 @@ await expect(
 ).rejects.toThrow();
 ```
 
-- [ ] **Step 2: Run database tests and verify RED**
+- [x] **Step 2: Run database tests and verify RED**
 
 Run: `pnpm --filter @battlefield/database test -- --run`
 
 Expected: the new migration suite fails because the five tables are missing.
 
-- [ ] **Step 3: Add the complete transactional migration**
+- [x] **Step 3: Add the complete transactional migration**
 
 The policy table must use this published-version core:
 
@@ -251,7 +251,7 @@ create unique index reminder_policy_versions_published_unique_idx
 
 Add immutable-update triggers for published policy/template versions, composite FKs for actions/users/channel addresses/events, claim indexes on `(status, available_at, id)`, recipient unread index on `(tenant_id, recipient_user_id, read_at, created_at desc, id desc)`, and forced RLS policies matching `app.current_tenant_id()`.
 
-- [ ] **Step 4: Seed only versioned due-time defaults for existing tenants**
+- [x] **Step 4: Seed only versioned due-time defaults for existing tenants**
 
 Insert one `default_action_due` published policy containing:
 
@@ -261,7 +261,7 @@ Insert one `default_action_due` published policy containing:
 
 Insert `action_due` templates for `in_app` and `feishu`. Use the tenant's first active user as `published_by`; tenants without an active user receive no seed and are surfaced by worker diagnostics rather than receiving an invalid implicit policy.
 
-- [ ] **Step 5: Update generated Kysely database interfaces**
+- [x] **Step 5: Update generated Kysely database interfaces**
 
 Add exact unions for reminder/delivery statuses and typed JSON structures. `OutboxMessageTable.status` becomes:
 

@@ -377,12 +377,19 @@ export interface OutboxMessageTable {
   topic: string;
   payload: JsonObject;
   status: Generated<
-    "pending" | "processing" | "published" | "failed" | "cancelled"
+    | "pending"
+    | "processing"
+    | "published"
+    | "failed"
+    | "cancelled"
+    | "dead_lettered"
   >;
   dedupe_key: string;
   available_at: Timestamp;
   attempt_count: Generated<number>;
   last_error: NullableText;
+  last_error_code: NullableText;
+  claim_token: string | null;
   claimed_at: NullableTimestamp;
   published_at: NullableTimestamp;
   created_at: Timestamp;
@@ -513,6 +520,124 @@ export interface ActionStatusHistoryTable {
   version_no: VersionNumber;
 }
 
+export interface ReminderPolicyNode {
+  kind: "advance" | "due" | "overdue" | "escalation";
+  offsetMinutes: number;
+  recipient: "owner";
+  channels: Array<"in_app" | "feishu" | "email">;
+}
+
+type ReminderPolicyNodes = ColumnType<
+  ReminderPolicyNode[],
+  ReminderPolicyNode[] | string,
+  ReminderPolicyNode[] | string
+>;
+
+export interface ReminderPolicyVersionTable {
+  tenant_id: string;
+  id: Generated<string>;
+  policy_key: string;
+  version_no: VersionNumber;
+  name: string;
+  status: "draft" | "published" | "retired";
+  nodes: ReminderPolicyNodes;
+  effective_at: Timestamp;
+  published_by: string;
+  created_at: Timestamp;
+}
+
+export interface NotificationTemplateVersionTable {
+  tenant_id: string;
+  id: Generated<string>;
+  template_key: string;
+  channel: "in_app" | "feishu" | "email";
+  version_no: VersionNumber;
+  name: string;
+  status: "draft" | "published" | "retired";
+  title_template: string;
+  body_template: string;
+  deep_link_template: string;
+  priority: "low" | "medium" | "high" | "urgent";
+  effective_at: Timestamp;
+  published_by: string;
+  created_at: Timestamp;
+}
+
+export interface ReminderInstanceTable {
+  tenant_id: string;
+  id: Generated<string>;
+  action_id: string;
+  recipient_user_id: string;
+  policy_version_id: string;
+  action_version_no: VersionNumber;
+  kind: "advance" | "due" | "overdue" | "escalation";
+  remind_at: Timestamp;
+  channels: JsonStringArray;
+  status: Generated<
+    | "scheduled"
+    | "processing"
+    | "notified"
+    | "failed"
+    | "cancelled"
+    | "dead_lettered"
+  >;
+  available_at: Timestamp;
+  attempt_count: Generated<number>;
+  claim_token: string | null;
+  claimed_at: NullableTimestamp;
+  notification_event_id: string | null;
+  dedupe_key: string;
+  last_error_code: NullableText;
+  last_error_message: NullableText;
+  cancelled_at: NullableTimestamp;
+  created_at: Timestamp;
+  updated_at: Timestamp;
+}
+
+export interface NotificationEventTable {
+  tenant_id: string;
+  id: Generated<string>;
+  recipient_user_id: string;
+  reminder_id: string;
+  event_type: "action_due";
+  title: string;
+  body: string;
+  deep_link: string;
+  priority: "low" | "medium" | "high" | "urgent";
+  read_at: NullableTimestamp;
+  dedupe_key: string;
+  created_at: Timestamp;
+}
+
+export interface NotificationDeliveryTable {
+  tenant_id: string;
+  id: Generated<string>;
+  notification_event_id: string;
+  recipient_user_id: string;
+  channel: "in_app" | "feishu" | "email";
+  address_id: string | null;
+  status: Generated<
+    | "pending"
+    | "processing"
+    | "delivered"
+    | "failed"
+    | "cancelled"
+    | "dead_lettered"
+  >;
+  dedupe_key: string;
+  available_at: Timestamp;
+  attempt_count: Generated<number>;
+  claim_token: string | null;
+  claimed_at: NullableTimestamp;
+  delivered_at: NullableTimestamp;
+  provider_message_id: NullableText;
+  provider_request_id: NullableText;
+  last_error_code: NullableText;
+  last_error_message: NullableText;
+  created_at: Timestamp;
+  updated_at: Timestamp;
+}
+
 export interface BattlefieldDatabase {
   "app.tenants": TenantTable;
   "app.org_units": OrgUnitTable;
@@ -549,4 +674,9 @@ export interface BattlefieldDatabase {
   "app.action_proposals": ActionProposalTable;
   "app.business_actions": BusinessActionTable;
   "app.action_status_history": ActionStatusHistoryTable;
+  "app.reminder_policy_versions": ReminderPolicyVersionTable;
+  "app.notification_template_versions": NotificationTemplateVersionTable;
+  "app.reminder_instances": ReminderInstanceTable;
+  "app.notification_events": NotificationEventTable;
+  "app.notification_deliveries": NotificationDeliveryTable;
 }
