@@ -1,0 +1,10 @@
+import type { FollowupDraftAgent } from "@battlefield/core";
+
+export class DeterministicFollowupDraftAgent implements FollowupDraftAgent {
+  async propose(input: Parameters<FollowupDraftAgent["propose"]>[0]) {
+    return {
+      summary: input.rawInput,
+      relatedOpportunityIds: [],
+    };
+  }
+}
