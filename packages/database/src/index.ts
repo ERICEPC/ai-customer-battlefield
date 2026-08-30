@@ -4,6 +4,10 @@ export {
   type KyselyActionQueryReaderOptions,
 } from "./action-decisions/kysely-action-query-reader.js";
 export {
+  KyselyOutboxStore,
+  OutboxClaimLostError,
+} from "./async-work/kysely-outbox-store.js";
+export {
   KyselyBattleAnalysisStore,
   type KyselyBattleAnalysisStoreOptions,
   KyselyConfirmedFactSnapshotReader,
@@ -52,11 +56,17 @@ export type {
   FollowupParticipantTable,
   FollowupTable,
   IdempotencyRecordTable,
+  NotificationDeliveryTable,
+  NotificationEventTable,
+  NotificationTemplateVersionTable,
   OpportunityAssignmentTable,
   OpportunityStageHistoryTable,
   OpportunityTable,
   OrgUnitTable,
   OutboxMessageTable,
+  ReminderInstanceTable,
+  ReminderPolicyNode,
+  ReminderPolicyVersionTable,
   SourceEvidenceTable,
   SourceInputTable,
   TenantTable,
@@ -74,6 +84,17 @@ export {
   SqlFileMigrationProvider,
   type SqlMigration,
 } from "./migration-provider.js";
+export {
+  InvalidInboxCursorError,
+  KyselyNotificationStore,
+  NotificationClaimLostError,
+  NotificationNotFoundError,
+} from "./notifications/kysely-notification-store.js";
+export {
+  InvalidPersistedReminderPolicyError,
+  KyselyReminderStore,
+  ReminderClaimLostError,
+} from "./reminders/kysely-reminder-store.js";
 export {
   type ActorDatabaseContext,
   InvalidActorDatabaseContextError,

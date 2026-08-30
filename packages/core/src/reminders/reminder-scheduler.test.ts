@@ -50,7 +50,9 @@ function memoryStore(status: "planned" | "completed" = "planned") {
     async claimDueBatch() {
       return [];
     },
-    async materializeDueReminder() {},
+    async materializeDueReminder() {
+      return "notified";
+    },
     async reschedule() {},
     async deadLetter() {},
   };
@@ -142,7 +144,7 @@ describe("action reminder scheduler", () => {
     store.materializeDueReminder = async (input) => {
       if (input.claimToken === "first") {
         events.push({ type: "notified", ...input });
-        return;
+        return "notified";
       }
       throw new Error("database detail that must not be persisted");
     };
@@ -159,6 +161,7 @@ describe("action reminder scheduler", () => {
     ).toEqual({
       claimed: 2,
       notified: 1,
+      cancelled: 0,
       rescheduled: 1,
       deadLettered: 0,
     });
@@ -171,6 +174,32 @@ describe("action reminder scheduler", () => {
       availableAt: "2026-09-01T01:01:00.000Z",
       errorCode: "REMINDER_MATERIALIZATION_FAILED",
       errorMessage: "Reminder materialization failed.",
+    });
+  });
+
+  it("reports a reminder cancelled by the persistence recheck truthfully", async () => {
+    const { store } = memoryStore();
+    store.claimDueBatch = async () => [
+      {
+        reminderId: "72000000-0000-4000-8000-000000000001",
+        attemptCount: 1,
+        claimToken: "terminal-action",
+      },
+    ];
+    store.materializeDueReminder = async () => "cancelled";
+    const subject = new DispatchDueReminders({
+      store,
+      clock: { now: () => new Date("2026-09-01T01:00:00.000Z") },
+    });
+
+    expect(
+      await subject.runOnce({ actor, limit: 50, leaseMs: 60_000 }),
+    ).toEqual({
+      claimed: 1,
+      notified: 0,
+      cancelled: 1,
+      rescheduled: 0,
+      deadLettered: 0,
     });
   });
 });

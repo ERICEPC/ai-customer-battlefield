@@ -275,7 +275,7 @@ type OutboxStatus =
   | "dead_lettered";
 ```
 
-- [ ] **Step 6: Verify PGlite and PostgreSQL 18 behavior**
+- [x] **Step 6: Verify PGlite and PostgreSQL 18 behavior**
 
 Run: `pnpm --filter @battlefield/database test -- --run`
 
@@ -283,7 +283,7 @@ Run with CI PostgreSQL: `DATABASE_URL=postgresql://postgres:postgres@localhost:5
 
 Expected: all migrations apply twice, every new tenant table has forced RLS, and all new invariants pass.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 Commit: `feat: add reminder and notification schema`
 
@@ -302,7 +302,7 @@ Commit: `feat: add reminder and notification schema`
 - Implements Task 1 ports without exposing Kysely outside `@battlefield/database`.
 - Each claim returns immutable data and a claim token; completion/retry updates require the same token and `processing` status.
 
-- [ ] **Step 1: Write failing concurrent-claim and crash-recovery tests**
+- [x] **Step 1: Write failing concurrent-claim and crash-recovery tests**
 
 ```ts
 const [first, second] = await Promise.all([
@@ -320,13 +320,13 @@ expect(await readOutbox(messageId)).toMatchObject({
 
 Also prove notification creation plus in-app delivery plus reminder `notified` status is one transaction, and repeated dedupe input returns the first notification instead of creating duplicates.
 
-- [ ] **Step 2: Run the database test and verify RED**
+- [x] **Step 2: Run the database test and verify RED**
 
 Run: `pnpm --filter @battlefield/database test -- --run`
 
 Expected: FAIL because the Kysely stores do not exist.
 
-- [ ] **Step 3: Implement short claim transactions**
+- [x] **Step 3: Implement short claim transactions**
 
 Use this locking form inside `withTenantTransaction`:
 
@@ -343,11 +343,11 @@ limit $3
 
 Update selected rows to `processing`, set `claimed_at`, increment `attempt_count`, and return them before any handler/external call. Complete/retry/dead-letter operations lock only the claimed row and validate its current state.
 
-- [ ] **Step 4: Implement reminder scheduling and notification materialization transactions**
+- [x] **Step 4: Implement reminder scheduling and notification materialization transactions**
 
 `scheduleForAction` reads the current published policy and formal action under tenant scope, expands only known nodes, and inserts with `on conflict (tenant_id, dedupe_key) do nothing`. `materializeDueReminder` locks one processing reminder, rechecks action status/version/owner, inserts notification event and in-app delivered row, then sets `notification_event_id` and `notified` atomically.
 
-- [ ] **Step 5: Implement tenant-safe inbox keyset reads and mark-read**
+- [x] **Step 5: Implement tenant-safe inbox keyset reads and mark-read**
 
 Cursor order is `(created_at desc, id desc)`. `markRead` updates only the actor's recipient row and is idempotent:
 
@@ -358,7 +358,7 @@ Cursor order is `(created_at desc, id desc)`. `markRead` updates only the actor'
 .set({ read_at: sql`coalesce(read_at, ${input.readAt}::timestamptz)` })
 ```
 
-- [ ] **Step 6: Run store tests twice and commit**
+- [x] **Step 6: Run store tests twice and commit**
 
 Run twice: `pnpm --filter @battlefield/database test -- --run`
 

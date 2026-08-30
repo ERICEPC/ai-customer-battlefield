@@ -66,7 +66,7 @@ export interface ReminderStore {
     reminderId: string;
     claimToken: string;
     notifiedAt: string;
-  }): Promise<void>;
+  }): Promise<"notified" | "cancelled">;
   reschedule(input: {
     actor: ActorScope;
     reminderId: string;
@@ -177,6 +177,7 @@ export class DispatchDueReminders {
   }): Promise<{
     claimed: number;
     notified: number;
+    cancelled: number;
     rescheduled: number;
     deadLettered: number;
   }> {
@@ -190,18 +191,19 @@ export class DispatchDueReminders {
     const result = {
       claimed: reminders.length,
       notified: 0,
+      cancelled: 0,
       rescheduled: 0,
       deadLettered: 0,
     };
     for (const reminder of reminders) {
       try {
-        await this.dependencies.store.materializeDueReminder({
+        const outcome = await this.dependencies.store.materializeDueReminder({
           actor: input.actor,
           reminderId: reminder.reminderId,
           claimToken: reminder.claimToken,
           notifiedAt: now.toISOString(),
         });
-        result.notified += 1;
+        result[outcome] += 1;
       } catch {
         if (reminder.attemptCount >= 8) {
           await this.dependencies.store.deadLetter({
