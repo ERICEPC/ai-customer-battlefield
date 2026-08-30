@@ -86,9 +86,10 @@ describe("PostgreSQL migrations", () => {
     expect(firstRun.map((migration) => migration.name)).toEqual([
       "0001_foundation",
       "0002_customer_operations",
+      "0003_followup_confirmation",
     ]);
     expect(secondRun).toEqual([]);
-    expect(rlsState.rows[0]).toEqual({ protected_count: 13, total_count: 13 });
+    expect(rlsState.rows[0]).toEqual({ protected_count: 27, total_count: 27 });
     expect(page.items.map((item) => item.id)).toEqual([SYNTHETIC_ENTITY_ID]);
   });
 });

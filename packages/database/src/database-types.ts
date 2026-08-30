@@ -16,6 +16,11 @@ type JsonObject = ColumnType<
   Record<string, unknown> | string | undefined,
   Record<string, unknown> | string
 >;
+type NullableJsonObject = ColumnType<
+  Record<string, unknown> | null,
+  Record<string, unknown> | string | null | undefined,
+  Record<string, unknown> | string | null
+>;
 type VersionNumber = ColumnType<
   string,
   bigint | number | string | undefined,
@@ -194,6 +199,190 @@ export interface OpportunityStageHistoryTable {
   changed_at: Timestamp;
 }
 
+export interface SourceInputTable {
+  tenant_id: string;
+  id: Generated<string>;
+  source_type: "web" | "feishu" | "email" | "import" | "api";
+  source_message_id: NullableText;
+  submitted_by: string;
+  raw_content: string;
+  content_hash: string;
+  received_at: Timestamp;
+  created_at: Timestamp;
+}
+
+export interface FollowupDraftTable {
+  tenant_id: string;
+  id: Generated<string>;
+  source_input_id: string;
+  entity_id: string;
+  status: "pending_confirmation" | "confirmed" | "cancelled" | "expired";
+  candidate_payload: JsonObject;
+  created_by: string;
+  expires_at: Timestamp;
+  confirmed_at: NullableTimestamp;
+  confirmed_by: NullableText;
+  cancelled_at: NullableTimestamp;
+  version_no: VersionNumber;
+  created_at: Timestamp;
+  updated_at: Timestamp;
+}
+
+export interface DraftRevisionTable {
+  tenant_id: string;
+  id: Generated<string>;
+  draft_id: string;
+  revision_no: VersionNumber;
+  candidate_payload: JsonObject;
+  changed_by: string;
+  changed_at: Timestamp;
+}
+
+export interface FollowupTable {
+  tenant_id: string;
+  id: Generated<string>;
+  entity_id: string;
+  source_input_id: string;
+  source_draft_id: string;
+  occurred_at: Timestamp;
+  followup_type: "meeting" | "call" | "message" | "email" | "other";
+  summary: string;
+  result_summary: NullableText;
+  submitted_by: string;
+  confirmed_by: string;
+  confirmed_at: Timestamp;
+  version_no: VersionNumber;
+  created_at: Timestamp;
+}
+
+export interface FollowupCorrectionTable {
+  tenant_id: string;
+  id: Generated<string>;
+  followup_id: string;
+  supersedes_followup_id: string;
+  reason: string;
+  corrected_by: string;
+  corrected_at: Timestamp;
+}
+
+export interface FollowupParticipantTable {
+  tenant_id: string;
+  id: Generated<string>;
+  followup_id: string;
+  user_id: string | null;
+  contact_id: string | null;
+  participant_role:
+    | "sales_owner"
+    | "participant"
+    | "customer_contact"
+    | "observer";
+  created_at: Timestamp;
+}
+
+export interface FollowupOpportunityTable {
+  tenant_id: string;
+  followup_id: string;
+  opportunity_id: string;
+  is_primary: Generated<boolean>;
+  created_at: Timestamp;
+}
+
+export interface BusinessFactTable {
+  tenant_id: string;
+  id: Generated<string>;
+  entity_id: string;
+  opportunity_id: string | null;
+  followup_id: string;
+  fact_type: string;
+  fact_value: string;
+  occurred_at: Timestamp;
+  confirmed_at: Timestamp;
+  confirmed_by: string;
+  valid_status: Generated<"valid" | "superseded" | "invalidated">;
+  supersedes_fact_id: string | null;
+  created_at: Timestamp;
+}
+
+export interface SourceEvidenceTable {
+  tenant_id: string;
+  id: Generated<string>;
+  source_input_id: string | null;
+  source_type: "web" | "feishu" | "email" | "attachment" | "import" | "api";
+  content_ref: NullableText;
+  excerpt: NullableText;
+  content_hash: string;
+  sensitivity: Generated<"public" | "internal" | "confidential" | "restricted">;
+  captured_at: Timestamp;
+  created_at: Timestamp;
+}
+
+export interface FactEvidenceLinkTable {
+  tenant_id: string;
+  fact_id: string;
+  evidence_id: string;
+  relation_type: "supports" | "contradicts" | "context";
+  created_at: Timestamp;
+}
+
+export interface IdempotencyRecordTable {
+  tenant_id: string;
+  id: Generated<string>;
+  operation: string;
+  idempotency_key: string;
+  request_hash: string;
+  status: "in_progress" | "completed";
+  response_payload: NullableJsonObject;
+  resource_type: NullableText;
+  resource_id: string | null;
+  created_by: string;
+  created_at: Timestamp;
+  completed_at: NullableTimestamp;
+  expires_at: NullableTimestamp;
+}
+
+export interface AuditEntryTable {
+  tenant_id: string;
+  id: Generated<string>;
+  aggregate_type: string;
+  aggregate_id: string;
+  action: string;
+  actor_user_id: string;
+  request_id: NullableText;
+  before_payload: NullableJsonObject;
+  after_payload: NullableJsonObject;
+  reason: NullableText;
+  occurred_at: Timestamp;
+}
+
+export interface DomainEventTable {
+  tenant_id: string;
+  id: Generated<string>;
+  aggregate_type: string;
+  aggregate_id: string;
+  event_type: string;
+  event_version: VersionNumber;
+  payload: JsonObject;
+  occurred_at: Timestamp;
+}
+
+export interface OutboxMessageTable {
+  tenant_id: string;
+  id: Generated<string>;
+  event_id: string;
+  topic: string;
+  payload: JsonObject;
+  status: Generated<
+    "pending" | "processing" | "published" | "failed" | "cancelled"
+  >;
+  dedupe_key: string;
+  available_at: Timestamp;
+  attempt_count: Generated<number>;
+  last_error: NullableText;
+  claimed_at: NullableTimestamp;
+  published_at: NullableTimestamp;
+  created_at: Timestamp;
+}
+
 export interface BattlefieldDatabase {
   "app.tenants": TenantTable;
   "app.org_units": OrgUnitTable;
@@ -208,4 +397,18 @@ export interface BattlefieldDatabase {
   "app.opportunities": OpportunityTable;
   "app.opportunity_assignments": OpportunityAssignmentTable;
   "app.opportunity_stage_history": OpportunityStageHistoryTable;
+  "app.source_inputs": SourceInputTable;
+  "app.followup_drafts": FollowupDraftTable;
+  "app.draft_revisions": DraftRevisionTable;
+  "app.followups": FollowupTable;
+  "app.followup_corrections": FollowupCorrectionTable;
+  "app.followup_participants": FollowupParticipantTable;
+  "app.followup_opportunities": FollowupOpportunityTable;
+  "app.business_facts": BusinessFactTable;
+  "app.source_evidence": SourceEvidenceTable;
+  "app.fact_evidence_links": FactEvidenceLinkTable;
+  "app.idempotency_records": IdempotencyRecordTable;
+  "app.audit_entries": AuditEntryTable;
+  "app.domain_events": DomainEventTable;
+  "app.outbox_messages": OutboxMessageTable;
 }

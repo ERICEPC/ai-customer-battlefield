@@ -83,11 +83,12 @@ Implemented today:
 
 - tenant, organization, user, membership, and channel-address foundation with fail-closed RLS;
 - business entities, contacts and affiliation history, opportunities, assignment history, and stage history;
+- the `0003` physical foundation for sources, draft revisions, formal follow-ups, facts/evidence, idempotency, audit events, domain events, and Outbox messages;
 - tenant-safe entity directory API with keyset pagination and responsive Web UI;
 - deterministic follow-up draft proposal that remains visibly `pending_confirmation`;
 - PGlite local tests and PostgreSQL 18 CI verification of the same SQL migrations.
 
-Still in progress for V1: confirmation-to-formal-record transactions, analysis and action loops, notifications, configurable prompts/models/rules, reports, management queries, import tools, production OIDC, and deploy/operations acceptance. Their adapters must preserve the boundaries established here.
+Still in progress for V1: the confirmation Store/API/Web transaction on top of `0003`, analysis and action loops, notifications, configurable prompts/models/rules, reports, management queries, import tools, production OIDC, and deploy/operations acceptance. Their adapters must preserve the boundaries established here.
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) before proposing a change.
 

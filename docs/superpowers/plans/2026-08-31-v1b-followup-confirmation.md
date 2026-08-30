@@ -71,9 +71,9 @@ Create receives `entityId`, `rawInput`, and optional `occurredAt`; PATCH receive
 
 Tables include sources, drafts, revisions, formal follow-ups, participants, opportunity links, facts, evidence and links, idempotency records, audit entries, domain events, and Outbox messages. Edge payloads may use JSONB, but formal searchable relationships use constrained columns and composite tenant foreign keys.
 
-- [ ] First prove RED for cross-tenant references, one source-to-draft relation, revision monotonicity, terminal-state checks, participant XOR, multi-opportunity primary rules, correction/evidence tenant safety, idempotency uniqueness, Outbox dedupe, and forced RLS.
-- [ ] Implement the migration with FK-side indexes, pending-draft and timeline partial/range indexes, `(status, available_at, id)` Outbox claim index, and immutable-event timestamps.
-- [ ] Extend Kysely database types and real PostgreSQL assertions; run database test/typecheck/build suites.
+- [x] First prove RED for cross-tenant references, one source-to-draft relation, revision monotonicity, terminal-state checks, participant XOR, multi-opportunity primary rules, correction/evidence tenant safety, idempotency uniqueness, Outbox dedupe, and forced RLS.
+- [x] Implement the migration with FK-side indexes, pending-draft and timeline partial/range indexes, `(status, available_at, id)` Outbox claim index, and immutable-event timestamps.
+- [x] Extend Kysely database types and real PostgreSQL assertions; run database test/typecheck/build suites.
 - [ ] Commit `feat: add follow-up confirmation schema` and verify remote PostgreSQL CI.
 
 ### Task 3: Kysely store and atomic confirmation transaction
