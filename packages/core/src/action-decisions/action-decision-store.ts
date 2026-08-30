@@ -97,6 +97,13 @@ export class ActionIdempotencyConflictError extends Error {
   }
 }
 
+export class ActionOwnerNotFoundError extends Error {
+  constructor() {
+    super("The selected action owner was not found in the tenant.");
+    this.name = "ActionOwnerNotFoundError";
+  }
+}
+
 export class BusinessActionNotFoundError extends Error {
   constructor() {
     super("Business action was not found.");

@@ -1,3 +1,9 @@
+export { KyselyActionDecisionStore } from "./action-decisions/kysely-action-decision-store.js";
+export {
+  KyselyBattleAnalysisStore,
+  type KyselyBattleAnalysisStoreOptions,
+  KyselyConfirmedFactSnapshotReader,
+} from "./battle-analysis/kysely-battle-analysis-store.js";
 export {
   KyselyBusinessEntityReader,
   type KyselyBusinessEntityReaderOptions,

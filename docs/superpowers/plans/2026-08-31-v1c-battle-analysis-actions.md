@@ -83,10 +83,10 @@ Tables: `analysis_runs`, `business_signals`, `battle_state_versions`, `battle_st
 - Create: `packages/database/src/action-decisions/kysely-action-decision-store.ts`
 - Create integration tests and modify package exports/seed helpers
 
-- [ ] Write integration tests for tenant-scoped fact snapshots, deterministic watermarking, append-only versions, evidence chains, projection replacement, late-run suppression, proposal creation, and empty/insufficient data.
-- [ ] Implement analysis start/failure/completion without keeping a transaction open across analyzer work. On completion, lock the entity/current projection, compare the fact watermark, append results, and update the projection only when current.
-- [ ] Write acceptance/rejection integration tests for fixed lock order, editable accepted fields, same-tenant owner, expiry, optimistic conflict, request-hash idempotency, terminal repeat, rollback on Outbox failure, and no cross-tenant visibility.
-- [ ] Implement formal action creation plus initial status history/audit/event/Outbox in one short transaction; rejected proposals never create actions.
+- [x] Write integration tests for tenant-scoped fact snapshots, deterministic watermarking, append-only versions, evidence chains, projection replacement, late-run suppression, proposal creation, and empty/insufficient data.
+- [x] Implement analysis start/failure/completion without keeping a transaction open across analyzer work. On completion, lock the entity/current projection, compare the fact watermark, append results, and update the projection only when current.
+- [x] Write acceptance/rejection integration tests for fixed lock order, editable accepted fields, same-tenant owner, expiry, optimistic conflict, request-hash idempotency, terminal repeat, rollback on Outbox failure, and no cross-tenant visibility.
+- [x] Implement formal action creation plus initial status history/audit/event/Outbox in one short transaction; rejected proposals never create actions.
 - [ ] Run PGlite and PostgreSQL transaction verification; commit `feat: persist battle states and confirmed actions`.
 
 ### Task 4: Analysis, map, proposal, and action REST APIs
