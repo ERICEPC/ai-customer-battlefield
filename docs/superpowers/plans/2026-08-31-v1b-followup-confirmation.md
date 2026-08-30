@@ -74,7 +74,7 @@ Tables include sources, drafts, revisions, formal follow-ups, participants, oppo
 - [x] First prove RED for cross-tenant references, one source-to-draft relation, revision monotonicity, terminal-state checks, participant XOR, multi-opportunity primary rules, correction/evidence tenant safety, idempotency uniqueness, Outbox dedupe, and forced RLS.
 - [x] Implement the migration with FK-side indexes, pending-draft and timeline partial/range indexes, `(status, available_at, id)` Outbox claim index, and immutable-event timestamps.
 - [x] Extend Kysely database types and real PostgreSQL assertions; run database test/typecheck/build suites.
-- [ ] Commit `feat: add follow-up confirmation schema` and verify remote PostgreSQL CI.
+- [x] Commit `feat: add follow-up confirmation schema` and verify remote PostgreSQL CI.
 
 ### Task 3: Kysely store and atomic confirmation transaction
 
@@ -83,10 +83,10 @@ Tables include sources, drafts, revisions, formal follow-ups, participants, oppo
 - Create: `packages/database/test/followup-confirmation-store.test.ts`
 - Modify: package exports and synthetic seed helpers
 
-- [ ] Write integration tests for tenant-scoped create/get/revise/cancel, optimistic conflicts, expiry, idempotent repeated confirm, idempotency payload mismatch, entity/opportunity validation, rollback on a forced failure, and no cross-tenant visibility.
-- [ ] Implement create using a short persistence transaction after Agent output exists; store a source hash and revision zero without placing raw content in logs.
-- [ ] Implement confirmation in the documented lock order. Create formal rows, minimal audit/event payloads, and an Outbox message in the same transaction; never call an external adapter.
-- [ ] Prove a repeated key returns the original result while a different request using the same key fails; prove all written rows disappear when any transaction step fails.
+- [x] Write integration tests for tenant-scoped create/get/revise/cancel, optimistic conflicts, expiry, idempotent repeated confirm, idempotency payload mismatch, entity/opportunity validation, rollback on a forced failure, and no cross-tenant visibility.
+- [x] Implement create using a short persistence transaction after Agent output exists; store a source hash and revision zero without placing raw content in logs.
+- [x] Implement confirmation in the documented lock order. Create formal rows, minimal audit/event payloads, and an Outbox message in the same transaction; never call an external adapter.
+- [x] Prove a repeated key returns the original result while a different request using the same key fails; prove all written rows disappear when any transaction step fails.
 - [ ] Run database tests including PostgreSQL CI and commit `feat: persist confirmed follow-up facts atomically`.
 
 ### Task 4: Persistent NestJS API

@@ -41,6 +41,7 @@ export type {
   UserMembershipTable,
   UserTable,
 } from "./database-types.js";
+export { KyselyFollowupConfirmationStore } from "./followup-confirmation/kysely-followup-confirmation-store.js";
 export {
   MigrationFailedError,
   MigrationHistoryError,

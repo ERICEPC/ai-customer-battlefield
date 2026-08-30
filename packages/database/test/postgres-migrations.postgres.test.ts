@@ -7,7 +7,9 @@ import { KyselyBusinessEntityReader } from "../src/business-entities/kysely-busi
 import { createPostgresDatabase } from "../src/database-factory.js";
 import type { DatabaseHandle } from "../src/database-handle.js";
 import type { BattlefieldDatabase } from "../src/database-types.js";
+import { KyselyFollowupConfirmationStore } from "../src/followup-confirmation/kysely-followup-confirmation-store.js";
 import { migrateDatabase } from "../src/migrate.js";
+import { withTenantTransaction } from "../src/tenant-session.js";
 import {
   SYNTHETIC_ENTITY_ID,
   SYNTHETIC_TENANT_ID,
@@ -69,6 +71,50 @@ describe("PostgreSQL migrations", () => {
       actor: { tenantId: SYNTHETIC_TENANT_ID, userId: SYNTHETIC_USER_ID },
       limit: 20,
     });
+    const followupStore = new KyselyFollowupConfirmationStore(database.db);
+    const draftId = "70000000-0000-4000-8000-000000000011";
+    await followupStore.create({
+      actor: { tenantId: SYNTHETIC_TENANT_ID, userId: SYNTHETIC_USER_ID },
+      draftId,
+      rawInput: "Synthetic customer confirmed the budget.",
+      candidate: {
+        entityId: SYNTHETIC_ENTITY_ID,
+        summary: "Synthetic customer confirmed the budget.",
+        occurredAt: "2026-08-31T02:30:00.000Z",
+        followupType: "meeting",
+        relatedOpportunityIds: [],
+        primaryOpportunityId: null,
+        facts: [{ factType: "budget_status", factValue: "Budget confirmed" }],
+      },
+      createdAt: "2026-08-31T02:30:00.000Z",
+      expiresAt: "2026-09-07T02:30:00.000Z",
+    });
+    const confirmation = await followupStore.confirm({
+      actor: { tenantId: SYNTHETIC_TENANT_ID, userId: SYNTHETIC_USER_ID },
+      draftId,
+      versionNo: "1",
+      idempotencyKey: "postgres-confirmation-001",
+      confirmedAt: "2026-08-31T02:35:00.000Z",
+    });
+    const confirmationCounts = await withTenantTransaction(
+      database.db,
+      {
+        tenantId: SYNTHETIC_TENANT_ID,
+        userId: SYNTHETIC_USER_ID,
+        requestId: "90000000-0000-4000-8000-000000000011",
+      },
+      async (transaction) => {
+        const result = await sql<{
+          followup_count: number;
+          outbox_count: number;
+        }>`
+          select
+            (select count(*)::int from app.followups) as followup_count,
+            (select count(*)::int from app.outbox_messages) as outbox_count
+        `.execute(transaction);
+        return result.rows[0];
+      },
+    );
     const rlsState = await sql<{
       protected_count: number;
       total_count: number;
@@ -91,6 +137,11 @@ describe("PostgreSQL migrations", () => {
     expect(secondRun).toEqual([]);
     expect(rlsState.rows[0]).toEqual({ protected_count: 27, total_count: 27 });
     expect(page.items.map((item) => item.id)).toEqual([SYNTHETIC_ENTITY_ID]);
+    expect(confirmation.status).toBe("confirmed");
+    expect(confirmationCounts).toEqual({
+      followup_count: 1,
+      outbox_count: 1,
+    });
   });
 });
 
