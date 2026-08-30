@@ -94,3 +94,26 @@ export {
   reviseFollowupDraftRequestSchema,
 } from "./followup-draft.js";
 export { type HealthResponse, healthResponseSchema } from "./health.js";
+export {
+  type InboxItem,
+  type InboxPage,
+  type InboxQuery,
+  inboxItemSchema,
+  inboxPageSchema,
+  inboxQuerySchema,
+  type MarkNotificationReadResponse,
+  markNotificationReadResponseSchema,
+  type NotificationEventType,
+  type NotificationPriority,
+  notificationApiErrorSchema,
+  notificationEventTypeSchema,
+  notificationPrioritySchema,
+} from "./notifications.js";
+export {
+  type ReminderInstance,
+  type ReminderKind,
+  type ReminderStatus,
+  reminderInstanceSchema,
+  reminderKindSchema,
+  reminderStatusSchema,
+} from "./reminders.js";

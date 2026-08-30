@@ -1,4 +1,5 @@
 export * from "./action-decisions/index.js";
+export * from "./async-work/outbox-processor.js";
 export * from "./battle-analysis/index.js";
 export * from "./business-entities/index.js";
 export * from "./followup-confirmation/index.js";
@@ -14,3 +15,5 @@ export type {
   FollowupDraftAgent,
   FollowupDraftCandidate,
 } from "./followup-drafts/followup-draft-agent.js";
+export * from "./notifications/notification-delivery.js";
+export * from "./reminders/reminder-scheduler.js";

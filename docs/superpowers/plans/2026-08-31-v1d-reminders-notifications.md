@@ -46,7 +46,7 @@
 - Produces `OutboxMessage`, `OutboxStore`, `OutboxTopicHandler`, `ProcessOutboxBatch`, `ReminderStore`, `ScheduleActionReminders`, `DispatchDueReminders`, `NotificationStore`, `NotificationChannel`, and strict HTTP response schemas.
 - `NotificationChannel` consumes rendered channel-neutral content and returns only provider metadata; it cannot query business tables.
 
-- [ ] **Step 1: Write failing contract tests for bounded public shapes**
+- [x] **Step 1: Write failing contract tests for bounded public shapes**
 
 ```ts
 expect(reminderInstanceSchema.parse({
@@ -74,13 +74,13 @@ expect(inboxPageSchema.parse({
 })).toBeDefined();
 ```
 
-- [ ] **Step 2: Run the new contract tests and verify RED**
+- [x] **Step 2: Run the new contract tests and verify RED**
 
 Run: `pnpm --filter @battlefield/contracts test -- --run`
 
 Expected: FAIL because `reminders.ts`, `notifications.ts`, and their exports do not exist.
 
-- [ ] **Step 3: Implement strict Zod contracts**
+- [x] **Step 3: Implement strict Zod contracts**
 
 ```ts
 export const reminderKindSchema = z.enum([
@@ -112,7 +112,7 @@ export const inboxQuerySchema = z.strictObject({
 
 Keep `title` at 200 characters, `body` at 2,000, `deepLink` at 2,000 and require an application-relative path beginning with `/`; reject arbitrary URLs and unknown keys.
 
-- [ ] **Step 4: Write failing core behavior tests**
+- [x] **Step 4: Write failing core behavior tests**
 
 Cover these exact invariants:
 
@@ -143,13 +143,13 @@ it("persists inbox truth before requesting an external channel", async () => {
 });
 ```
 
-- [ ] **Step 5: Run core tests and verify RED**
+- [x] **Step 5: Run core tests and verify RED**
 
 Run: `pnpm --filter @battlefield/core test -- --run`
 
 Expected: FAIL on missing ports/use cases.
 
-- [ ] **Step 6: Implement the smallest framework-free modules**
+- [x] **Step 6: Implement the smallest framework-free modules**
 
 ```ts
 export interface OutboxStore {
@@ -170,7 +170,7 @@ export interface NotificationChannel {
 
 `ProcessOutboxBatch` selects a handler by exact topic, treats unknown topics as permanent errors, calculates retry delay from the documented formula, and never catches an error without persisting retry/dead-letter state.
 
-- [ ] **Step 7: Run focused tests, typecheck, and commit**
+- [x] **Step 7: Run focused tests, typecheck, and commit**
 
 Run: `pnpm --filter @battlefield/contracts test -- --run && pnpm --filter @battlefield/core test -- --run && pnpm --filter @battlefield/core typecheck`
 
