@@ -55,11 +55,11 @@ Analysis requests accept an entity ID plus an optional expected input watermark.
 - Create: `packages/core/src/action-decisions/*`
 - Modify core indexes
 
-- [ ] First write contract tests for strict candidates, score ranges, sufficiency/risk/quadrant codes, evidence references, cursor filters, proposal versions, acceptance/rejection payloads, action transitions, terminal receipts, and stable errors.
-- [ ] Write core tests proving facts are read before analyzer execution, analyzer execution is outside persistence, stale input is surfaced explicitly, and only one deep Store call persists a validated result.
-- [ ] Write action-decision tests for separate acceptance/rejection, required owner/time/source, optimistic conflict, expiry, terminal-state rejection, idempotent repeat, and invalid transitions.
-- [ ] Implement the smallest provider-free schemas, ports, use cases, clocks, ID seams, and typed errors that make the tests pass.
-- [ ] Run focused and full verification; commit `feat: define battle analysis and action contracts`.
+- [x] First write contract tests for strict candidates, score ranges, sufficiency/risk/quadrant codes, evidence references, cursor filters, proposal versions, acceptance/rejection payloads, action transitions, terminal receipts, and stable errors.
+- [x] Write core tests proving facts are read before analyzer execution, analyzer execution is outside persistence, stale input is surfaced explicitly, and only one deep Store call persists a validated result.
+- [x] Write action-decision tests for separate acceptance/rejection, required owner/time/source, optimistic conflict, expiry, terminal-state rejection, idempotent repeat, and invalid transitions.
+- [x] Implement the smallest provider-free schemas, ports, use cases, clocks, ID seams, and typed errors that make the tests pass.
+- [x] Run focused and full verification; commit `feat: define battle analysis and action contracts`.
 
 ### Task 2: `0004_battle_analysis_actions` schema and invariants
 
