@@ -37,13 +37,15 @@ describe("0001_foundation migration", () => {
       order by table_name
     `.execute(database.db);
 
-    expect(result.rows.map((row) => row.table_name)).toEqual([
-      "channel_addresses",
-      "org_units",
-      "tenants",
-      "user_memberships",
-      "users",
-    ]);
+    expect(result.rows.map((row) => row.table_name)).toEqual(
+      expect.arrayContaining([
+        "channel_addresses",
+        "org_units",
+        "tenants",
+        "user_memberships",
+        "users",
+      ]),
+    );
   });
 
   test("rejects an org parent from another tenant", async () => {

@@ -9,7 +9,15 @@ export type {
 } from "./database-handle.js";
 export type {
   BattlefieldDatabase,
+  BusinessEntityTable,
+  BusinessEntityTypeTable,
   ChannelAddressTable,
+  ContactAffiliationTable,
+  ContactTable,
+  EntityAssignmentTable,
+  OpportunityAssignmentTable,
+  OpportunityStageHistoryTable,
+  OpportunityTable,
   OrgUnitTable,
   TenantTable,
   UserMembershipTable,

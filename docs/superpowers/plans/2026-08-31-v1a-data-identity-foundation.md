@@ -226,7 +226,7 @@ Inside one Kysely transaction call `set_config('app.current_tenant_id', tenantId
 
 Run the two focused tests, then `pnpm --filter @battlefield/database test && pnpm --filter @battlefield/database typecheck`.
 
-- [ ] **Step 6: Commit and push**
+- [x] **Step 6: Commit and push**
 
 ```bash
 git add packages/database
@@ -244,7 +244,7 @@ pnpm check:public && git push origin main
 **Interfaces:**
 - Produces physical storage for business entity types/entities, entity assignments, contacts/affiliations, opportunities/assignments, and stage history.
 
-- [ ] **Step 1: Write failing invariant tests**
+- [x] **Step 1: Write failing invariant tests**
 
 Prove with literal synthetic rows:
 
@@ -256,13 +256,13 @@ Prove with literal synthetic rows:
 6. stage progress is restricted to 0–100 and amount is non-negative;
 7. stage history is appendable and references the same-tenant opportunity.
 
-- [ ] **Step 2: Verify RED**
+- [x] **Step 2: Verify RED**
 
 Run: `pnpm --filter @battlefield/database test -- customer-operations-migration.test.ts`
 
 Expected: FAIL because `0002_customer_operations.sql` is absent.
 
-- [ ] **Step 3: Implement the migration**
+- [x] **Step 3: Implement the migration**
 
 Create exactly these tables in `app`: `business_entity_types`, `business_entities`, `entity_assignments`, `contacts`, `contact_affiliations`, `opportunities`, `opportunity_assignments`, `opportunity_stage_history`. Every table includes `tenant_id`; every relation uses composite tenant FK; every FK has an index; current primary and active-pair invariants use partial unique indexes.
 
@@ -277,11 +277,11 @@ assignment_role: owner | collaborator | management_observer
 
 Stage code remains text and references a versioned rule later; `stage_progress` is numeric(5,2) with `0 <= value <= 100`.
 
-- [ ] **Step 4: Add RLS and query indexes**
+- [x] **Step 4: Add RLS and query indexes**
 
 Enable/force the tenant policy on all eight tables. Add list index `(tenant_id, status, updated_at desc, id desc)`, entity opportunity index `(tenant_id, entity_id, status, updated_at desc)`, and active assignment/affiliation partial indexes specified by the data model.
 
-- [ ] **Step 5: Verify GREEN and empty-database rebuild**
+- [x] **Step 5: Verify GREEN and empty-database rebuild**
 
 Run all database tests twice using fresh database handles. Both runs must pass independently, proving no test depends on prior state.
 
