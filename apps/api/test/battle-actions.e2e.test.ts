@@ -1,6 +1,7 @@
 import { fileURLToPath } from "node:url";
 import {
   actionDecisionResponseSchema,
+  actionOwnerPageSchema,
   actionProposalPageSchema,
   actionProposalRecordSchema,
   actionTransitionResponseSchema,
@@ -15,6 +16,7 @@ import {
   type BattlefieldDatabase,
   type DatabaseHandle,
   migrateDatabase,
+  withTenantTransaction,
 } from "@battlefield/database";
 import {
   createPgliteDatabase,
@@ -94,6 +96,18 @@ describe("battle analysis and confirmed action API", () => {
     expect(detail.evidenceFacts).toHaveLength(1);
     expect(detail.signals).toHaveLength(1);
 
+    expect(
+      battleStateDetailSchema.parse(
+        (
+          await actorRequest(app)
+            .get(
+              `/api/v1/business-entities/${SYNTHETIC_ENTITY_ID}/battle-states/${analysis.battleStateVersionId}`,
+            )
+            .expect(200)
+        ).body,
+      ),
+    ).toEqual(detail);
+
     const map = battleMapPageSchema.parse(
       (
         await actorRequest(app)
@@ -108,6 +122,24 @@ describe("battle analysis and confirmed action API", () => {
       entityId: SYNTHETIC_ENTITY_ID,
     });
     expect(map.items[0]?.state?.versionNo).toBe("1");
+    expect(
+      battleMapPageSchema.parse(
+        (
+          await actorRequest(app)
+            .get(`/api/v1/battle-map?entityId=${SYNTHETIC_ENTITY_ID}&limit=1`)
+            .expect(200)
+        ).body,
+      ).items,
+    ).toEqual([map.items[0]]);
+
+    expect(
+      actionOwnerPageSchema.parse(
+        (await actorRequest(app).get("/api/v1/action-owners").expect(200)).body,
+      ).items,
+    ).toContainEqual({
+      userId: SYNTHETIC_USER_ID,
+      displayName: "alpha-owner",
+    });
 
     const proposalPage = actionProposalPageSchema.parse(
       (
@@ -278,6 +310,105 @@ describe("battle analysis and confirmed action API", () => {
     });
   });
 
+  test("uses server time to project expired proposals out of the pending queue", async () => {
+    const analysis = battleAnalysisResultSchema.parse(
+      (
+        await actorRequest(app)
+          .post(
+            `/api/v1/business-entities/${SYNTHETIC_ENTITY_ID}/analysis-runs`,
+          )
+          .send({})
+          .expect(201)
+      ).body,
+    );
+    if (analysis.status !== "completed" || !analysis.proposalIds[0]) {
+      throw new Error("Expected an expirable proposal.");
+    }
+    const sourceProposalId = analysis.proposalIds[0];
+    const proposalId = "c0000000-0000-4000-8000-000000000088";
+    await withTenantTransaction(
+      database.db,
+      {
+        tenantId: SYNTHETIC_TENANT_ID,
+        userId: SYNTHETIC_USER_ID,
+        requestId: "90000000-0000-4000-8000-000000000088",
+      },
+      async (transaction) => {
+        const source = await transaction
+          .selectFrom("app.action_proposals")
+          .select([
+            "entity_id",
+            "opportunity_id",
+            "title",
+            "description",
+            "suggested_owner_id",
+            "suggested_priority",
+            "source_battle_state_version_id",
+          ])
+          .where("tenant_id", "=", SYNTHETIC_TENANT_ID)
+          .where("id", "=", sourceProposalId)
+          .executeTakeFirstOrThrow();
+        await transaction
+          .insertInto("app.action_proposals")
+          .values({
+            tenant_id: SYNTHETIC_TENANT_ID,
+            id: proposalId,
+            ...source,
+            suggested_planned_at: null,
+            status: "pending_confirmation",
+            version_no: 1,
+            proposed_at: "2019-12-31T00:00:00.000Z",
+            expires_at: "2020-01-01T00:00:00.000Z",
+            decided_at: null,
+            decided_by: null,
+            decision_reason: null,
+            created_at: "2019-12-31T00:00:00.000Z",
+            updated_at: "2019-12-31T00:00:00.000Z",
+          })
+          .executeTakeFirstOrThrow();
+      },
+    );
+
+    const pending = actionProposalPageSchema.parse(
+      (
+        await actorRequest(app)
+          .get("/api/v1/action-proposals?status=pending_confirmation")
+          .expect(200)
+      ).body,
+    );
+    expect(pending.items).not.toContainEqual(
+      expect.objectContaining({ proposalId }),
+    );
+    expect(
+      actionProposalRecordSchema.parse(
+        (
+          await actorRequest(app)
+            .get(`/api/v1/action-proposals/${proposalId}`)
+            .expect(200)
+        ).body,
+      ),
+    ).toMatchObject({ proposalId, status: "expired" });
+    const response = await actorRequest(app)
+      .post(`/api/v1/action-proposals/${proposalId}/accept`)
+      .set("idempotency-key", "accept-expired-proposal-e2e")
+      .send({
+        versionNo: "1",
+        title: "不会创建的动作",
+        description: "过期建议必须由服务端拒绝。",
+        ownerUserId: SYNTHETIC_USER_ID,
+        priority: "high",
+        plannedAt: new Date(Date.now() + 86_400_000).toISOString(),
+      })
+      .expect(409);
+    expect(response.body).toMatchObject({ code: "ACTION_PROPOSAL_EXPIRED" });
+    const rejected = await actorRequest(app)
+      .post(`/api/v1/action-proposals/${proposalId}/reject`)
+      .set("idempotency-key", "reject-expired-proposal-e2e")
+      .send({ versionNo: "1", reason: "过期后也不能拒绝" })
+      .expect(409);
+    expect(rejected.body).toMatchObject({ code: "ACTION_PROPOSAL_EXPIRED" });
+  });
+
   test("maps malformed input, stale watermarks, missing actors, and tenant isolation", async () => {
     await request(app.getHttpServer())
       .get(`/api/v1/business-entities/${SYNTHETIC_ENTITY_ID}/battle-state`)
@@ -290,6 +421,9 @@ describe("battle analysis and confirmed action API", () => {
       .expect(400);
     await actorRequest(app)
       .get("/api/v1/actions?cursor=not-a-valid-cursor")
+      .expect(400);
+    await actorRequest(app)
+      .get("/api/v1/action-owners?cursor=not-a-valid-cursor")
       .expect(400);
     const stale = await actorRequest(app)
       .post(`/api/v1/business-entities/${SYNTHETIC_ENTITY_ID}/analysis-runs`)

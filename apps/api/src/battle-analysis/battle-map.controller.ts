@@ -36,6 +36,7 @@ export class BattleMapController {
         await this.queryReader.listMap({
           actor,
           limit: parsed.data.limit ?? 20,
+          ...(parsed.data.entityId ? { entityId: parsed.data.entityId } : {}),
           ...(parsed.data.isT0 === undefined ? {} : { isT0: parsed.data.isT0 }),
           ...(parsed.data.quadrantCode
             ? { quadrantCode: parsed.data.quadrantCode }

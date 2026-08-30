@@ -1,16 +1,35 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 
+import { developmentActorConfiguration } from "../config/development-actor";
+
 const navigation = [
   { label: "经营总览", href: "#" },
   { label: "经营对象", href: "/entities" },
-  { label: "客户作战地图", href: "#" },
+  { label: "客户作战地图", href: "/battle-map" },
   { label: "跟进工作台", href: "/" },
-  { label: "经营动作", href: "#" },
+  { label: "经营动作", href: "/actions" },
   { label: "周报中心", href: "#" },
 ] as const;
 
 type NavigationLabel = (typeof navigation)[number]["label"];
+
+const mobileNavigation: ReadonlyArray<{
+  label: string;
+  href: string;
+  activeItem: NavigationLabel;
+  mark: string;
+}> = [
+  { label: "今日", href: "/", activeItem: "跟进工作台", mark: "今" },
+  { label: "对象", href: "/entities", activeItem: "经营对象", mark: "客" },
+  {
+    label: "地图",
+    href: "/battle-map",
+    activeItem: "客户作战地图",
+    mark: "图",
+  },
+  { label: "动作", href: "/actions", activeItem: "经营动作", mark: "动" },
+];
 
 export function AppShell({
   activeItem,
@@ -21,6 +40,7 @@ export function AppShell({
   breadcrumb: string;
   children: ReactNode;
 }) {
+  const actor = developmentActorConfiguration();
   return (
     <div className="app-shell">
       <aside className="sidebar">
@@ -61,12 +81,29 @@ export function AppShell({
         <header className="topbar">
           <span className="breadcrumb">{breadcrumb}</span>
           <div className="user-chip">
-            <span aria-hidden="true">演</span>
-            演示销售
+            <span aria-hidden="true">{actor.displayName.slice(0, 1)}</span>
+            {actor.displayName}
           </div>
         </header>
         {children}
       </main>
+
+      <nav className="mobile-navigation" aria-label="移动端主导航">
+        {mobileNavigation.map((item) => {
+          const isActive = item.activeItem === activeItem;
+          return (
+            <Link
+              href={item.href}
+              className={isActive ? "active" : undefined}
+              aria-current={isActive ? "page" : undefined}
+              key={item.label}
+            >
+              <span aria-hidden="true">{item.mark}</span>
+              {item.label}
+            </Link>
+          );
+        })}
+      </nav>
     </div>
   );
 }

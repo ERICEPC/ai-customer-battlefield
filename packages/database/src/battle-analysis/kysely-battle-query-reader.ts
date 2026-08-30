@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import {
+  type ActorScope,
   type BattleDataSufficiency,
   type BattleMapPage,
   type BattleQueryReader,
@@ -63,36 +64,55 @@ export class KyselyBattleQueryReader implements BattleQueryReader {
   async getCurrent(
     input: Parameters<BattleQueryReader["getCurrent"]>[0],
   ): Promise<BattleStateDetail> {
+    return this.getDetail(input);
+  }
+
+  async getVersion(
+    input: Parameters<BattleQueryReader["getVersion"]>[0],
+  ): Promise<BattleStateDetail> {
+    return this.getDetail(input);
+  }
+
+  private async getDetail(input: {
+    actor: ActorScope;
+    entityId: string;
+    battleStateVersionId?: string;
+  }): Promise<BattleStateDetail> {
     return withTenantTransaction(
       this.database,
       { ...input.actor, requestId: input.entityId },
       async (transaction) => {
-        const state = await transaction
-          .selectFrom("app.battle_state_current as current")
-          .innerJoin("app.battle_state_versions as state", (join) =>
-            join
-              .onRef("state.tenant_id", "=", "current.tenant_id")
-              .onRef("state.id", "=", "current.battle_state_version_id"),
-          )
-          .select([
-            "state.id as state_id",
-            "state.entity_id",
-            "state.version_no",
-            "state.input_version",
-            "state.relationship_score",
-            "state.potential_score",
-            "state.quadrant_code",
-            "state.primary_opportunity_id",
-            "state.risk_level",
-            "state.data_sufficiency",
-            "state.data_gaps",
-            "state.summary",
-            "state.analysis_run_id",
-            "state.effective_at",
-          ])
-          .where("current.tenant_id", "=", input.actor.tenantId)
-          .where("current.entity_id", "=", input.entityId)
-          .executeTakeFirst();
+        const versionFilter = input.battleStateVersionId
+          ? sql`and state.id = ${input.battleStateVersionId}::uuid`
+          : sql`and state.id = (
+              select current.battle_state_version_id
+              from app.battle_state_current as current
+              where current.tenant_id = ${input.actor.tenantId}::uuid
+                and current.entity_id = ${input.entityId}::uuid
+            )`;
+        const stateResult = await sql<StateRow>`
+          select
+            state.id::text as state_id,
+            state.entity_id::text as entity_id,
+            state.version_no,
+            state.input_version,
+            state.relationship_score,
+            state.potential_score,
+            state.quadrant_code,
+            state.primary_opportunity_id::text as primary_opportunity_id,
+            state.risk_level,
+            state.data_sufficiency,
+            state.data_gaps,
+            state.summary,
+            state.analysis_run_id::text as analysis_run_id,
+            state.effective_at
+          from app.battle_state_versions as state
+          where state.tenant_id = ${input.actor.tenantId}::uuid
+            and state.entity_id = ${input.entityId}::uuid
+          ${versionFilter}
+          limit 1
+        `.execute(transaction);
+        const state = stateResult.rows[0];
         if (!state) {
           throw new BattleStateNotFoundError();
         }
@@ -140,7 +160,7 @@ export class KyselyBattleQueryReader implements BattleQueryReader {
         const evidenceFactIds = facts.map((fact) => fact.fact_id);
 
         return {
-          state: mapState(state as StateRow, evidenceFactIds),
+          state: mapState(state, evidenceFactIds),
           evidenceFacts: facts.map((fact) => ({
             factId: fact.fact_id,
             factType: fact.fact_type,
@@ -180,6 +200,9 @@ export class KyselyBattleQueryReader implements BattleQueryReader {
         requestId: this.requestIdFactory(),
       },
       async (transaction) => {
+        const entityFilter = input.entityId
+          ? sql`and entity.id = ${input.entityId}::uuid`
+          : sql``;
         const t0Filter =
           input.isT0 === undefined
             ? sql``
@@ -250,6 +273,7 @@ export class KyselyBattleQueryReader implements BattleQueryReader {
               and link.fact_id is not null
           ) as evidence on true
           where entity.tenant_id = ${input.actor.tenantId}::uuid
+          ${entityFilter}
           ${t0Filter}
           ${quadrantFilter}
           ${sufficiencyFilter}

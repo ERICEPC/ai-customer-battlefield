@@ -13,10 +13,12 @@ export type ActionProposalStatus =
 export interface ActionProposalRecord {
   proposalId: string;
   entityId: string;
+  entityName: string;
   opportunityId: string | null;
   title: string;
   description: string;
   suggestedOwnerId: string | null;
+  suggestedOwnerName: string | null;
   suggestedPriority: ActionPriority;
   suggestedPlannedAt: string | null;
   sourceBattleStateVersionId: string;
@@ -33,10 +35,12 @@ export interface ActionProposalRecord {
 export interface BusinessActionRecord {
   actionId: string;
   entityId: string;
+  entityName: string;
   opportunityId: string | null;
   title: string;
   description: string;
   ownerUserId: string;
+  ownerName: string;
   priority: ActionPriority;
   status: BusinessActionStatus;
   plannedAt: string;
@@ -52,12 +56,25 @@ export interface ActionProposalPage {
   nextCursor: string | null;
 }
 
+export interface ActionOwnerOption {
+  userId: string;
+  displayName: string;
+}
+
 export interface BusinessActionPage {
   items: BusinessActionRecord[];
   nextCursor: string | null;
 }
 
 export interface ActionQueryReader {
+  listOwners(input: {
+    actor: ActorScope;
+    cursor?: string;
+    limit: number;
+  }): Promise<{
+    items: ActionOwnerOption[];
+    nextCursor: string | null;
+  }>;
   getProposal(input: {
     actor: ActorScope;
     proposalId: string;

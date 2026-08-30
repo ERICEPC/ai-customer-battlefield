@@ -90,4 +90,30 @@ export class BattleAnalysisController {
       return mapBattleError(error);
     }
   }
+
+  @Get(":entityId/battle-states/:battleStateVersionId")
+  async getVersion(
+    @Param("entityId") rawEntityId: string,
+    @Param("battleStateVersionId") rawBattleStateVersionId: string,
+    @Headers("x-tenant-id") tenantId?: string,
+    @Headers("x-user-id") userId?: string,
+  ): Promise<BattleStateDetail> {
+    const actor = developmentActor(tenantId, userId);
+    const entityId = resourceIdentifier(rawEntityId, "Business entity");
+    const battleStateVersionId = resourceIdentifier(
+      rawBattleStateVersionId,
+      "Battle state version",
+    );
+    try {
+      return battleStateDetailSchema.parse(
+        await this.queryReader.getVersion({
+          actor,
+          entityId,
+          battleStateVersionId,
+        }),
+      );
+    } catch (error) {
+      return mapBattleError(error);
+    }
+  }
 }

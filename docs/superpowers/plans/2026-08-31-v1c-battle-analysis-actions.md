@@ -29,8 +29,10 @@
 ```text
 POST /api/v1/business-entities/:id/analysis-runs
 GET  /api/v1/business-entities/:id/battle-state
+GET  /api/v1/business-entities/:id/battle-states/:stateVersionId
 GET  /api/v1/battle-map
 
+GET  /api/v1/action-owners
 GET  /api/v1/action-proposals
 GET  /api/v1/action-proposals/:id
 POST /api/v1/action-proposals/:id/accept
@@ -41,7 +43,7 @@ GET  /api/v1/actions/:id
 POST /api/v1/actions/:id/transition
 ```
 
-Analysis requests accept an entity ID plus an optional expected input watermark. Map and queue reads use cursor pagination and bounded filters. Accept receives proposal `versionNo`, owner, priority, planned time, and editable title/description; reject receives `versionNo` and a required reason. Decisions carry `Idempotency-Key`. Action transition is optimistic and supports only the documented state machine.
+Analysis requests accept an entity ID plus an optional expected input watermark. Current-state reads are distinct from immutable source-version reads. Map, owner-directory, and queue reads use cursor pagination and bounded filters; an exact entity filter makes source deep links independent of the first map page. Accept receives proposal `versionNo`, an active same-tenant owner, priority, planned time, and editable title/description; reject receives `versionNo` and a required reason. Decisions carry `Idempotency-Key`. Action transition is optimistic and supports only the documented state machine.
 
 ---
 
@@ -109,12 +111,12 @@ Tables: `analysis_runs`, `business_signals`, `battle_state_versions`, `battle_st
 - Create feature clients/components/tests under `apps/web/src`
 - Modify AppShell navigation and shared responsive styles
 
-- [ ] Build a native map page with T0 cards, KPI summary, relationship × potential plot, data-sufficiency treatment, selected-point explanation, evidence list, and an accessible table/list equivalent.
-- [ ] Build an action-proposal queue where one proposal is reviewed at a time; require owner, time, priority, source visibility, explicit “创建经营动作”, and a reason for rejection.
-- [ ] Show proposals and formal actions as different objects/states. Never label pending proposals as tasks and never imply reminders are active.
-- [ ] Cover loading, empty, insufficient data, analyzer failure, stale analysis, version conflict, retry with stable idempotency, accepted/rejected terminal receipts, and refresh recovery.
-- [ ] Verify desktop and 390px mobile layouts, keyboard operation, non-color point encoding, no horizontal overflow, and console cleanliness against the real Nest + PGlite demo.
-- [ ] Run full verification; commit `feat: add battle map and action confirmation workspace`.
+- [x] Build a native map page with T0 cards, KPI summary, relationship × potential plot, data-sufficiency treatment, selected-point explanation, evidence list, and an accessible table/list equivalent.
+- [x] Build an action-proposal queue where one proposal is reviewed at a time; require owner, time, priority, source visibility, explicit “创建经营动作”, and a reason for rejection.
+- [x] Show proposals and formal actions as different objects/states. Never label pending proposals as tasks and never imply reminders are active.
+- [x] Cover loading, empty, insufficient data, analyzer failure, stale analysis, version conflict, retry with stable idempotency, accepted/rejected terminal receipts, and refresh recovery.
+- [x] Verify desktop and 390px mobile layouts, keyboard operation, non-color point encoding, no horizontal overflow, and console cleanliness against the real Nest + PGlite demo.
+- [x] Run full verification; commit `feat: add battle map and action confirmation workspace`.
 
 ### Task 6: Phase acceptance and continuity
 

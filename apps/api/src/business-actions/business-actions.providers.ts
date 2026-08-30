@@ -33,6 +33,7 @@ const unavailableStore: ActionDecisionStore = {
   transition: unavailable,
 };
 const unavailableReader: ActionQueryReader = {
+  listOwners: unavailable,
   getProposal: unavailable,
   listProposals: unavailable,
   getAction: unavailable,

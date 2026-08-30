@@ -41,6 +41,7 @@ const unavailableAnalysisStore: BattleAnalysisStore = {
 };
 const unavailableQueryReader: BattleQueryReader = {
   getCurrent: unavailable,
+  getVersion: unavailable,
   listMap: unavailable,
 };
 const unavailableAnalyzer: BattleAnalyzer = { analyze: unavailable };

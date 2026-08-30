@@ -169,12 +169,14 @@ describe("battle analysis contracts", () => {
 
     expect(
       battleMapQuerySchema.parse({
+        entityId,
         isT0: "true",
         quadrantCode: "high_relationship_high_potential",
         dataSufficiency: "sufficient",
         limit: "20",
       }),
     ).toEqual({
+      entityId,
       isT0: true,
       quadrantCode: "high_relationship_high_potential",
       dataSufficiency: "sufficient",

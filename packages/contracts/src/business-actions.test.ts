@@ -4,6 +4,8 @@ import {
   acceptActionProposalRequestSchema,
   actionApiErrorSchema,
   actionDecisionResponseSchema,
+  actionOwnerListQuerySchema,
+  actionOwnerPageSchema,
   actionProposalListQuerySchema,
   actionProposalPageSchema,
   actionProposalRecordSchema,
@@ -25,10 +27,12 @@ function proposal() {
   return {
     proposalId,
     entityId,
+    entityName: "Aurora Systems",
     opportunityId: null,
     title: "提交解决方案",
     description: "按客户要求补充实施排期。",
     suggestedOwnerId: actorId,
+    suggestedOwnerName: "销售甲",
     suggestedPriority: "high" as const,
     suggestedPlannedAt: "2026-09-03T09:00:00.000Z",
     sourceBattleStateVersionId: stateId,
@@ -116,10 +120,12 @@ describe("business action contracts", () => {
     const action = {
       actionId,
       entityId,
+      entityName: "Aurora Systems",
       opportunityId: null,
       title: "提交正式解决方案",
       description: "包含安全方案与实施排期。",
       ownerUserId: actorId,
+      ownerName: "销售甲",
       priority: "urgent" as const,
       status: "planned" as const,
       plannedAt: "2026-09-03T09:00:00.000Z",
@@ -144,6 +150,15 @@ describe("business action contracts", () => {
   });
 
   it("keeps proposal queue filters bounded and rejects unknown input", () => {
+    expect(
+      actionOwnerListQuerySchema.parse({ limit: "50", cursor: "next-page" }),
+    ).toEqual({ limit: 50, cursor: "next-page" });
+    expect(
+      actionOwnerPageSchema.parse({
+        items: [{ userId: actorId, displayName: "销售甲" }],
+        nextCursor: null,
+      }).items,
+    ).toEqual([{ userId: actorId, displayName: "销售甲" }]);
     expect(
       actionProposalListQuerySchema.parse({
         status: "pending_confirmation",
@@ -175,10 +190,12 @@ describe("business action contracts", () => {
           {
             actionId,
             entityId,
+            entityName: "Aurora Systems",
             opportunityId: null,
             title: "提交正式解决方案",
             description: "包含安全方案与实施排期。",
             ownerUserId: actorId,
+            ownerName: "销售甲",
             priority: "urgent",
             status: "planned",
             plannedAt: "2026-09-03T09:00:00.000Z",

@@ -15,10 +15,12 @@ import { sql } from "kysely";
 import { afterEach, beforeEach, describe, expect, test } from "vitest";
 
 import { KyselyActionDecisionStore } from "../src/action-decisions/kysely-action-decision-store.js";
+import { KyselyActionQueryReader } from "../src/action-decisions/kysely-action-query-reader.js";
 import {
   KyselyBattleAnalysisStore,
   KyselyConfirmedFactSnapshotReader,
 } from "../src/battle-analysis/kysely-battle-analysis-store.js";
+import { KyselyBattleQueryReader } from "../src/battle-analysis/kysely-battle-query-reader.js";
 import type { DatabaseHandle } from "../src/database-handle.js";
 import type { BattlefieldDatabase } from "../src/database-types.js";
 import { KyselyFollowupConfirmationStore } from "../src/followup-confirmation/kysely-followup-confirmation-store.js";
@@ -103,6 +105,140 @@ describe("Kysely action decision persistence", () => {
         title: "篡改后的动作",
       }),
     ).rejects.toBeInstanceOf(ActionIdempotencyConflictError);
+  });
+
+  test("projects elapsed pending proposals as expired and removes them from the pending queue", async () => {
+    const expiredProposalId = "c0000000-0000-4000-8000-000000000098";
+    await withTenantTransaction(
+      database.db,
+      { ...actor, requestId: REQUEST_ID },
+      async (transaction) => {
+        const source = await transaction
+          .selectFrom("app.action_proposals")
+          .select([
+            "entity_id",
+            "opportunity_id",
+            "title",
+            "description",
+            "suggested_owner_id",
+            "suggested_priority",
+            "source_battle_state_version_id",
+          ])
+          .where("tenant_id", "=", actor.tenantId)
+          .where("id", "=", proposalId)
+          .executeTakeFirstOrThrow();
+        await transaction
+          .insertInto("app.action_proposals")
+          .values({
+            tenant_id: actor.tenantId,
+            id: expiredProposalId,
+            ...source,
+            suggested_planned_at: null,
+            status: "pending_confirmation",
+            version_no: 1,
+            proposed_at: "2019-12-31T00:00:00.000Z",
+            expires_at: "2020-01-01T00:00:00.000Z",
+            decided_at: null,
+            decided_by: null,
+            decision_reason: null,
+            created_at: "2019-12-31T00:00:00.000Z",
+            updated_at: "2019-12-31T00:00:00.000Z",
+          })
+          .executeTakeFirstOrThrow();
+      },
+    );
+    const reader = new KyselyActionQueryReader(database.db);
+
+    await expect(
+      reader.getProposal({ actor, proposalId: expiredProposalId }),
+    ).resolves.toMatchObject({
+      proposalId: expiredProposalId,
+      status: "expired",
+    });
+    const pending = await reader.listProposals({
+      actor,
+      status: "pending_confirmation",
+      limit: 20,
+    });
+    expect(pending.items).not.toContainEqual(
+      expect.objectContaining({ proposalId: expiredProposalId }),
+    );
+    await expect(
+      reader.listProposals({ actor, status: "expired", limit: 20 }),
+    ).resolves.toMatchObject({
+      items: [
+        expect.objectContaining({
+          proposalId: expiredProposalId,
+          status: "expired",
+        }),
+      ],
+    });
+  });
+
+  test("reads an immutable state version and locates one map entity independently", async () => {
+    const battleReader = new KyselyBattleQueryReader(database.db);
+    const current = await battleReader.getCurrent({
+      actor,
+      entityId: SYNTHETIC_ENTITY_ID,
+    });
+
+    await expect(
+      battleReader.getVersion({
+        actor,
+        entityId: SYNTHETIC_ENTITY_ID,
+        battleStateVersionId: current.state.battleStateVersionId,
+      }),
+    ).resolves.toEqual(current);
+    await expect(
+      battleReader.listMap({
+        actor,
+        entityId: SYNTHETIC_ENTITY_ID,
+        limit: 1,
+      }),
+    ).resolves.toMatchObject({
+      items: [{ entityId: SYNTHETIC_ENTITY_ID }],
+      nextCursor: null,
+    });
+  });
+
+  test("pages the complete active-owner directory without duplicates", async () => {
+    await withTenantTransaction(
+      database.db,
+      { ...actor, requestId: REQUEST_ID },
+      async (transaction) => {
+        await transaction
+          .insertInto("app.users")
+          .values(
+            Array.from({ length: 105 }, (_, index) => ({
+              tenant_id: actor.tenantId,
+              id: `30000000-0000-4000-8001-${String(index + 1).padStart(12, "0")}`,
+              display_name: `分页销售 ${String(index + 1).padStart(3, "0")}`,
+              email: null,
+              mobile: null,
+              status:
+                index === 104 ? ("inactive" as const) : ("active" as const),
+            })),
+          )
+          .execute();
+      },
+    );
+    const reader = new KyselyActionQueryReader(database.db);
+    const loaded: string[] = [];
+    let cursor: string | undefined;
+    do {
+      const page = await reader.listOwners({
+        actor,
+        limit: 40,
+        ...(cursor ? { cursor } : {}),
+      });
+      loaded.push(...page.items.map((owner) => owner.userId));
+      cursor = page.nextCursor ?? undefined;
+    } while (cursor);
+
+    expect(loaded[0]).toBe(SYNTHETIC_USER_ID);
+    expect(loaded).toHaveLength(105);
+    expect(new Set(loaded)).toHaveLength(105);
+    expect(loaded).not.toContain("30000000-0000-4000-8001-000000000105");
   });
 
   test("rejects a proposal idempotently without creating a formal action", async () => {

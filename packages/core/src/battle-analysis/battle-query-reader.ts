@@ -60,8 +60,14 @@ export interface BattleQueryReader {
     actor: ActorScope;
     entityId: string;
   }): Promise<BattleStateDetail>;
+  getVersion(input: {
+    actor: ActorScope;
+    entityId: string;
+    battleStateVersionId: string;
+  }): Promise<BattleStateDetail>;
   listMap(input: {
     actor: ActorScope;
+    entityId?: string;
     isT0?: boolean;
     quadrantCode?: string;
     dataSufficiency?: BattleDataSufficiency;

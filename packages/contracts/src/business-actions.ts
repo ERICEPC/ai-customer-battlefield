@@ -14,10 +14,12 @@ export const actionProposalRecordSchema = z
   .strictObject({
     proposalId: z.uuid(),
     entityId: z.uuid(),
+    entityName: z.string().trim().min(1).max(300),
     opportunityId: z.uuid().nullable(),
     title: z.string().trim().min(1).max(300),
     description: z.string().trim().min(1).max(5_000),
     suggestedOwnerId: z.uuid().nullable(),
+    suggestedOwnerName: z.string().trim().min(1).max(200).nullable(),
     suggestedPriority: prioritySchema,
     suggestedPlannedAt: z.iso.datetime().nullable(),
     sourceBattleStateVersionId: z.uuid(),
@@ -82,6 +84,21 @@ export const actionProposalPageSchema = z.strictObject({
   nextCursor: z.string().trim().min(1).max(4_096).nullable(),
 });
 
+export const actionOwnerOptionSchema = z.strictObject({
+  userId: z.uuid(),
+  displayName: z.string().trim().min(1).max(200),
+});
+
+export const actionOwnerListQuerySchema = z.strictObject({
+  cursor: z.string().trim().min(1).max(4_096).optional(),
+  limit: z.coerce.number().int().min(1).max(100).optional(),
+});
+
+export const actionOwnerPageSchema = z.strictObject({
+  items: z.array(actionOwnerOptionSchema).max(100),
+  nextCursor: z.string().trim().min(1).max(4_096).nullable(),
+});
+
 export const acceptActionProposalRequestSchema = z.strictObject({
   versionNo: versionNoSchema,
   title: z.string().trim().min(1).max(300),
@@ -124,10 +141,12 @@ export const businessActionRecordSchema = z
   .strictObject({
     actionId: z.uuid(),
     entityId: z.uuid(),
+    entityName: z.string().trim().min(1).max(300),
     opportunityId: z.uuid().nullable(),
     title: z.string().trim().min(1).max(300),
     description: z.string().trim().min(1).max(5_000),
     ownerUserId: z.uuid(),
+    ownerName: z.string().trim().min(1).max(200),
     priority: prioritySchema,
     status: businessActionStatusSchema,
     plannedAt: z.iso.datetime(),
@@ -212,6 +231,9 @@ export const actionApiErrorSchema = z.strictObject({
 });
 
 export type ActionProposalRecord = z.infer<typeof actionProposalRecordSchema>;
+export type ActionOwnerOption = z.infer<typeof actionOwnerOptionSchema>;
+export type ActionOwnerListQuery = z.infer<typeof actionOwnerListQuerySchema>;
+export type ActionOwnerPage = z.infer<typeof actionOwnerPageSchema>;
 export type ActionProposalListQuery = z.infer<
   typeof actionProposalListQuerySchema
 >;

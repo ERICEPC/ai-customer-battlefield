@@ -214,6 +214,7 @@ const booleanQuerySchema = z.preprocess((value) => {
 }, z.boolean());
 
 export const battleMapQuerySchema = z.strictObject({
+  entityId: z.uuid().optional(),
   isT0: booleanQuerySchema.optional(),
   quadrantCode: codeSchema.optional(),
   dataSufficiency: battleDataSufficiencySchema.optional(),
