@@ -71,9 +71,9 @@ Analysis requests accept an entity ID plus an optional expected input watermark.
 
 Tables: `analysis_runs`, `business_signals`, `battle_state_versions`, `battle_state_current`, `battle_state_evidence_links`, `action_proposals`, `business_actions`, and `action_status_history`. Reuse existing `idempotency_records`, `audit_entries`, `domain_events`, and `outbox_messages` rather than creating feature-specific duplicates.
 
-- [ ] Prove RED for cross-tenant references, score/risk/sufficiency/status checks, immutable version numbering, one current projection per entity, evidence XOR/uniqueness, stale watermark protection, proposal expiry/terminal metadata, one action per accepted proposal, action owner tenant safety, and valid action transitions.
-- [ ] Implement composite foreign keys, forced RLS, FK-side indexes, current-map/filter indexes, pending-proposal indexes, owner/due-action indexes, and immutable-history constraints.
-- [ ] Keep `battle_state_current` replaceable and derived; do not use triggers to hide application decisions or model rules.
+- [x] Prove RED for cross-tenant references, score/risk/sufficiency/status checks, immutable version numbering, one current projection per entity, evidence XOR/uniqueness, stale watermark protection, proposal expiry/terminal metadata, one action per accepted proposal, action owner tenant safety, and valid action transitions.
+- [x] Implement composite foreign keys, forced RLS, FK-side indexes, current-map/filter indexes, pending-proposal indexes, owner/due-action indexes, and immutable-history constraints.
+- [x] Keep `battle_state_current` replaceable and derived; do not use triggers to hide application decisions or model rules.
 - [ ] Extend real PostgreSQL 18 assertions and migration transaction smoke tests; commit `feat: add battle analysis and action schema`.
 
 ### Task 3: Kysely analysis persistence and separate action decision transactions

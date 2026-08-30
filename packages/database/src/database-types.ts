@@ -21,6 +21,11 @@ type NullableJsonObject = ColumnType<
   Record<string, unknown> | string | null | undefined,
   Record<string, unknown> | string | null
 >;
+type JsonStringArray = ColumnType<
+  string[],
+  string[] | string | undefined,
+  string[] | string
+>;
 type VersionNumber = ColumnType<
   string,
   bigint | number | string | undefined,
@@ -383,6 +388,131 @@ export interface OutboxMessageTable {
   created_at: Timestamp;
 }
 
+export interface AnalysisRunTable {
+  tenant_id: string;
+  id: Generated<string>;
+  entity_id: string;
+  trigger_event_id: string | null;
+  rule_version: string;
+  analyzer_config_version: string;
+  input_version: string;
+  status: Generated<"running" | "completed" | "failed" | "superseded">;
+  error_code: NullableText;
+  error_message: NullableText;
+  started_at: Timestamp;
+  finished_at: NullableTimestamp;
+  created_by: string;
+  created_at: Timestamp;
+}
+
+export interface BusinessSignalTable {
+  tenant_id: string;
+  id: Generated<string>;
+  entity_id: string;
+  fact_id: string;
+  analysis_run_id: string;
+  dimension: "relationship" | "potential" | "risk" | "stage";
+  direction: "positive" | "negative" | "neutral";
+  strength: number;
+  reason: string;
+  created_at: Timestamp;
+}
+
+export interface BattleStateVersionTable {
+  tenant_id: string;
+  id: Generated<string>;
+  entity_id: string;
+  version_no: VersionNumber;
+  input_version: string;
+  relationship_score: NullableDecimal;
+  potential_score: NullableDecimal;
+  quadrant_code: NullableText;
+  primary_opportunity_id: string | null;
+  risk_level: "low" | "medium" | "high" | "critical";
+  data_sufficiency: "insufficient" | "partial" | "sufficient";
+  data_gaps: JsonStringArray;
+  summary: string;
+  analysis_run_id: string;
+  effective_at: Timestamp;
+  created_at: Timestamp;
+}
+
+export interface BattleStateCurrentTable {
+  tenant_id: string;
+  entity_id: string;
+  battle_state_version_id: string;
+  version_no: VersionNumber;
+  input_version: string;
+  updated_at: Timestamp;
+}
+
+export interface BattleStateEvidenceLinkTable {
+  tenant_id: string;
+  id: Generated<string>;
+  entity_id: string;
+  battle_state_version_id: string;
+  fact_id: string | null;
+  signal_id: string | null;
+  contribution: string;
+  created_at: Timestamp;
+}
+
+export interface ActionProposalTable {
+  tenant_id: string;
+  id: Generated<string>;
+  entity_id: string;
+  opportunity_id: string | null;
+  title: string;
+  description: string;
+  suggested_owner_id: string | null;
+  suggested_priority: "low" | "medium" | "high" | "urgent";
+  suggested_planned_at: NullableTimestamp;
+  source_battle_state_version_id: string;
+  status: Generated<
+    "pending_confirmation" | "accepted" | "rejected" | "expired"
+  >;
+  version_no: VersionNumber;
+  proposed_at: Timestamp;
+  expires_at: Timestamp;
+  decided_at: NullableTimestamp;
+  decided_by: string | null;
+  decision_reason: NullableText;
+  created_at: Timestamp;
+  updated_at: Timestamp;
+}
+
+export interface BusinessActionTable {
+  tenant_id: string;
+  id: Generated<string>;
+  entity_id: string;
+  opportunity_id: string | null;
+  title: string;
+  description: string;
+  owner_user_id: string;
+  priority: "low" | "medium" | "high" | "urgent";
+  status: Generated<"planned" | "in_progress" | "completed" | "cancelled">;
+  planned_at: Timestamp;
+  completed_at: NullableTimestamp;
+  source_proposal_id: string;
+  confirmed_by: string;
+  confirmed_at: Timestamp;
+  version_no: VersionNumber;
+  created_at: Timestamp;
+  updated_at: Timestamp;
+}
+
+export interface ActionStatusHistoryTable {
+  tenant_id: string;
+  id: Generated<string>;
+  action_id: string;
+  from_status: NullableText;
+  to_status: "planned" | "in_progress" | "completed" | "cancelled";
+  changed_by: string;
+  reason: NullableText;
+  changed_at: Timestamp;
+  version_no: VersionNumber;
+}
+
 export interface BattlefieldDatabase {
   "app.tenants": TenantTable;
   "app.org_units": OrgUnitTable;
@@ -411,4 +541,12 @@ export interface BattlefieldDatabase {
   "app.audit_entries": AuditEntryTable;
   "app.domain_events": DomainEventTable;
   "app.outbox_messages": OutboxMessageTable;
+  "app.analysis_runs": AnalysisRunTable;
+  "app.business_signals": BusinessSignalTable;
+  "app.battle_state_versions": BattleStateVersionTable;
+  "app.battle_state_current": BattleStateCurrentTable;
+  "app.battle_state_evidence_links": BattleStateEvidenceLinkTable;
+  "app.action_proposals": ActionProposalTable;
+  "app.business_actions": BusinessActionTable;
+  "app.action_status_history": ActionStatusHistoryTable;
 }
