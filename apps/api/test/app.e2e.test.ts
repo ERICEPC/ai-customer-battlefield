@@ -47,7 +47,10 @@ describe("public API v1", () => {
       .post("/api/v1/followup-drafts")
       .set("x-tenant-id", "tenant-demo")
       .set("x-user-id", "user-demo")
-      .send({ rawInput: "客户确认预算，下一步提交方案" })
+      .send({
+        entityId: "50000000-0000-4000-8000-000000000001",
+        rawInput: "客户确认预算，下一步提交方案",
+      })
       .expect(201);
 
     const draft = followupDraftResponseSchema.parse(response.body);
@@ -67,7 +70,10 @@ describe("public API v1", () => {
       .post("/api/v1/followup-drafts")
       .set("x-tenant-id", "tenant-demo")
       .set("x-user-id", "user-demo")
-      .send({ rawInput: "   " })
+      .send({
+        entityId: "50000000-0000-4000-8000-000000000001",
+        rawInput: "   ",
+      })
       .expect(400);
   });
 });

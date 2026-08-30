@@ -1,4 +1,5 @@
 export * from "./business-entities/index.js";
+export * from "./followup-confirmation/index.js";
 export {
   type Clock,
   CreateFollowupDraft,

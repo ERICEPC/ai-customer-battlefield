@@ -9,9 +9,25 @@ export {
   businessEntityStatusSchema,
 } from "./business-entities.js";
 export {
+  type ConfirmFollowupDraftRequest,
   type CreateFollowupDraftRequest,
+  cancelFollowupDraftRequestSchema,
+  confirmFollowupDraftRequestSchema,
   createFollowupDraftRequestSchema,
+  type FollowupConfirmationResponse,
+  type FollowupDraftCandidate,
   type FollowupDraftResponse,
+  type FollowupFactCandidate,
+  type FollowupType,
+  followupApiErrorSchema,
+  followupConfirmationResponseSchema,
+  followupDraftCandidateSchema,
   followupDraftResponseSchema,
+  followupDraftStatusSchema,
+  followupFactCandidateSchema,
+  followupTypeSchema,
+  idempotencyKeySchema,
+  type ReviseFollowupDraftRequest,
+  reviseFollowupDraftRequestSchema,
 } from "./followup-draft.js";
 export { type HealthResponse, healthResponseSchema } from "./health.js";

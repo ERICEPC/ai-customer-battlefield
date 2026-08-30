@@ -15,10 +15,13 @@ type CreateDraft = (
 
 interface FollowupDraftFormProps {
   createDraft?: CreateDraft;
+  entityId?: string;
 }
 
 export function FollowupDraftForm({
   createDraft = createFollowupDraftViaApi,
+  entityId = process.env.NEXT_PUBLIC_DEV_ENTITY_ID ??
+    "50000000-0000-4000-8000-000000000001",
 }: FollowupDraftFormProps) {
   const [rawInput, setRawInput] = useState("");
   const [draft, setDraft] = useState<FollowupDraftResponse | null>(null);
@@ -37,7 +40,10 @@ export function FollowupDraftForm({
     setIsSubmitting(true);
     setHasError(false);
     try {
-      const nextDraft = await createDraft({ rawInput: rawInput.trim() });
+      const nextDraft = await createDraft({
+        entityId,
+        rawInput: rawInput.trim(),
+      });
       setDraft(nextDraft);
     } catch {
       setHasError(true);

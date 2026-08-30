@@ -44,7 +44,11 @@ export class FollowupDraftsController {
 
     const draft = await this.createFollowupDraft.execute({
       actor: { tenantId, userId },
+      entityId: parsedRequest.data.entityId,
       rawInput: parsedRequest.data.rawInput,
+      ...(parsedRequest.data.occurredAt
+        ? { occurredAt: parsedRequest.data.occurredAt }
+        : {}),
     });
 
     return followupDraftResponseSchema.parse(draft);

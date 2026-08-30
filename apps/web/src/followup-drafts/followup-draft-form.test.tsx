@@ -7,14 +7,26 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { FollowupDraftForm } from "./followup-draft-form";
 
 const returnedDraft: FollowupDraftResponse = {
-  draftId: "draft-001",
+  draftId: "70000000-0000-4000-8000-000000000001",
   status: "pending_confirmation",
   rawInput: "客户确认预算，下一步提交方案",
   candidate: {
+    entityId: "50000000-0000-4000-8000-000000000001",
     summary: "客户已确认预算，下一步提交方案",
+    occurredAt: "2026-08-31T02:30:00.000Z",
+    followupType: "other",
     relatedOpportunityIds: [],
+    primaryOpportunityId: null,
+    facts: [],
   },
+  versionNo: "1",
   createdAt: "2026-08-31T02:30:00.000Z",
+  updatedAt: "2026-08-31T02:30:00.000Z",
+  expiresAt: "2026-09-07T02:30:00.000Z",
+  confirmedAt: null,
+  confirmedBy: null,
+  cancelledAt: null,
+  followupId: null,
 };
 
 afterEach(cleanup);
@@ -38,6 +50,7 @@ describe("FollowupDraftForm", () => {
     await screen.findByText(returnedDraft.candidate.summary);
     expect(createDraft).toHaveBeenCalledTimes(1);
     expect(createDraft).toHaveBeenCalledWith({
+      entityId: "50000000-0000-4000-8000-000000000001",
       rawInput: "客户确认预算，下一步提交方案",
     });
   });

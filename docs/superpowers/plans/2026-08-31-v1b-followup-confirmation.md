@@ -56,10 +56,10 @@ Create receives `entityId`, `rawInput`, and optional `occurredAt`; PATCH receive
 - Create: `packages/core/src/followup-confirmation/manage-followup-drafts.test.ts`
 - Modify: package indexes
 
-- [ ] Write contract tests for UUID entity IDs, ISO timestamps, candidate facts, strict unknown-field rejection, optimistic versions, idempotency keys, terminal responses, and stable error payloads.
-- [ ] Write core tests proving Agent output is normalized outside persistence; create persists only after Agent success; revision/cancel/confirm call one deep port with actor/version/idempotency; invalid transitions and stale versions surface typed domain errors.
-- [ ] Implement the smallest schemas, ports, use cases, and typed errors that make focused tests pass without importing Kysely, NestJS, Next.js, or provider SDKs.
-- [ ] Run both package test/typecheck/build suites and commit `feat: define persistent follow-up confirmation contract`.
+- [x] Write contract tests for UUID entity IDs, ISO timestamps, candidate facts, strict unknown-field rejection, optimistic versions, idempotency keys, terminal responses, and stable error payloads.
+- [x] Write core tests proving Agent output is normalized outside persistence; create persists only after Agent success; revision/cancel/confirm call one deep port with actor/version/idempotency; invalid transitions and stale versions surface typed domain errors.
+- [x] Implement the smallest schemas, ports, use cases, and typed errors that make focused tests pass without importing Kysely, NestJS, Next.js, or provider SDKs.
+- [x] Run both package test/typecheck/build suites and commit `feat: define persistent follow-up confirmation contract`.
 
 ### Task 2: `0003_followup_confirmation` schema and invariants
 
