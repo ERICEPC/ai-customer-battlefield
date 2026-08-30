@@ -152,7 +152,7 @@ pnpm --filter @battlefield/database build
 
 Expected: all exit 0 with no warnings.
 
-- [ ] **Step 6: Commit and push**
+- [x] **Step 6: Commit and push**
 
 ```bash
 git add packages/database pnpm-workspace.yaml pnpm-lock.yaml
@@ -187,7 +187,7 @@ export async function withTenantTransaction<T>(
 ): Promise<T>;
 ```
 
-- [ ] **Step 1: Write failing migration tests**
+- [x] **Step 1: Write failing migration tests**
 
 Tests must prove these behaviors against a real PGlite database:
 
@@ -199,13 +199,13 @@ Tests must prove these behaviors against a real PGlite database:
 
 The mutations caught are missing composite FKs, missing partial uniqueness, or permissive RLS.
 
-- [ ] **Step 2: Run focused tests and verify RED**
+- [x] **Step 2: Run focused tests and verify RED**
 
 Run: `pnpm --filter @battlefield/database test -- foundation-migration.test.ts tenant-session.test.ts`
 
 Expected: FAIL because the migration and tenant-session implementation do not exist.
 
-- [ ] **Step 3: Implement `0001_foundation.sql`**
+- [x] **Step 3: Implement `0001_foundation.sql`**
 
 Create schemas `app` and `app_meta`; functions `app.current_tenant_id()` and `app.current_user_id()` read transaction-local settings with `missing_ok=true`. Create the five tables with UUID IDs, `timestamptz`, lower-case identifiers, check constraints, composite `(tenant_id,id)` unique keys, FK-side indexes, and partial active-membership uniqueness.
 
@@ -218,11 +218,11 @@ with check (tenant_id = app.current_tenant_id())
 
 No context must evaluate to null/false. The migration role can seed tenants; the runtime role receives only schema usage and required DML grants in deployment setup, not ownership.
 
-- [ ] **Step 4: Implement transaction-local actor context**
+- [x] **Step 4: Implement transaction-local actor context**
 
 Inside one Kysely transaction call `set_config('app.current_tenant_id', tenantId, true)`, `set_config('app.current_user_id', userId, true)`, and `set_config('app.request_id', requestId, true)` before invoking `work`. Validate every ID as UUID before opening the transaction.
 
-- [ ] **Step 5: Verify GREEN**
+- [x] **Step 5: Verify GREEN**
 
 Run the two focused tests, then `pnpm --filter @battlefield/database test && pnpm --filter @battlefield/database typecheck`.
 

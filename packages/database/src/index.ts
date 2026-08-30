@@ -7,6 +7,14 @@ export type {
   MigrationDriver,
   MigrationTransaction,
 } from "./database-handle.js";
+export type {
+  BattlefieldDatabase,
+  ChannelAddressTable,
+  OrgUnitTable,
+  TenantTable,
+  UserMembershipTable,
+  UserTable,
+} from "./database-types.js";
 export {
   MigrationFailedError,
   MigrationHistoryError,
@@ -17,3 +25,8 @@ export {
   SqlFileMigrationProvider,
   type SqlMigration,
 } from "./migration-provider.js";
+export {
+  type ActorDatabaseContext,
+  InvalidActorDatabaseContextError,
+  withTenantTransaction,
+} from "./tenant-session.js";
