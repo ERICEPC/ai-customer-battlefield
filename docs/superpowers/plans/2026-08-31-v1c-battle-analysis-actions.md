@@ -87,7 +87,7 @@ Tables: `analysis_runs`, `business_signals`, `battle_state_versions`, `battle_st
 - [x] Implement analysis start/failure/completion without keeping a transaction open across analyzer work. On completion, lock the entity/current projection, compare the fact watermark, append results, and update the projection only when current.
 - [x] Write acceptance/rejection integration tests for fixed lock order, editable accepted fields, same-tenant owner, expiry, optimistic conflict, request-hash idempotency, terminal repeat, rollback on Outbox failure, and no cross-tenant visibility.
 - [x] Implement formal action creation plus initial status history/audit/event/Outbox in one short transaction; rejected proposals never create actions.
-- [ ] Run PGlite and PostgreSQL transaction verification; commit `feat: persist battle states and confirmed actions`.
+- [x] Run PGlite and PostgreSQL transaction verification; commit `feat: persist battle states and confirmed actions`.
 
 ### Task 4: Analysis, map, proposal, and action REST APIs
 
@@ -95,11 +95,11 @@ Tables: `analysis_runs`, `business_signals`, `battle_state_versions`, `battle_st
 - Create/modify NestJS modules under `apps/api/src/battle-analysis`, `battle-map`, and `business-actions`
 - Create/modify real Nest + PGlite E2E tests
 
-- [ ] Write E2E tests for request analysis, retrieve current/evidence, map pagination/filtering, proposal queue/detail, accept/reject idempotency, formal action retrieval/transition, malformed IDs, missing actor, stale versions, terminal conflicts, and tenant isolation.
-- [ ] Add a deterministic development analyzer behind the core analyzer interface. It must use synthetic, explicit rules and expose its fixed rule/config version; no provider SDK enters controllers or transactions.
-- [ ] Map typed failures to stable 400/404/409/422 error contracts without leaking SQL, prompts, or evidence text.
-- [ ] Keep production fail-closed when required database/analyzer/auth adapters are unavailable.
-- [ ] Run API and full repository verification; commit `feat: expose battle analysis and action api`.
+- [x] Write E2E tests for request analysis, retrieve current/evidence, map pagination/filtering, proposal queue/detail, accept/reject idempotency, formal action retrieval/transition, malformed IDs, missing actor, stale versions, terminal conflicts, and tenant isolation.
+- [x] Add a deterministic development analyzer behind the core analyzer interface. It must use synthetic, explicit rules and expose its fixed rule/config version; no provider SDK enters controllers or transactions.
+- [x] Map typed failures to stable 400/404/409/422 error contracts without leaking SQL, prompts, or evidence text.
+- [x] Keep production fail-closed when required database/analyzer/auth adapters are unavailable.
+- [x] Run API and full repository verification; commit `feat: expose battle analysis and action api`.
 
 ### Task 5: Native battle map and action confirmation Web flows
 

@@ -189,6 +189,24 @@ export const battleStateRecordSchema = z
     }
   });
 
+export const battleEvidenceFactSchema = z.strictObject({
+  factId: z.uuid(),
+  factType: codeSchema,
+  factValue: z.string().trim().min(1).max(10_000),
+  occurredAt: z.iso.datetime(),
+  opportunityId: z.uuid().nullable(),
+});
+
+export const battleSignalRecordSchema = battleSignalCandidateSchema.extend({
+  signalId: z.uuid(),
+});
+
+export const battleStateDetailSchema = z.strictObject({
+  state: battleStateRecordSchema,
+  evidenceFacts: z.array(battleEvidenceFactSchema).max(500),
+  signals: z.array(battleSignalRecordSchema).max(500),
+});
+
 const booleanQuerySchema = z.preprocess((value) => {
   if (value === "true") return true;
   if (value === "false") return false;
@@ -223,6 +241,9 @@ export type BattleAnalysisCandidate = z.infer<
 export type BattleAnalysisRequest = z.infer<typeof battleAnalysisRequestSchema>;
 export type BattleAnalysisResult = z.infer<typeof battleAnalysisResultSchema>;
 export type BattleStateRecord = z.infer<typeof battleStateRecordSchema>;
+export type BattleEvidenceFact = z.infer<typeof battleEvidenceFactSchema>;
+export type BattleSignalRecord = z.infer<typeof battleSignalRecordSchema>;
+export type BattleStateDetail = z.infer<typeof battleStateDetailSchema>;
 export type BattleMapQuery = z.infer<typeof battleMapQuerySchema>;
 export type BattleMapItem = z.infer<typeof battleMapItemSchema>;
 export type BattleMapPage = z.infer<typeof battleMapPageSchema>;

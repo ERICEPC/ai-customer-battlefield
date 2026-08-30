@@ -6,6 +6,7 @@ import {
   battleAnalysisResultSchema,
   battleMapPageSchema,
   battleMapQuerySchema,
+  battleStateDetailSchema,
   battleStateRecordSchema,
 } from "./battle-analysis.js";
 
@@ -198,5 +199,48 @@ describe("battle analysis contracts", () => {
         nextCursor: null,
       }).items[0]?.state,
     ).toBeNull();
+  });
+
+  it("returns evidence facts and signals in a bounded current-state detail", () => {
+    expect(
+      battleStateDetailSchema.parse({
+        state: {
+          battleStateVersionId: stateId,
+          entityId,
+          versionNo: "2",
+          inputVersion: "a".repeat(64),
+          relationshipScore: "72.50",
+          potentialScore: "81.00",
+          quadrantCode: "high_relationship_high_potential",
+          primaryOpportunityId: null,
+          riskLevel: "medium",
+          dataSufficiency: "sufficient",
+          dataGaps: [],
+          summary: "关系稳定，潜力较高。",
+          analysisRunId: runId,
+          effectiveAt: "2026-08-31T03:00:02.000Z",
+          evidenceFactIds: [factId],
+        },
+        evidenceFacts: [
+          {
+            factId,
+            factType: "budget_status",
+            factValue: "预算已确认",
+            occurredAt: "2026-08-31T02:30:00.000Z",
+            opportunityId: null,
+          },
+        ],
+        signals: [
+          {
+            signalId: "c0000000-0000-4000-8000-000000000001",
+            factId,
+            dimension: "potential",
+            direction: "positive",
+            strength: 80,
+            reason: "客户已确认预算。",
+          },
+        ],
+      }).signals,
+    ).toHaveLength(1);
   });
 });

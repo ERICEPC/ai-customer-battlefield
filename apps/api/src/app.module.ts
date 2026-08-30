@@ -1,11 +1,18 @@
 import { Module } from "@nestjs/common";
 
+import { BattleAnalysisModule } from "./battle-analysis/battle-analysis.module.js";
+import { BusinessActionsModule } from "./business-actions/business-actions.module.js";
 import { BusinessEntitiesModule } from "./business-entities/business-entities.module.js";
 import { FollowupDraftsModule } from "./followup-drafts/followup-drafts.module.js";
 import { HealthController } from "./health/health.controller.js";
 
 @Module({
-  imports: [BusinessEntitiesModule, FollowupDraftsModule],
+  imports: [
+    BusinessEntitiesModule,
+    FollowupDraftsModule,
+    BattleAnalysisModule,
+    BusinessActionsModule,
+  ],
   controllers: [HealthController],
 })
 export class AppModule {}

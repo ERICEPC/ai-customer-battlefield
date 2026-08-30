@@ -43,6 +43,13 @@ export class InvalidBattleAnalysisCandidateError extends Error {
   }
 }
 
+export class BattleAnalyzerExecutionError extends Error {
+  constructor(options?: ErrorOptions) {
+    super("Battle analyzer failed to produce a result.", options);
+    this.name = "BattleAnalyzerExecutionError";
+  }
+}
+
 export class RequestBattleAnalysis {
   constructor(
     private readonly dependencies: {
@@ -101,7 +108,10 @@ export class RequestBattleAnalysis {
         errorCode: invalid ? "INVALID_ANALYSIS_OUTPUT" : "ANALYZER_FAILED",
         finishedAt: this.dependencies.clock.now().toISOString(),
       });
-      throw error;
+      if (invalid) {
+        throw error;
+      }
+      throw new BattleAnalyzerExecutionError({ cause: error });
     }
 
     return this.dependencies.store.complete({

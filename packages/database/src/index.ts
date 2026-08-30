@@ -1,9 +1,17 @@
 export { KyselyActionDecisionStore } from "./action-decisions/kysely-action-decision-store.js";
 export {
+  KyselyActionQueryReader,
+  type KyselyActionQueryReaderOptions,
+} from "./action-decisions/kysely-action-query-reader.js";
+export {
   KyselyBattleAnalysisStore,
   type KyselyBattleAnalysisStoreOptions,
   KyselyConfirmedFactSnapshotReader,
 } from "./battle-analysis/kysely-battle-analysis-store.js";
+export {
+  KyselyBattleQueryReader,
+  type KyselyBattleQueryReaderOptions,
+} from "./battle-analysis/kysely-battle-query-reader.js";
 export {
   KyselyBusinessEntityReader,
   type KyselyBusinessEntityReaderOptions,

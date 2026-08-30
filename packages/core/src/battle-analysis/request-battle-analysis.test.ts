@@ -7,6 +7,7 @@ import type {
 } from "./battle-analysis-store.js";
 import {
   type BattleAnalysisInputChangedError,
+  type BattleAnalyzerExecutionError,
   InvalidBattleAnalysisCandidateError,
   RequestBattleAnalysis,
 } from "./request-battle-analysis.js";
@@ -194,9 +195,12 @@ describe("RequestBattleAnalysis", () => {
     });
     const { subject } = useCase(parts);
 
-    await expect(subject.execute({ actor, entityId })).rejects.toBe(
-      modelFailure,
-    );
+    await expect(
+      subject.execute({ actor, entityId }),
+    ).rejects.toMatchObject<BattleAnalyzerExecutionError>({
+      name: "BattleAnalyzerExecutionError",
+      cause: modelFailure,
+    });
     expect(parts.store.fail).toHaveBeenCalledWith({
       actor,
       analysisRunId,

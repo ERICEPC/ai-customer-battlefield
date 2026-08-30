@@ -4,10 +4,12 @@ import { sql } from "kysely";
 import { afterAll, beforeAll, describe, expect, test } from "vitest";
 
 import { KyselyActionDecisionStore } from "../src/action-decisions/kysely-action-decision-store.js";
+import { KyselyActionQueryReader } from "../src/action-decisions/kysely-action-query-reader.js";
 import {
   KyselyBattleAnalysisStore,
   KyselyConfirmedFactSnapshotReader,
 } from "../src/battle-analysis/kysely-battle-analysis-store.js";
+import { KyselyBattleQueryReader } from "../src/battle-analysis/kysely-battle-query-reader.js";
 import { KyselyBusinessEntityReader } from "../src/business-entities/kysely-business-entity-reader.js";
 import { createPostgresDatabase } from "../src/database-factory.js";
 import type { DatabaseHandle } from "../src/database-handle.js";
@@ -175,6 +177,23 @@ describe("PostgreSQL migrations", () => {
       plannedAt: "2026-09-03T09:00:00.000Z",
       decidedAt: "2026-08-31T02:38:00.000Z",
     });
+    const battleQueryReader = new KyselyBattleQueryReader(database.db);
+    const actionQueryReader = new KyselyActionQueryReader(database.db);
+    const [stateDetail, mapPage, proposalDetail, proposalPage, actionDetail, actionPage] =
+      await Promise.all([
+        battleQueryReader.getCurrent({
+          actor,
+          entityId: SYNTHETIC_ENTITY_ID,
+        }),
+        battleQueryReader.listMap({ actor, limit: 20 }),
+        actionQueryReader.getProposal({
+          actor,
+          proposalId: analysis.proposalIds[0],
+        }),
+        actionQueryReader.listProposals({ actor, limit: 20 }),
+        actionQueryReader.getAction({ actor, actionId: action.actionId }),
+        actionQueryReader.listActions({ actor, limit: 20 }),
+      ]);
     const confirmationCounts = await withTenantTransaction(
       database.db,
       {
@@ -226,6 +245,28 @@ describe("PostgreSQL migrations", () => {
     expect(confirmation.status).toBe("confirmed");
     expect(analysis.status).toBe("completed");
     expect(action.status).toBe("accepted");
+    expect(stateDetail.state.entityId).toBe(SYNTHETIC_ENTITY_ID);
+    expect(stateDetail.evidenceFacts).toHaveLength(1);
+    expect(stateDetail.signals).toHaveLength(1);
+    expect(mapPage.items.map((item) => item.entityId)).toEqual([
+      SYNTHETIC_ENTITY_ID,
+    ]);
+    expect(proposalDetail).toMatchObject({
+      proposalId: analysis.proposalIds[0],
+      status: "accepted",
+      actionId: action.actionId,
+    });
+    expect(proposalPage.items.map((item) => item.proposalId)).toEqual([
+      analysis.proposalIds[0],
+    ]);
+    expect(actionDetail).toMatchObject({
+      actionId: action.actionId,
+      status: "planned",
+      sourceProposalId: analysis.proposalIds[0],
+    });
+    expect(actionPage.items.map((item) => item.actionId)).toEqual([
+      action.actionId,
+    ]);
     expect(confirmationCounts).toEqual({
       action_count: 1,
       followup_count: 1,

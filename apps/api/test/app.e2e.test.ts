@@ -57,6 +57,17 @@ describe("public API v1", () => {
       .expect(503);
   });
 
+  it("fails closed when battle persistence is not configured", async () => {
+    await request(app.getHttpServer())
+      .post(
+        "/api/v1/business-entities/50000000-0000-4000-8000-000000000001/analysis-runs",
+      )
+      .set("x-tenant-id", "10000000-0000-4000-8000-000000000001")
+      .set("x-user-id", "30000000-0000-4000-8000-000000000001")
+      .send({})
+      .expect(503);
+  });
+
   it("rejects a draft request without development actor headers", async () => {
     await request(app.getHttpServer())
       .post("/api/v1/followup-drafts")

@@ -5,7 +5,11 @@ import {
   actionApiErrorSchema,
   actionDecisionResponseSchema,
   actionProposalListQuerySchema,
+  actionProposalPageSchema,
   actionProposalRecordSchema,
+  actionTransitionResponseSchema,
+  businessActionListQuerySchema,
+  businessActionPageSchema,
   businessActionRecordSchema,
   rejectActionProposalRequestSchema,
   transitionBusinessActionRequestSchema,
@@ -154,6 +158,48 @@ describe("business action contracts", () => {
     expect(
       actionProposalListQuerySchema.safeParse({ limit: 101 }).success,
     ).toBe(false);
+    expect(
+      actionProposalPageSchema.parse({ items: [proposal()], nextCursor: null })
+        .items,
+    ).toHaveLength(1);
+    expect(
+      businessActionListQuerySchema.parse({
+        status: "planned",
+        ownerUserId: actorId,
+        limit: "20",
+      }),
+    ).toEqual({ status: "planned", ownerUserId: actorId, limit: 20 });
+    expect(
+      businessActionPageSchema.parse({
+        items: [
+          {
+            actionId,
+            entityId,
+            opportunityId: null,
+            title: "提交正式解决方案",
+            description: "包含安全方案与实施排期。",
+            ownerUserId: actorId,
+            priority: "urgent",
+            status: "planned",
+            plannedAt: "2026-09-03T09:00:00.000Z",
+            completedAt: null,
+            sourceProposalId: proposalId,
+            confirmedBy: actorId,
+            confirmedAt: "2026-08-31T03:05:00.000Z",
+            versionNo: "1",
+          },
+        ],
+        nextCursor: null,
+      }).items,
+    ).toHaveLength(1);
+    expect(
+      actionTransitionResponseSchema.parse({
+        actionId,
+        status: "in_progress",
+        versionNo: "2",
+        changedAt: "2026-08-31T03:06:00.000Z",
+      }).status,
+    ).toBe("in_progress");
   });
 
   it("provides stable conflict codes without accepting arbitrary errors", () => {
