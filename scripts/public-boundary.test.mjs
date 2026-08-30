@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { existsSync, readFileSync } from "node:fs";
 import test from "node:test";
 
 import { findPublicBoundaryViolations } from "./public-boundary.mjs";
@@ -51,4 +52,25 @@ test("allows approved public project documents", () => {
   ];
 
   assert.deepEqual(findPublicBoundaryViolations(entries), []);
+});
+
+test("the public CI workflow runs every repository quality gate", () => {
+  const workflowPath = ".github/workflows/ci.yml";
+  assert.equal(existsSync(workflowPath), true, "the CI workflow must exist");
+
+  const workflow = readFileSync(workflowPath, "utf8");
+  const requiredCommands = [
+    "pnpm check:public",
+    "pnpm lint",
+    "pnpm typecheck",
+    "pnpm test",
+    "pnpm build",
+  ];
+
+  for (const command of requiredCommands) {
+    assert.match(
+      workflow,
+      new RegExp(`run: ${command.replace(":", "\\:")}(?:\\n|$)`),
+    );
+  }
 });

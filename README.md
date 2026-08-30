@@ -24,6 +24,23 @@ Requirements:
 After dependencies are installed:
 
 ```bash
+corepack enable
+corepack prepare pnpm@11.19.0 --activate
+pnpm install
+```
+
+Start the API and Web applications in separate terminals:
+
+```bash
+pnpm --filter @battlefield/api dev
+pnpm --filter @battlefield/web dev
+```
+
+The Web app runs at `http://localhost:3000` and the API at `http://localhost:3001`.
+
+Before opening a pull request:
+
+```bash
 pnpm test
 pnpm typecheck
 pnpm lint
@@ -37,6 +54,14 @@ pnpm check:public
 - [Business data model](docs/02-业务数据模型.md)
 - [Documentation index](docs/README.md)
 - [Foundation implementation plan](docs/superpowers/plans/2026-08-31-foundation-walking-skeleton.md)
+
+## Current scope
+
+The repository currently proves one vertical slice: raw sales follow-up input becomes a structured AI proposal that is visibly marked `pending_confirmation`. The development Agent is deterministic, making the slice runnable without a model account.
+
+Authentication, database persistence, confirmation-to-formal-record transactions, real model providers, notifications, and production deployment are intentionally outside this first milestone. Their future adapters must preserve the boundaries established here.
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) before proposing a change.
 
 ## Data safety
 
