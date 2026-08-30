@@ -4,6 +4,7 @@ import request from "supertest";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { AppModule } from "../src/app.module.js";
+import { DATABASE_HANDLE } from "../src/database/database.module.js";
 import { configureApp } from "../src/main.js";
 
 describe("public API v1", () => {
@@ -12,7 +13,10 @@ describe("public API v1", () => {
   beforeAll(async () => {
     const moduleRef = await Test.createTestingModule({
       imports: [AppModule],
-    }).compile();
+    })
+      .overrideProvider(DATABASE_HANDLE)
+      .useValue(null)
+      .compile();
     app = moduleRef.createNestApplication();
     configureApp(app);
     await app.init();
