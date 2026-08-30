@@ -87,7 +87,7 @@ Tables include sources, drafts, revisions, formal follow-ups, participants, oppo
 - [x] Implement create using a short persistence transaction after Agent output exists; store a source hash and revision zero without placing raw content in logs.
 - [x] Implement confirmation in the documented lock order. Create formal rows, minimal audit/event payloads, and an Outbox message in the same transaction; never call an external adapter.
 - [x] Prove a repeated key returns the original result while a different request using the same key fails; prove all written rows disappear when any transaction step fails.
-- [ ] Run database tests including PostgreSQL CI and commit `feat: persist confirmed follow-up facts atomically`.
+- [x] Run database tests including PostgreSQL CI and commit `feat: persist confirmed follow-up facts atomically`.
 
 ### Task 4: Persistent NestJS API
 
@@ -96,10 +96,10 @@ Tables include sources, drafts, revisions, formal follow-ups, participants, oppo
 - Create: `apps/api/src/followups/*`
 - Create/modify: API E2E tests
 
-- [ ] Write real Nest + PGlite E2E tests for create/get/revise/cancel/confirm/get-formal-record, missing actor, invalid IDs, missing idempotency key, stale version 409, terminal transition 409, and tenant isolation.
-- [ ] Inject the database store into core use cases while retaining an explicit unavailable adapter when no development database is configured; production remains fail-closed.
-- [ ] Map typed domain errors to stable `{ code, message, requestId, issues? }` responses without leaking SQL or raw evidence.
-- [ ] Run API E2E/typecheck/build and full repository regression; commit `feat: expose persistent follow-up confirmation api`.
+- [x] Write real Nest + PGlite E2E tests for create/get/revise/cancel/confirm/get-formal-record, missing actor, invalid IDs, missing idempotency key, stale version 409, terminal transition 409, and tenant isolation.
+- [x] Inject the database store into core use cases while retaining an explicit unavailable adapter when no development database is configured; production remains fail-closed.
+- [x] Map typed domain errors to stable `{ code, message, requestId, issues? }` responses without leaking SQL or raw evidence.
+- [x] Run API E2E/typecheck/build and full repository regression; commit `feat: expose persistent follow-up confirmation api`.
 
 ### Task 5: Web confirmation workbench
 

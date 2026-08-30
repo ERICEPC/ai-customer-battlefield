@@ -62,6 +62,20 @@ function store(overrides: Partial<FollowupConfirmationStore> = {}) {
       versionNo: "2",
       confirmedAt: now.toISOString(),
     }),
+    getFollowup: vi.fn().mockResolvedValue({
+      followupId: "80000000-0000-4000-8000-000000000001",
+      sourceDraftId: draftId,
+      entityId,
+      occurredAt: now.toISOString(),
+      followupType: "other",
+      summary: "客户确认预算",
+      submittedBy: actor.userId,
+      confirmedBy: actor.userId,
+      confirmedAt: now.toISOString(),
+      relatedOpportunityIds: [],
+      primaryOpportunityId: null,
+      facts: [],
+    }),
     ...overrides,
   } satisfies FollowupConfirmationStore;
 }

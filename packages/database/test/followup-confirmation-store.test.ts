@@ -210,6 +210,20 @@ describe("KyselyFollowupConfirmationStore", () => {
       followupId: confirmed.followupId,
       confirmedBy: actor.userId,
     });
+    expect(
+      await store.getFollowup({ actor, followupId: confirmed.followupId }),
+    ).toMatchObject({
+      followupId: confirmed.followupId,
+      sourceDraftId: DRAFT_ID,
+      entityId: ENTITY_ID,
+      facts: [
+        {
+          factType: "budget_status",
+          factValue: "预算已确认",
+          opportunityId,
+        },
+      ],
+    });
 
     const counts = await tableCounts(database, [
       "followups",

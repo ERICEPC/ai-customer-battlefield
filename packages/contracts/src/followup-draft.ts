@@ -137,9 +137,33 @@ export const followupConfirmationResponseSchema = z.strictObject({
   confirmedAt: z.iso.datetime(),
 });
 
+export const formalFollowupRecordSchema = z.strictObject({
+  followupId: z.uuid(),
+  sourceDraftId: z.uuid(),
+  entityId: z.uuid(),
+  occurredAt: z.iso.datetime(),
+  followupType: followupTypeSchema,
+  summary: z.string().trim().min(1).max(5_000),
+  submittedBy: z.uuid(),
+  confirmedBy: z.uuid(),
+  confirmedAt: z.iso.datetime(),
+  relatedOpportunityIds: z.array(z.uuid()).max(100),
+  primaryOpportunityId: z.uuid().nullable(),
+  facts: z
+    .array(
+      z.strictObject({
+        factType: factTypeSchema,
+        factValue: z.string().trim().min(1).max(5_000),
+        opportunityId: z.uuid().nullable(),
+      }),
+    )
+    .max(100),
+});
+
 export const followupApiErrorSchema = z.strictObject({
   code: z.enum([
     "DRAFT_NOT_FOUND",
+    "FOLLOWUP_NOT_FOUND",
     "DRAFT_VERSION_CONFLICT",
     "DRAFT_NOT_PENDING",
     "DRAFT_EXPIRED",
@@ -179,3 +203,4 @@ export type FollowupDraftResponse = z.infer<typeof followupDraftResponseSchema>;
 export type FollowupConfirmationResponse = z.infer<
   typeof followupConfirmationResponseSchema
 >;
+export type FormalFollowupRecord = z.infer<typeof formalFollowupRecordSchema>;

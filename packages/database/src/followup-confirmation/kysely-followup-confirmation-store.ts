@@ -7,6 +7,7 @@ import {
   FollowupDraftNotPendingError,
   FollowupDraftVersionConflictError,
   FollowupIdempotencyConflictError,
+  FollowupNotFoundError,
   FollowupRelatedRecordNotFoundError,
   InvalidFollowupDraftCandidateError,
   type PersistentFollowupDraft,
@@ -115,6 +116,75 @@ export class KyselyFollowupConfirmationStore
     );
   }
 
+  async getFollowup(
+    input: Parameters<FollowupConfirmationStore["getFollowup"]>[0],
+  ) {
+    return withTenantTransaction(
+      this.database,
+      { ...input.actor, requestId: input.followupId },
+      async (transaction) => {
+        const followup = await transaction
+          .selectFrom("app.followups")
+          .select([
+            "id",
+            "source_draft_id",
+            "entity_id",
+            "occurred_at",
+            "followup_type",
+            "summary",
+            "submitted_by",
+            "confirmed_by",
+            "confirmed_at",
+          ])
+          .where("tenant_id", "=", input.actor.tenantId)
+          .where("id", "=", input.followupId)
+          .executeTakeFirst();
+        if (!followup) {
+          throw new FollowupNotFoundError();
+        }
+        const opportunities = await transaction
+          .selectFrom("app.followup_opportunities")
+          .select(["opportunity_id", "is_primary"])
+          .where("tenant_id", "=", input.actor.tenantId)
+          .where("followup_id", "=", input.followupId)
+          .orderBy("is_primary", "desc")
+          .orderBy("opportunity_id")
+          .execute();
+        const facts = await transaction
+          .selectFrom("app.business_facts")
+          .select(["fact_type", "fact_value", "opportunity_id"])
+          .where("tenant_id", "=", input.actor.tenantId)
+          .where("followup_id", "=", input.followupId)
+          .orderBy("created_at")
+          .orderBy("id")
+          .execute();
+
+        return {
+          followupId: followup.id,
+          sourceDraftId: followup.source_draft_id,
+          entityId: followup.entity_id,
+          occurredAt: toIsoString(followup.occurred_at),
+          followupType: followup.followup_type,
+          summary: followup.summary,
+          submittedBy: followup.submitted_by,
+          confirmedBy: followup.confirmed_by,
+          confirmedAt: toIsoString(followup.confirmed_at),
+          relatedOpportunityIds: opportunities.map(
+            (opportunity) => opportunity.opportunity_id,
+          ),
+          primaryOpportunityId:
+            opportunities.find((opportunity) => opportunity.is_primary)
+              ?.opportunity_id ?? null,
+          facts: facts.map((fact) => ({
+            factType: fact.fact_type,
+            factValue: fact.fact_value,
+            opportunityId: fact.opportunity_id,
+          })),
+        };
+      },
+    );
+  }
+
   async revise(
     input: Parameters<FollowupConfirmationStore["revise"]>[0],
   ): Promise<PersistentFollowupDraft> {
@@ -179,7 +249,6 @@ export class KyselyFollowupConfirmationStore
           stableJson({
             draftId: input.draftId,
             versionNo: input.versionNo,
-            cancelledAt: input.cancelledAt,
           }),
         );
         const existing = await beginIdempotentOperation(transaction, {
@@ -254,7 +323,6 @@ export class KyselyFollowupConfirmationStore
           stableJson({
             draftId: input.draftId,
             versionNo: input.versionNo,
-            confirmedAt: input.confirmedAt,
           }),
         );
         const existing = await beginIdempotentOperation(transaction, {

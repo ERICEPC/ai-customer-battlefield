@@ -47,6 +47,25 @@ export interface FollowupConfirmationResult {
   confirmedAt: string;
 }
 
+export interface FormalFollowupRecord {
+  followupId: string;
+  sourceDraftId: string;
+  entityId: string;
+  occurredAt: string;
+  followupType: FollowupType;
+  summary: string;
+  submittedBy: string;
+  confirmedBy: string;
+  confirmedAt: string;
+  relatedOpportunityIds: string[];
+  primaryOpportunityId: string | null;
+  facts: Array<{
+    factType: string;
+    factValue: string;
+    opportunityId: string | null;
+  }>;
+}
+
 export interface FollowupConfirmationStore {
   create(input: {
     actor: ActorScope;
@@ -81,12 +100,23 @@ export interface FollowupConfirmationStore {
     idempotencyKey: string;
     confirmedAt: string;
   }): Promise<FollowupConfirmationResult>;
+  getFollowup(input: {
+    actor: ActorScope;
+    followupId: string;
+  }): Promise<FormalFollowupRecord>;
 }
 
 export class FollowupDraftNotFoundError extends Error {
   constructor() {
     super("Follow-up draft was not found.");
     this.name = "FollowupDraftNotFoundError";
+  }
+}
+
+export class FollowupNotFoundError extends Error {
+  constructor() {
+    super("Formal follow-up was not found.");
+    this.name = "FollowupNotFoundError";
   }
 }
 

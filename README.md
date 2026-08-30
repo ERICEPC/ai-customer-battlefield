@@ -88,7 +88,7 @@ Implemented today:
 - deterministic follow-up draft proposal that remains visibly `pending_confirmation`;
 - PGlite local tests and PostgreSQL 18 CI verification of the same SQL migrations.
 
-Still in progress for V1: the confirmation Store/API/Web transaction on top of `0003`, analysis and action loops, notifications, configurable prompts/models/rules, reports, management queries, import tools, production OIDC, and deploy/operations acceptance. Their adapters must preserve the boundaries established here.
+Still in progress for V1: the Web confirmation workbench on top of the completed `0003` Store/API transaction, analysis and action loops, notifications, configurable prompts/models/rules, reports, management queries, import tools, production OIDC, and deploy/operations acceptance. Their adapters must preserve the boundaries established here.
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) before proposing a change.
 

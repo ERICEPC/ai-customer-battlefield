@@ -18,8 +18,13 @@ export function configureApp(app: INestApplication): void {
   if (webOrigin) {
     app.enableCors({
       origin: webOrigin,
-      methods: ["GET", "POST"],
-      allowedHeaders: ["content-type", "x-tenant-id", "x-user-id"],
+      methods: ["GET", "POST", "PATCH"],
+      allowedHeaders: [
+        "content-type",
+        "idempotency-key",
+        "x-tenant-id",
+        "x-user-id",
+      ],
     });
   }
 }

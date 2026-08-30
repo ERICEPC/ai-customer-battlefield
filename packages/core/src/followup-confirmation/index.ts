@@ -8,8 +8,10 @@ export {
   FollowupDraftVersionConflictError,
   type FollowupFactCandidate,
   FollowupIdempotencyConflictError,
+  FollowupNotFoundError,
   FollowupRelatedRecordNotFoundError,
   type FollowupType,
+  type FormalFollowupRecord,
   type PersistentFollowupDraft,
   type PersistentFollowupDraftCandidate,
 } from "./followup-confirmation-store.js";
@@ -18,6 +20,7 @@ export {
   ConfirmFollowupDraft,
   CreatePersistentFollowupDraft,
   GetFollowupDraft,
+  GetFormalFollowup,
   InvalidFollowupDraftCandidateError,
   InvalidIdempotencyKeyError,
   ReviseFollowupDraft,

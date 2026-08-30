@@ -1,4 +1,3 @@
-import { followupDraftResponseSchema } from "@battlefield/contracts";
 import type { INestApplication } from "@nestjs/common";
 import { Test } from "@nestjs/testing";
 import request from "supertest";
@@ -42,20 +41,16 @@ describe("public API v1", () => {
     );
   });
 
-  it("returns an AI proposal as a pending-confirmation draft", async () => {
-    const response = await request(app.getHttpServer())
+  it("fails closed when follow-up persistence is not configured", async () => {
+    await request(app.getHttpServer())
       .post("/api/v1/followup-drafts")
-      .set("x-tenant-id", "tenant-demo")
-      .set("x-user-id", "user-demo")
+      .set("x-tenant-id", "10000000-0000-4000-8000-000000000001")
+      .set("x-user-id", "30000000-0000-4000-8000-000000000001")
       .send({
         entityId: "50000000-0000-4000-8000-000000000001",
         rawInput: "客户确认预算，下一步提交方案",
       })
-      .expect(201);
-
-    const draft = followupDraftResponseSchema.parse(response.body);
-    expect(draft.status).toBe("pending_confirmation");
-    expect(draft.rawInput).toBe("客户确认预算，下一步提交方案");
+      .expect(503);
   });
 
   it("rejects a draft request without development actor headers", async () => {
@@ -68,8 +63,8 @@ describe("public API v1", () => {
   it("rejects blank follow-up input", async () => {
     await request(app.getHttpServer())
       .post("/api/v1/followup-drafts")
-      .set("x-tenant-id", "tenant-demo")
-      .set("x-user-id", "user-demo")
+      .set("x-tenant-id", "10000000-0000-4000-8000-000000000001")
+      .set("x-user-id", "30000000-0000-4000-8000-000000000001")
       .send({
         entityId: "50000000-0000-4000-8000-000000000001",
         rawInput: "   ",

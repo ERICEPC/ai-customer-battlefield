@@ -10,6 +10,7 @@ import type {
 import type {
   FollowupConfirmationResult,
   FollowupConfirmationStore,
+  FormalFollowupRecord,
   PersistentFollowupDraft,
   PersistentFollowupDraftCandidate,
 } from "./followup-confirmation-store.js";
@@ -92,6 +93,17 @@ export class GetFollowupDraft {
     draftId: string;
   }): Promise<PersistentFollowupDraft> {
     return this.store.get(input);
+  }
+}
+
+export class GetFormalFollowup {
+  constructor(private readonly store: FollowupConfirmationStore) {}
+
+  async execute(input: {
+    actor: ActorScope;
+    followupId: string;
+  }): Promise<FormalFollowupRecord> {
+    return this.store.getFollowup(input);
   }
 }
 
