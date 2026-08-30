@@ -179,21 +179,27 @@ describe("PostgreSQL migrations", () => {
     });
     const battleQueryReader = new KyselyBattleQueryReader(database.db);
     const actionQueryReader = new KyselyActionQueryReader(database.db);
-    const [stateDetail, mapPage, proposalDetail, proposalPage, actionDetail, actionPage] =
-      await Promise.all([
-        battleQueryReader.getCurrent({
-          actor,
-          entityId: SYNTHETIC_ENTITY_ID,
-        }),
-        battleQueryReader.listMap({ actor, limit: 20 }),
-        actionQueryReader.getProposal({
-          actor,
-          proposalId: analysis.proposalIds[0],
-        }),
-        actionQueryReader.listProposals({ actor, limit: 20 }),
-        actionQueryReader.getAction({ actor, actionId: action.actionId }),
-        actionQueryReader.listActions({ actor, limit: 20 }),
-      ]);
+    const [
+      stateDetail,
+      mapPage,
+      proposalDetail,
+      proposalPage,
+      actionDetail,
+      actionPage,
+    ] = await Promise.all([
+      battleQueryReader.getCurrent({
+        actor,
+        entityId: SYNTHETIC_ENTITY_ID,
+      }),
+      battleQueryReader.listMap({ actor, limit: 20 }),
+      actionQueryReader.getProposal({
+        actor,
+        proposalId: analysis.proposalIds[0],
+      }),
+      actionQueryReader.listProposals({ actor, limit: 20 }),
+      actionQueryReader.getAction({ actor, actionId: action.actionId }),
+      actionQueryReader.listActions({ actor, limit: 20 }),
+    ]);
     const confirmationCounts = await withTenantTransaction(
       database.db,
       {
