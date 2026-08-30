@@ -18,10 +18,14 @@
   "scripts": {
     "prebuild": "pnpm --filter @battlefield/core build",
     "build": "tsc -p tsconfig.json",
+    "premigrate": "pnpm build",
+    "migrate": "node dist/cli/migrate.js",
     "pretypecheck": "pnpm --filter @battlefield/core build",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "pretest": "pnpm --filter @battlefield/core build",
-    "test": "vitest run"
+    "test": "vitest run --exclude test/postgres-migrations.postgres.test.ts",
+    "pretest:postgres": "pnpm --filter @battlefield/core build",
+    "test:postgres": "vitest run test/postgres-migrations.postgres.test.ts"
   },
   "dependencies": {
     "@battlefield/core": "workspace:*",

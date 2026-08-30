@@ -433,7 +433,7 @@ Use the deep-blue/white/gold tokens from `docs/03-UI与交互设计.md`. The dir
 
 Run the focused Web tests. Start API/Web with synthetic development seed, verify desktop and 390px layouts, keyboard focus, no horizontal overflow, loading/error/empty states, and tenant-scoped rows.
 
-- [ ] **Step 5: Commit and push**
+- [x] **Step 5: Commit and push**
 
 ```bash
 git add apps/web
@@ -453,11 +453,11 @@ pnpm check:public && git push origin main
 **Interfaces:**
 - Produces: CI evidence that migrations and repository behavior run on PostgreSQL 18; documents PostgreSQL 17+ compatibility and local PGlite setup.
 
-- [ ] **Step 1: Add PostgreSQL service to CI**
+- [x] **Step 1: Add PostgreSQL service to CI**
 
 Use `postgres:18-alpine` with a health check and job-level `DATABASE_URL`. Add an explicit `pnpm --filter @battlefield/database test:postgres` step before repository-wide tests. The database test script must create/drop its own schemas and must not depend on a pre-existing database.
 
-- [ ] **Step 2: Run fresh full local verification**
+- [x] **Step 2: Run fresh full local verification**
 
 ```bash
 pnpm install --frozen-lockfile
@@ -471,7 +471,7 @@ git diff --check
 
 Expected: exit 0; migration tests pass on PGlite; all existing 17 tests remain green plus the new suite.
 
-- [ ] **Step 3: Update documentation and public boundary**
+- [x] **Step 3: Update documentation and public boundary**
 
 Document local PGlite behavior, production `DATABASE_URL`, forward migration command, synthetic seed, and the explicit limitation that PGlite is not production. Remove the old README statement that persistence belongs only to a future milestone.
 
