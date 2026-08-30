@@ -9,6 +9,19 @@ import { AppModule } from "./app.module.js";
 
 export function configureApp(app: INestApplication): void {
   app.setGlobalPrefix("api/v1");
+
+  const webOrigin =
+    process.env.WEB_ORIGIN ??
+    (process.env.NODE_ENV === "production"
+      ? undefined
+      : "http://localhost:3000");
+  if (webOrigin) {
+    app.enableCors({
+      origin: webOrigin,
+      methods: ["GET", "POST"],
+      allowedHeaders: ["content-type", "x-tenant-id", "x-user-id"],
+    });
+  }
 }
 
 async function bootstrap(): Promise<void> {

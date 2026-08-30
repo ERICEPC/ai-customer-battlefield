@@ -30,6 +30,18 @@ describe("public API v1", () => {
       .expect({ status: "ok" });
   });
 
+  it("allows the configured Web origin without opening CORS to every site", async () => {
+    const response = await request(app.getHttpServer())
+      .options("/api/v1/followup-drafts")
+      .set("origin", "http://localhost:3000")
+      .set("access-control-request-method", "POST")
+      .expect(204);
+
+    expect(response.headers["access-control-allow-origin"]).toBe(
+      "http://localhost:3000",
+    );
+  });
+
   it("returns an AI proposal as a pending-confirmation draft", async () => {
     const response = await request(app.getHttpServer())
       .post("/api/v1/followup-drafts")
