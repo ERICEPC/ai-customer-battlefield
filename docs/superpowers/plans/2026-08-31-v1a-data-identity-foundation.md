@@ -475,7 +475,7 @@ Expected: exit 0; migration tests pass on PGlite; all existing 17 tests remain g
 
 Document local PGlite behavior, production `DATABASE_URL`, forward migration command, synthetic seed, and the explicit limitation that PGlite is not production. Remove the old README statement that persistence belongs only to a future milestone.
 
-- [ ] **Step 4: Commit, push, and verify Actions**
+- [x] **Step 4: Commit, push, and verify Actions**
 
 ```bash
 git add .github README.md docs packages apps pnpm-lock.yaml
