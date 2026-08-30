@@ -15,8 +15,8 @@ export interface ListBusinessEntitiesInput {
 }
 
 export class InvalidBusinessEntityListInputError extends Error {
-  constructor() {
-    super("Business entity list filters are invalid.");
+  constructor(options?: ErrorOptions) {
+    super("Business entity list filters are invalid.", options);
     this.name = "InvalidBusinessEntityListInputError";
   }
 }

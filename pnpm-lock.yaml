@@ -29,6 +29,9 @@ importers:
       '@battlefield/core':
         specifier: workspace:*
         version: link:../../packages/core
+      '@battlefield/database':
+        specifier: workspace:*
+        version: link:../../packages/database
       '@nestjs/common':
         specifier: ^12.0.1
         version: 12.0.1(reflect-metadata@0.2.2)(rxjs@7.8.2)
@@ -51,6 +54,9 @@ importers:
       '@types/supertest':
         specifier: ^7.2.1
         version: 7.2.1
+      kysely:
+        specifier: ^0.29.5
+        version: 0.29.5
       supertest:
         specifier: ^7.2.2
         version: 7.2.2
@@ -99,6 +105,9 @@ importers:
 
   packages/database:
     dependencies:
+      '@battlefield/core':
+        specifier: workspace:*
+        version: link:../core
       kysely:
         specifier: ^0.29.5
         version: 0.29.5

@@ -4,19 +4,20 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "predev": "pnpm --filter @battlefield/contracts build && pnpm --filter @battlefield/core build",
+    "predev": "pnpm --filter @battlefield/contracts build && pnpm --filter @battlefield/core build && pnpm --filter @battlefield/database build",
     "dev": "tsx watch src/main.ts",
-    "prebuild": "pnpm --filter @battlefield/contracts build && pnpm --filter @battlefield/core build",
-    "build": "tsc -p tsconfig.json",
-    "pretypecheck": "pnpm --filter @battlefield/contracts build && pnpm --filter @battlefield/core build",
+    "prebuild": "pnpm --filter @battlefield/contracts build && pnpm --filter @battlefield/core build && pnpm --filter @battlefield/database build",
+    "build": "tsc -p tsconfig.build.json",
+    "pretypecheck": "pnpm --filter @battlefield/contracts build && pnpm --filter @battlefield/core build && pnpm --filter @battlefield/database build",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "test": "pnpm test:e2e",
-    "pretest:e2e": "pnpm --filter @battlefield/contracts build && pnpm --filter @battlefield/core build",
-    "test:e2e": "vitest run test/app.e2e.test.ts"
+    "pretest:e2e": "pnpm --filter @battlefield/contracts build && pnpm --filter @battlefield/core build && pnpm --filter @battlefield/database build",
+    "test:e2e": "vitest run --dir test"
   },
   "dependencies": {
     "@battlefield/contracts": "workspace:*",
     "@battlefield/core": "workspace:*",
+    "@battlefield/database": "workspace:*",
     "@nestjs/common": "^12.0.1",
     "@nestjs/core": "^12.0.1",
     "@nestjs/platform-express": "^12.0.1",
@@ -26,6 +27,7 @@
   "devDependencies": {
     "@nestjs/testing": "^12.0.1",
     "@types/supertest": "^7.2.1",
+    "kysely": "^0.29.5",
     "supertest": "^7.2.2",
     "tsx": "^4.23.12"
   }

@@ -1,4 +1,8 @@
 export {
+  KyselyBusinessEntityReader,
+  type KyselyBusinessEntityReaderOptions,
+} from "./business-entities/kysely-business-entity-reader.js";
+export {
   createPostgresDatabase,
   type PostgresDatabaseOptions,
 } from "./database-factory.js";

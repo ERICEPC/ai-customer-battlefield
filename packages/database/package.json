@@ -16,11 +16,15 @@
     }
   },
   "scripts": {
+    "prebuild": "pnpm --filter @battlefield/core build",
     "build": "tsc -p tsconfig.json",
+    "pretypecheck": "pnpm --filter @battlefield/core build",
     "typecheck": "tsc --noEmit -p tsconfig.json",
+    "pretest": "pnpm --filter @battlefield/core build",
     "test": "vitest run"
   },
   "dependencies": {
+    "@battlefield/core": "workspace:*",
     "kysely": "^0.29.5",
     "pg": "^8.23.0"
   },

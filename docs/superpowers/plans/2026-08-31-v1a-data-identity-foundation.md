@@ -348,7 +348,7 @@ Use a specific in-memory reader and assert observable inputs/results: default li
 
 Run: `pnpm --filter @battlefield/core test -- list-business-entities.test.ts`.
 
-- [ ] **Step 5: Commit and push**
+- [x] **Step 5: Commit and push**
 
 ```bash
 git add packages/contracts packages/core
@@ -373,23 +373,23 @@ pnpm check:public && git push origin main
 - `KyselyBusinessEntityReader` implements `BusinessEntityReader`.
 - `GET /api/v1/business-entities` returns the contract page and keeps the development actor adapter fail-closed in production.
 
-- [ ] **Step 1: Write failing repository integration tests**
+- [x] **Step 1: Write failing repository integration tests**
 
 Seed two tenants, several entities, assignments and opportunities through `withTenantTransaction`. Assert tenant A never sees tenant B, active primary owner/opportunity are projected, search is case-insensitive, status filters work, and the second cursor page has no duplicate or missing row.
 
-- [ ] **Step 2: Verify repository RED**
+- [x] **Step 2: Verify repository RED**
 
 Run: `pnpm --filter @battlefield/database test -- kysely-business-entity-reader.test.ts`.
 
-- [ ] **Step 3: Implement keyset query and cursor codec**
+- [x] **Step 3: Implement keyset query and cursor codec**
 
 Order by `updated_at desc, id desc`; encode `{ updatedAt, id }` as base64url JSON with strict decoding. Fetch `limit + 1`, return at most `limit`, and derive `nextCursor` from the last returned item only when another row exists. Join current primary owner and open primary opportunity through bounded lateral/subqueries so each entity remains one row.
 
-- [ ] **Step 4: Write failing API E2E tests**
+- [x] **Step 4: Write failing API E2E tests**
 
 Prove `401` without development actor headers, `400` for invalid query, `200` with contract-conforming tenant-scoped data, and no tenant leakage. Test the real Nest module with a real PGlite database adapter; only the external identity provider remains substituted by the development adapter.
 
-- [ ] **Step 5: Implement Nest module/controller and verify GREEN**
+- [x] **Step 5: Implement Nest module/controller and verify GREEN**
 
 The controller parses headers into the existing development `ActorScope`, validates the query with Zod, calls `ListBusinessEntities`, and parses the response contract before returning. No SQL or tenant filter belongs in the controller.
 
