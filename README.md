@@ -2,7 +2,7 @@
 
 AI Customer Battlefield is an independent customer-operation workspace for sales teams. It is designed around reviewable business facts, human-confirmed AI suggestions, configurable workflows, and replaceable integrations rather than any single collaboration platform or model provider.
 
-The repository now contains two connected vertical slices: a review-only AI follow-up draft flow and a persistent, tenant-scoped business-entity directory backed by versioned PostgreSQL migrations. The complete V1 product is still under active development; AI output is not yet promoted to a formal follow-up fact.
+The repository now contains two connected vertical slices: a persistent, tenant-scoped business-entity directory and a human-confirmed follow-up workflow backed by versioned PostgreSQL migrations. AI output remains a draft until the salesperson explicitly confirms it; confirmation atomically creates the formal follow-up, facts/evidence links, audit event, domain event, idempotency result, and Outbox message. The complete V1 product is still under active development.
 
 ## Architecture boundaries
 
@@ -37,7 +37,7 @@ pnpm --filter @battlefield/api dev:demo
 pnpm --filter @battlefield/web dev
 ```
 
-Open `http://localhost:3000/entities`. The demo database is recreated on every API restart and must never be used as production storage.
+Open `http://localhost:3000/` for the follow-up confirmation workbench or `http://localhost:3000/entities` for the entity directory. The demo database is recreated on every API restart and must never be used as production storage.
 
 For a PostgreSQL-backed environment, use a dedicated PostgreSQL 17+ database, apply forward migrations explicitly, and then start the normal API:
 
@@ -76,6 +76,7 @@ The integration test refuses to reset a database whose name does not end in `_te
 - [System architecture and detailed design](docs/04-系统架构与详细设计.md)
 - [Documentation index](docs/README.md)
 - [V1-A implementation plan](docs/superpowers/plans/2026-08-31-v1a-data-identity-foundation.md)
+- [Follow-up confirmation implementation plan](docs/superpowers/plans/2026-08-31-v1b-followup-confirmation.md)
 
 ## Current scope
 
@@ -85,10 +86,11 @@ Implemented today:
 - business entities, contacts and affiliation history, opportunities, assignment history, and stage history;
 - the `0003` physical foundation for sources, draft revisions, formal follow-ups, facts/evidence, idempotency, audit events, domain events, and Outbox messages;
 - tenant-safe entity directory API with keyset pagination and responsive Web UI;
-- deterministic follow-up draft proposal that remains visibly `pending_confirmation`;
+- deterministic follow-up proposal plus persistent create/read/revise/cancel/confirm REST APIs and immutable formal-record retrieval;
+- responsive Web confirmation workbench with explicit human acknowledgement, optimistic-conflict recovery, stable retry idempotency, and confirmed source/actor receipt;
 - PGlite local tests and PostgreSQL 18 CI verification of the same SQL migrations.
 
-Still in progress for V1: the Web confirmation workbench on top of the completed `0003` Store/API transaction, analysis and action loops, notifications, configurable prompts/models/rules, reports, management queries, import tools, production OIDC, and deploy/operations acceptance. Their adapters must preserve the boundaries established here.
+Still in progress for V1: battle analysis and separately confirmed action loops, Outbox workers and notifications, configurable prompts/models/rules, reminders, reports, management queries, import tools, production OIDC, and deploy/operations acceptance. Their adapters must preserve the boundaries established here.
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) before proposing a change.
 

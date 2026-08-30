@@ -117,9 +117,9 @@ Tables include sources, drafts, revisions, formal follow-ups, participants, oppo
 
 ### Task 6: Phase acceptance and continuity
 
-- [ ] Run clean lockfile install, public-boundary scan, lint, typecheck, all tests, production builds, and `git diff --check`.
+- [x] Run clean lockfile install, public-boundary scan, lint, typecheck, all tests, production builds, and `git diff --check`.
 - [ ] Push `main`, verify the remote SHA and PostgreSQL 18 Actions run, and record exact counts/URL in ignored `progress.md`.
-- [ ] Update the product/data/architecture docs with implemented versus deferred behavior; do not claim action confirmation, analysis, reminders, notifications, reports, or production auth are complete.
+- [x] Update the product/data/architecture docs with implemented versus deferred behavior; do not claim action confirmation, analysis, reminders, notifications, reports, or production auth are complete.
 - [ ] Mark V1-B complete in persistent plans and immediately create/execute the next vertical plan for battle analysis and separately confirmed actions.
 
 ## Acceptance gate
