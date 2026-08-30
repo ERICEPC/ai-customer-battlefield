@@ -109,11 +109,11 @@ Tables include sources, drafts, revisions, formal follow-ups, participants, oppo
 - Modify: `apps/web/app/globals.css`
 - Test: component and API-client tests
 
-- [ ] Write UI tests for entity selection, generation, editable summary/type/time, fact rows, dirty-state revision, confirm confirmation, loading/error/conflict recovery, cancelled state, and confirmed immutable receipt.
-- [ ] Load selectable entities through the existing directory contract; do not embed database or Feishu assumptions in the client.
-- [ ] Make the human boundary unmistakable: the primary action says “确认并写入正式跟进”, the result identifies the confirmed salesperson and source, and suggested actions remain separately unconfirmed.
-- [ ] Verify desktop and 390px mobile layouts, keyboard flow, focus, no horizontal overflow, and browser console cleanliness against the real Nest + PGlite demo.
-- [ ] Run full verification and commit `feat: complete follow-up confirmation workbench`.
+- [x] Write UI tests for entity selection, generation, editable summary/type/time, fact rows, dirty-state revision, confirm confirmation, loading/error/conflict recovery, cancelled state, and confirmed immutable receipt.
+- [x] Load selectable entities through the existing directory contract; do not embed database or Feishu assumptions in the client.
+- [x] Make the human boundary unmistakable: the primary action says “确认并写入正式跟进”, the result identifies the confirmed salesperson and source, and suggested actions remain separately unconfirmed.
+- [x] Verify desktop and 390px mobile layouts, keyboard flow, focus, no horizontal overflow, and browser console cleanliness against the real Nest + PGlite demo.
+- [x] Run full verification and commit `feat: complete follow-up confirmation workbench`.
 
 ### Task 6: Phase acceptance and continuity
 

@@ -330,6 +330,41 @@ main {
   font-weight: 700;
 }
 
+.input-card > select,
+.editor-grid select,
+.editor-grid input,
+.fact-row input {
+  width: 100%;
+  min-height: 44px;
+  padding: 0 13px;
+  color: var(--ink);
+  border: 1px solid #d8dfdb;
+  border-radius: 10px;
+  background: #fbfcfb;
+}
+
+.input-card > select:hover,
+.input-card > select:focus,
+.editor-grid select:hover,
+.editor-grid select:focus,
+.editor-grid input:hover,
+.editor-grid input:focus,
+.fact-row input:hover,
+.fact-row input:focus {
+  border-color: #739df0;
+  box-shadow: 0 0 0 4px rgba(47, 111, 237, 0.1);
+}
+
+.source-label {
+  margin-top: 22px;
+}
+
+.entity-loader {
+  margin-bottom: 9px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
 textarea {
   display: block;
   width: 100%;
@@ -407,6 +442,29 @@ button:disabled {
   background: var(--danger-soft);
 }
 
+.inline-button,
+.text-button {
+  min-height: auto;
+  padding: 0;
+  color: inherit;
+  font-size: inherit;
+  text-decoration: underline;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.inline-button {
+  margin-left: 10px;
+}
+
+.inline-button:hover:not(:disabled),
+.text-button:hover:not(:disabled) {
+  color: var(--blue);
+  transform: none;
+  background: transparent;
+}
+
 .result-region {
   min-width: 0;
 }
@@ -428,6 +486,172 @@ button:disabled {
   flex-direction: column;
   min-width: 0;
   padding: 28px;
+}
+
+.confirmation-editor .result-content {
+  gap: 18px;
+}
+
+.confirmation-editor .field-label,
+.fact-heading .field-label {
+  margin-bottom: 7px;
+}
+
+.summary-editor {
+  min-height: 126px;
+}
+
+.editor-grid {
+  display: grid;
+  grid-template-columns: 1fr 1.2fr;
+  gap: 14px;
+}
+
+.editor-grid label,
+.fact-row label {
+  min-width: 0;
+}
+
+.fact-heading {
+  display: flex;
+  gap: 16px;
+  justify-content: space-between;
+  align-items: flex-start;
+  padding-top: 4px;
+  border-top: 1px solid var(--line);
+}
+
+.fact-heading p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.55;
+}
+
+.secondary-button {
+  color: var(--navy);
+  border: 1px solid #cfd8e6;
+  background: #ffffff;
+  box-shadow: none;
+}
+
+.secondary-button:hover:not(:disabled) {
+  color: var(--blue);
+  border-color: #9fbaf0;
+  background: var(--blue-soft);
+}
+
+.fact-list {
+  display: grid;
+  gap: 12px;
+}
+
+.fact-row {
+  display: grid;
+  grid-template-columns: minmax(110px, 0.7fr) minmax(160px, 1.3fr) auto;
+  gap: 10px;
+  align-items: end;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: #fafbfd;
+}
+
+.danger-button {
+  min-height: 42px;
+  color: var(--danger);
+}
+
+.conflict-panel {
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 0;
+}
+
+.acknowledgement {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  width: fit-content;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.acknowledgement input {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--blue);
+}
+
+.boundary-note {
+  margin: -8px 0 0;
+  padding: 10px 12px;
+  color: #2456ad;
+  font-size: 11px;
+  line-height: 1.55;
+  border-left: 3px solid var(--blue);
+  background: var(--blue-soft);
+}
+
+.confirmation-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+}
+
+.confirmation-receipt .result-content {
+  justify-content: center;
+}
+
+.confirmation-receipt h2 {
+  margin: 0 0 26px;
+  font-family: Georgia, "Songti SC", serif;
+  font-size: 30px;
+}
+
+.confirmation-receipt code {
+  display: block;
+  overflow-wrap: anywhere;
+  margin: 5px 0 30px;
+  padding: 12px;
+  color: #2456ad;
+  border: 1px solid #cfe0ff;
+  border-radius: 10px;
+  background: var(--blue-soft);
+}
+
+.receipt-details {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin: 0 0 30px;
+}
+
+.receipt-details div {
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #fafbfd;
+}
+
+.receipt-details dt {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.receipt-details dd {
+  overflow-wrap: anywhere;
+  margin: 5px 0 0;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.confirmation-receipt .boundary-note {
+  margin: 0;
 }
 
 .summary-text {
@@ -876,6 +1100,29 @@ button:disabled {
 
   .form-footer button {
     width: 100%;
+  }
+
+  .editor-grid,
+  .fact-row,
+  .receipt-details {
+    grid-template-columns: 1fr;
+  }
+
+  .fact-heading,
+  .confirmation-actions,
+  .conflict-panel {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .fact-heading button,
+  .confirmation-actions button {
+    width: 100%;
+  }
+
+  .danger-button {
+    width: fit-content;
+    min-height: auto;
   }
 
   .directory-page {
