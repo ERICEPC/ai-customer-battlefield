@@ -393,13 +393,15 @@ Prove `401` without development actor headers, `400` for invalid query, `200` wi
 
 The controller parses headers into the existing development `ActorScope`, validates the query with Zod, calls `ListBusinessEntities`, and parses the response contract before returning. No SQL or tenant filter belongs in the controller.
 
-- [ ] **Step 6: Commit and push**
+- [x] **Step 6: Commit and push**
 
 ```bash
 git add packages/database apps/api
 git commit -m "feat: expose persistent business entity directory"
 pnpm check:public && git push origin main
 ```
+
+Task 5 delivered on `main` as commit `385acec`.
 
 ### Task 6: Web business-entity directory
 
@@ -415,19 +417,19 @@ pnpm check:public && git push origin main
 - Consumes: `GET /api/v1/business-entities` and shared Zod response schema.
 - Produces: accessible desktop table and mobile card directory with search/status filters and cursor pagination.
 
-- [ ] **Step 1: Write failing UI behavior tests**
+- [x] **Step 1: Write failing UI behavior tests**
 
 Prove initial loading, rows with owner/opportunity/stage, empty state, recoverable API error, debounced search submission, status filter, next-page append without duplicates, and a 390px-friendly semantic card/table switch. Test the real component with an injected request function returning complete contract objects.
 
-- [ ] **Step 2: Verify UI RED**
+- [x] **Step 2: Verify UI RED**
 
 Run: `pnpm --filter @battlefield/web test -- business-entity-directory.test.tsx`.
 
-- [ ] **Step 3: Implement the page and API client**
+- [x] **Step 3: Implement the page and API client**
 
 Use the deep-blue/white/gold tokens from `docs/03-UI与交互设计.md`. The directory heading answers “当前由谁负责、主商机推进到哪里”； T0 is a gold label, status always includes text, and missing owner/opportunity displays an explicit data gap rather than a blank cell.
 
-- [ ] **Step 4: Verify component tests and browser behavior**
+- [x] **Step 4: Verify component tests and browser behavior**
 
 Run the focused Web tests. Start API/Web with synthetic development seed, verify desktop and 390px layouts, keyboard focus, no horizontal overflow, loading/error/empty states, and tenant-scoped rows.
 

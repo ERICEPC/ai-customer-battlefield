@@ -54,9 +54,6 @@ importers:
       '@types/supertest':
         specifier: ^7.2.1
         version: 7.2.1
-      kysely:
-        specifier: ^0.29.5
-        version: 0.29.5
       supertest:
         specifier: ^7.2.2
         version: 7.2.2

@@ -6,13 +6,15 @@
   "scripts": {
     "predev": "pnpm --filter @battlefield/contracts build && pnpm --filter @battlefield/core build && pnpm --filter @battlefield/database build",
     "dev": "tsx watch src/main.ts",
+    "dev:demo": "tsx dev/demo-server.ts",
     "prebuild": "pnpm --filter @battlefield/contracts build && pnpm --filter @battlefield/core build && pnpm --filter @battlefield/database build",
     "build": "tsc -p tsconfig.build.json",
     "pretypecheck": "pnpm --filter @battlefield/contracts build && pnpm --filter @battlefield/core build && pnpm --filter @battlefield/database build",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "test": "pnpm test:e2e",
     "pretest:e2e": "pnpm --filter @battlefield/contracts build && pnpm --filter @battlefield/core build && pnpm --filter @battlefield/database build",
-    "test:e2e": "vitest run --dir test"
+    "test:e2e": "vitest run --dir test",
+    "typecheck:dev": "tsc --noEmit -p tsconfig.json"
   },
   "dependencies": {
     "@battlefield/contracts": "workspace:*",
@@ -27,7 +29,6 @@
   "devDependencies": {
     "@nestjs/testing": "^12.0.1",
     "@types/supertest": "^7.2.1",
-    "kysely": "^0.29.5",
     "supertest": "^7.2.2",
     "tsx": "^4.23.12"
   }
