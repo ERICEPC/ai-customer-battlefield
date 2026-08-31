@@ -1,4 +1,5 @@
 import {
+  idempotencyKeySchema,
   type ManagementQueryRequest,
   type ManagementQueryResult,
   type ManagementQuerySubjectListQuery,
@@ -92,11 +93,16 @@ export async function listManagementQuerySubjects(
 
 export async function runManagementQuery(
   input: ManagementQueryRequest,
+  idempotencyKey: string,
 ): Promise<ManagementQueryResult> {
   const request = managementQueryRequestSchema.parse(input);
+  const key = idempotencyKeySchema.parse(idempotencyKey);
   return apiRequest("/management-queries", managementQueryResultSchema, {
     method: "POST",
-    headers: { "content-type": "application/json" },
+    headers: {
+      "content-type": "application/json",
+      "Idempotency-Key": key,
+    },
     body: JSON.stringify(request),
   });
 }

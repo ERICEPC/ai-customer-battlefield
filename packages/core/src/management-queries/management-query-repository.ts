@@ -65,6 +65,7 @@ export interface ManagementQueryRepository {
   }): Promise<{ items: ManagementQuerySubject[]; nextCursor: string | null }>;
   runSalesWeeklyProgress(input: {
     actor: ActorScope;
+    idempotencyKey: string;
     subjectUserId: string;
     periodStart: string;
     periodEnd: string;
@@ -77,6 +78,23 @@ export class ManagementQuerySubjectNotFoundError extends Error {
   constructor(options?: ErrorOptions) {
     super("The management-query subject was not found.", options);
     this.name = "ManagementQuerySubjectNotFoundError";
+  }
+}
+
+export class ManagementQueryResultLimitExceededError extends Error {
+  constructor(options?: ErrorOptions) {
+    super(
+      "The management-query result exceeds the configured processing limit.",
+      options,
+    );
+    this.name = "ManagementQueryResultLimitExceededError";
+  }
+}
+
+export class ManagementQueryIdempotencyConflictError extends Error {
+  constructor(options?: ErrorOptions) {
+    super("The management-query idempotency key cannot be reused.", options);
+    this.name = "ManagementQueryIdempotencyConflictError";
   }
 }
 

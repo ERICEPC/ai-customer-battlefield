@@ -12,13 +12,20 @@ import type {
 import Link from "next/link";
 import { type FormEvent, useEffect, useRef, useState } from "react";
 
-import { listManagementQuerySubjects, runManagementQuery } from "./api-client";
+import {
+  listManagementQuerySubjects,
+  ManagementQueryApiError,
+  runManagementQuery,
+} from "./api-client";
 
 export interface ManagementQueryWorkspaceApi {
   listSubjects(
     input: ManagementQuerySubjectListQuery,
   ): Promise<ManagementQuerySubjectPage>;
-  run(input: ManagementQueryRequest): Promise<ManagementQueryResult>;
+  run(
+    input: ManagementQueryRequest,
+    idempotencyKey: string,
+  ): Promise<ManagementQueryResult>;
 }
 
 const defaultApi: ManagementQueryWorkspaceApi = {
@@ -29,9 +36,11 @@ const defaultApi: ManagementQueryWorkspaceApi = {
 export function ManagementQueryWorkspace({
   api = defaultApi,
   now = () => new Date(),
+  idempotencyKeyFactory = defaultIdempotencyKey,
 }: {
   api?: ManagementQueryWorkspaceApi;
   now?: () => Date;
+  idempotencyKeyFactory?: () => string;
 }) {
   const initialPeriod = useRef(thisWeekDates(now()));
   const [subjects, setSubjects] = useState<ManagementQuerySubject[]>([]);
@@ -46,9 +55,15 @@ export function ManagementQueryWorkspace({
   const [isRunning, setIsRunning] = useState(false);
   const [isQuerySlow, setIsQuerySlow] = useState(false);
   const [queryError, setQueryError] = useState<string | null>(null);
+  const [queryNeedsFreshAttempt, setQueryNeedsFreshAttempt] = useState(false);
   const [validationError, setValidationError] = useState<string | null>(null);
   const subjectRequestVersion = useRef(0);
   const queryRequestVersion = useRef(0);
+  const queryInFlight = useRef(false);
+  const retryAttempt = useRef<{
+    fingerprint: string;
+    idempotencyKey: string;
+  } | null>(null);
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: subjectReloadVersion intentionally triggers recovery.
   useEffect(() => {
@@ -60,6 +75,8 @@ export function ManagementQueryWorkspace({
     setSubjectError(null);
     setResult(null);
     setQueryError(null);
+    setQueryNeedsFreshAttempt(false);
+    retryAttempt.current = null;
     const slowTimer = window.setTimeout(() => {
       if (subjectRequestVersion.current === version) setIsSubjectSlow(true);
     }, 2_000);
@@ -93,9 +110,11 @@ export function ManagementQueryWorkspace({
     queryRequestVersion.current += 1;
     setResult(null);
     setQueryError(null);
+    setQueryNeedsFreshAttempt(false);
     setValidationError(null);
     setIsRunning(false);
     setIsQuerySlow(false);
+    retryAttempt.current = null;
   }
 
   function selectSubject(userId: string): void {
@@ -108,8 +127,12 @@ export function ManagementQueryWorkspace({
     setter(value);
   }
 
-  async function submit(event?: FormEvent): Promise<void> {
+  async function submit(
+    event?: FormEvent,
+    reuseIdempotencyKey = false,
+  ): Promise<void> {
     event?.preventDefault();
+    if (queryInFlight.current) return;
     const request = buildRequest({
       subjectUserId: selectedSubjectId,
       startDate,
@@ -120,26 +143,42 @@ export function ManagementQueryWorkspace({
       setValidationError(request);
       return;
     }
+    const fingerprint = JSON.stringify(request);
+    const idempotencyKey =
+      reuseIdempotencyKey && retryAttempt.current?.fingerprint === fingerprint
+        ? retryAttempt.current.idempotencyKey
+        : idempotencyKeyFactory();
+    retryAttempt.current = { fingerprint, idempotencyKey };
 
     const version = queryRequestVersion.current + 1;
     queryRequestVersion.current = version;
+    queryInFlight.current = true;
     setValidationError(null);
     setQueryError(null);
+    setQueryNeedsFreshAttempt(false);
     setIsRunning(true);
     setIsQuerySlow(false);
     const slowTimer = window.setTimeout(() => {
       if (queryRequestVersion.current === version) setIsQuerySlow(true);
     }, 2_000);
     try {
-      const nextResult = await api.run(request);
+      const nextResult = await api.run(request, idempotencyKey);
       if (queryRequestVersion.current === version) setResult(nextResult);
     } catch (error) {
       if (queryRequestVersion.current === version) {
+        const needsFreshAttempt = isIdempotencyScopeConflict(error);
+        if (needsFreshAttempt) retryAttempt.current = null;
         setResult(null);
-        setQueryError(errorMessage(error, "管理问数失败，请重试。"));
+        setQueryNeedsFreshAttempt(needsFreshAttempt);
+        setQueryError(
+          needsFreshAttempt
+            ? "授权范围已变化，请确认后按当前范围重新查询。"
+            : errorMessage(error, "管理问数失败，请重试。"),
+        );
       }
     } finally {
       window.clearTimeout(slowTimer);
+      queryInFlight.current = false;
       if (queryRequestVersion.current === version) {
         setIsRunning(false);
         setIsQuerySlow(false);
@@ -213,12 +252,13 @@ export function ManagementQueryWorkspace({
           <strong>销售本周有哪些可核验进展？</strong>
           <p>所有指标由正式业务记录确定性计算，证据链接仍会再次校验权限。</p>
         </div>
-        <form onSubmit={(event) => void submit(event)}>
+        <form onSubmit={(event) => void submit(event, queryError !== null)}>
           <label>
             查询销售
             <select
               aria-label="查询销售"
               value={selectedSubjectId}
+              disabled={isRunning}
               onChange={(event) => selectSubject(event.currentTarget.value)}
             >
               {subjects.map((subject) => (
@@ -234,6 +274,7 @@ export function ManagementQueryWorkspace({
               aria-label="开始日期"
               type="date"
               value={startDate}
+              disabled={isRunning}
               onChange={(event) =>
                 changePeriod(setStartDate, event.currentTarget.value)
               }
@@ -245,15 +286,20 @@ export function ManagementQueryWorkspace({
               aria-label="结束日期（不含）"
               type="date"
               value={endDate}
+              disabled={isRunning}
               onChange={(event) =>
                 changePeriod(setEndDate, event.currentTarget.value)
               }
             />
           </label>
-          <button type="submit">
-            {isRunning || result || queryError
-              ? "重新生成答复"
-              : "生成进展答复"}
+          <button type="submit" disabled={isRunning}>
+            {isRunning
+              ? "正在生成答复…"
+              : queryNeedsFreshAttempt
+                ? "按当前范围重新生成"
+                : result || queryError
+                  ? "重新生成答复"
+                  : "生成进展答复"}
           </button>
         </form>
         <p className="ask-period-note">
@@ -269,8 +315,12 @@ export function ManagementQueryWorkspace({
       {queryError ? (
         <div className="ask-inline-error" role="alert">
           <span>{queryError}</span>
-          <button type="button" onClick={() => void submit()}>
-            重试本次查询
+          <button
+            type="button"
+            disabled={isRunning}
+            onClick={() => void submit(undefined, true)}
+          >
+            {queryNeedsFreshAttempt ? "按当前范围重新查询" : "重试本次查询"}
           </button>
         </div>
       ) : null}
@@ -284,6 +334,18 @@ export function ManagementQueryWorkspace({
       ) : null}
       {result ? <ManagementQueryAnswer result={result} /> : null}
     </div>
+  );
+}
+
+function defaultIdempotencyKey(): string {
+  return `management-query-${crypto.randomUUID()}`;
+}
+
+function isIdempotencyScopeConflict(error: unknown): boolean {
+  return (
+    error instanceof ManagementQueryApiError &&
+    error.status === 409 &&
+    error.code === "MANAGEMENT_QUERY_IDEMPOTENCY_CONFLICT"
   );
 }
 

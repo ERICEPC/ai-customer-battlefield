@@ -14,6 +14,7 @@ import {
 } from "@testing-library/react";
 import { afterEach, describe, expect, test, vi } from "vitest";
 
+import { ManagementQueryApiError } from "./api-client";
 import {
   ManagementQueryWorkspace,
   type ManagementQueryWorkspaceApi,
@@ -147,12 +148,15 @@ describe("ManagementQueryWorkspace", () => {
     ).toHaveAttribute("href", `/actions?actionId=${actionId}`);
     expect(within(answer).getByText("华南示范客户")).toBeVisible();
     expect(within(answer).getByText(/不能据此判断风险高低/)).toBeVisible();
-    expect(queryApi.run).toHaveBeenCalledWith({
-      capability: "sales_weekly_progress",
-      subjectUserId: sellerId,
-      periodStart: "2026-08-31T00:00:00.000Z",
-      periodEnd: "2026-09-07T00:00:00.000Z",
-    });
+    expect(queryApi.run).toHaveBeenCalledWith(
+      {
+        capability: "sales_weekly_progress",
+        subjectUserId: sellerId,
+        periodStart: "2026-08-31T00:00:00.000Z",
+        periodEnd: "2026-09-07T00:00:00.000Z",
+      },
+      expect.stringMatching(/^management-query-/),
+    );
   });
 
   test("does not invent a result when no seller is currently queryable", async () => {
@@ -217,7 +221,12 @@ describe("ManagementQueryWorkspace", () => {
       .fn()
       .mockReturnValueOnce(pending.promise)
       .mockResolvedValueOnce(result);
-    render(<ManagementQueryWorkspace api={api({ run })} />);
+    render(
+      <ManagementQueryWorkspace
+        api={api({ run })}
+        idempotencyKeyFactory={() => "management-query-retry-key"}
+      />,
+    );
     await act(async () => Promise.resolve());
     fireEvent.click(screen.getByRole("button", { name: "生成进展答复" }));
     await act(async () => {
@@ -230,39 +239,122 @@ describe("ManagementQueryWorkspace", () => {
     expect(screen.getByRole("alert")).toHaveTextContent("问数服务暂不可用");
     fireEvent.click(screen.getByRole("button", { name: "重试本次查询" }));
     await act(async () => Promise.resolve());
+    expect(run).toHaveBeenNthCalledWith(
+      1,
+      expect.any(Object),
+      "management-query-retry-key",
+    );
+    expect(run).toHaveBeenNthCalledWith(
+      2,
+      expect.any(Object),
+      "management-query-retry-key",
+    );
     expect(
       screen.getByRole("region", { name: "演示销售的经营进展" }),
     ).toBeVisible();
   });
 
-  test("suppresses a stale answer when a newer query completes first", async () => {
-    const first = deferred<ManagementQueryResult>();
-    const second = deferred<ManagementQueryResult>();
+  test("reuses the failed attempt key from the primary submit button too", async () => {
     const run = vi
       .fn()
-      .mockReturnValueOnce(first.promise)
-      .mockReturnValueOnce(second.promise);
-    render(<ManagementQueryWorkspace api={api({ run })} />);
+      .mockRejectedValueOnce(new Error("连接中断"))
+      .mockResolvedValueOnce(result);
+    const idempotencyKeyFactory = vi
+      .fn()
+      .mockReturnValueOnce("management-query-primary-retry")
+      .mockReturnValueOnce("management-query-should-not-be-used");
+    render(
+      <ManagementQueryWorkspace
+        api={api({ run })}
+        idempotencyKeyFactory={idempotencyKeyFactory}
+      />,
+    );
     await screen.findByLabelText("查询销售");
     fireEvent.click(screen.getByRole("button", { name: "生成进展答复" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("连接中断");
+
     fireEvent.click(screen.getByRole("button", { name: "重新生成答复" }));
+    await act(async () => Promise.resolve());
+
+    expect(run).toHaveBeenNthCalledWith(
+      1,
+      expect.any(Object),
+      "management-query-primary-retry",
+    );
+    expect(run).toHaveBeenNthCalledWith(
+      2,
+      expect.any(Object),
+      "management-query-primary-retry",
+    );
+    expect(idempotencyKeyFactory).toHaveBeenCalledTimes(1);
+  });
+
+  test("starts a user-confirmed fresh attempt after an idempotency scope conflict", async () => {
+    const run = vi
+      .fn()
+      .mockRejectedValueOnce(
+        new ManagementQueryApiError(
+          409,
+          "MANAGEMENT_QUERY_IDEMPOTENCY_CONFLICT",
+          "The authorized scope changed.",
+        ),
+      )
+      .mockResolvedValueOnce(result);
+    const idempotencyKeyFactory = vi
+      .fn()
+      .mockReturnValueOnce("management-query-old-scope")
+      .mockReturnValueOnce("management-query-current-scope");
+    render(
+      <ManagementQueryWorkspace
+        api={api({ run })}
+        idempotencyKeyFactory={idempotencyKeyFactory}
+      />,
+    );
+    await screen.findByLabelText("查询销售");
+    fireEvent.click(screen.getByRole("button", { name: "生成进展答复" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "授权范围已变化",
+    );
+    fireEvent.click(screen.getByRole("button", { name: "按当前范围重新查询" }));
+    await act(async () => Promise.resolve());
+
+    expect(run).toHaveBeenNthCalledWith(
+      1,
+      expect.any(Object),
+      "management-query-old-scope",
+    );
+    expect(run).toHaveBeenNthCalledWith(
+      2,
+      expect.any(Object),
+      "management-query-current-scope",
+    );
+    expect(idempotencyKeyFactory).toHaveBeenCalledTimes(2);
+  });
+
+  test("disables submission and suppresses duplicate execution while a query runs", async () => {
+    const pending = deferred<ManagementQueryResult>();
+    const run = vi.fn().mockReturnValue(pending.promise);
+    render(<ManagementQueryWorkspace api={api({ run })} />);
+    await screen.findByLabelText("查询销售");
+    const submit = screen.getByRole("button", { name: "生成进展答复" });
+    fireEvent.click(submit);
+
+    expect(
+      screen.getByRole("button", { name: "正在生成答复…" }),
+    ).toBeDisabled();
+    fireEvent.submit(submit.closest("form") as HTMLFormElement);
+    expect(run).toHaveBeenCalledTimes(1);
 
     await act(async () =>
-      second.resolve({
+      pending.resolve({
         ...result,
-        subject: { ...result.subject, displayName: "第二次结果" },
+        subject: { ...result.subject, displayName: "唯一结果" },
       }),
     );
     expect(
-      await screen.findByRole("region", { name: "第二次结果的经营进展" }),
+      await screen.findByRole("region", { name: "唯一结果的经营进展" }),
     ).toBeVisible();
-    await act(async () =>
-      first.resolve({
-        ...result,
-        subject: { ...result.subject, displayName: "过期结果" },
-      }),
-    );
-    expect(screen.queryByText("过期结果")).not.toBeInTheDocument();
   });
 });
 

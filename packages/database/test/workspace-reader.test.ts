@@ -213,7 +213,7 @@ describe("Kysely role-scoped workspace reader", () => {
     ).toBe(true);
   });
 
-  test("authorizes exact action reads with the same active assignment rules as the workspace", async () => {
+  test("authorizes exact historical action reads without widening active assignment scope", async () => {
     const actionReader = new KyselyActionQueryReader(database.db);
 
     await expect(
@@ -224,6 +224,16 @@ describe("Kysely role-scoped workspace reader", () => {
     ).resolves.toMatchObject({ actionId: OBSERVED_ACTION_ID });
     await expect(
       actionReader.getAction({
+        actor: manager,
+        actionId: COMPLETED_OBSERVED_ACTION_ID,
+      }),
+    ).resolves.toMatchObject({
+      actionId: COMPLETED_OBSERVED_ACTION_ID,
+      status: "completed",
+      canTransition: false,
+    });
+    await expect(
+      actionReader.getAction({
         actor: colleague,
         actionId: COMPLETED_OBSERVED_ACTION_ID,
       }),
@@ -231,7 +241,6 @@ describe("Kysely role-scoped workspace reader", () => {
 
     for (const [deniedActor, actionId] of [
       [actor, COLLEAGUE_OWN_ENTITY_ACTION_ID],
-      [manager, COMPLETED_OBSERVED_ACTION_ID],
       [actor, UNASSIGNED_ACTION_ID],
       [actor, ENDED_ACTION_ID],
       [unassignedUser, OWN_ACTION_ID],

@@ -1,18 +1,28 @@
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import {
   InvalidManagementQueryCursorError,
   type ManagementQueryDataGap,
   type ManagementQueryEvidence,
   type ManagementQueryHighlight,
+  ManagementQueryIdempotencyConflictError,
   type ManagementQueryMetrics,
   type ManagementQueryRepository,
   type ManagementQueryResult,
+  ManagementQueryResultLimitExceededError,
   ManagementQuerySubjectNotFoundError,
 } from "@battlefield/core";
-import { type Kysely, sql } from "kysely";
+import { type Kysely, type RawBuilder, sql, type Transaction } from "kysely";
 
 import type { BattlefieldDatabase } from "../database-types.js";
 import { withTenantTransaction } from "../tenant-session.js";
+
+type DatabaseTransaction = Transaction<BattlefieldDatabase>;
+
+interface IdempotencyRow {
+  request_hash: string;
+  status: "in_progress" | "completed";
+  response_payload: Record<string, unknown> | null;
+}
 
 interface SubjectRow {
   user_id: string;
@@ -47,13 +57,26 @@ interface OpenActionRow {
   confirmed_at: Date | string;
 }
 
+interface BattleStateRow {
+  id: string;
+  entity_id: string;
+  summary: string;
+  effective_at: Date | string;
+}
+
 interface EntityAggregate extends ManagementQueryHighlight {
   hasBattleState: boolean;
 }
 
+const DEFAULT_MAX_SCOPED_ENTITIES = 500;
+const DEFAULT_MAX_EVENT_ROWS_PER_KIND = 5_000;
+const MAX_EVIDENCE_LABEL_LENGTH = 500;
+
 export interface KyselyManagementQueryRepositoryOptions {
   queryIdFactory?: () => string;
   requestIdFactory?: () => string;
+  maxScopedEntities?: number;
+  maxEventRowsPerKind?: number;
 }
 
 export class KyselyManagementQueryRepository
@@ -61,6 +84,8 @@ export class KyselyManagementQueryRepository
 {
   private readonly queryIdFactory: () => string;
   private readonly requestIdFactory: () => string;
+  private readonly maxScopedEntities: number;
+  private readonly maxEventRowsPerKind: number;
 
   constructor(
     private readonly database: Kysely<BattlefieldDatabase>,
@@ -68,6 +93,12 @@ export class KyselyManagementQueryRepository
   ) {
     this.queryIdFactory = options.queryIdFactory ?? randomUUID;
     this.requestIdFactory = options.requestIdFactory ?? randomUUID;
+    this.maxScopedEntities = positiveLimit(
+      options.maxScopedEntities ?? DEFAULT_MAX_SCOPED_ENTITIES,
+    );
+    this.maxEventRowsPerKind = positiveLimit(
+      options.maxEventRowsPerKind ?? DEFAULT_MAX_EVENT_ROWS_PER_KIND,
+    );
   }
 
   async listSubjects(
@@ -88,7 +119,12 @@ export class KyselyManagementQueryRepository
             )`
           : sql``;
         const result = await sql<SubjectRow>`
-          with candidate as (
+          with active_assignments as (
+            ${activeAssignmentsSql(
+              input.actor.tenantId,
+              sql`current_timestamp`,
+            )}
+          ), candidate as (
             select
               app_user.id as user_id,
               app_user.display_name,
@@ -101,15 +137,10 @@ export class KyselyManagementQueryRepository
               and app_user.status = 'active'
               and exists (
                 select 1
-                from app.entity_assignments as self_assignment
+                from active_assignments as self_assignment
                 where self_assignment.tenant_id = app_user.tenant_id
                   and self_assignment.user_id = app_user.id
                   and self_assignment.assignment_role in ('owner', 'collaborator')
-                  and self_assignment.valid_from <= current_timestamp
-                  and (
-                    self_assignment.valid_to is null
-                    or self_assignment.valid_to > current_timestamp
-                  )
               )
             union all
             select
@@ -124,25 +155,15 @@ export class KyselyManagementQueryRepository
               and app_user.status = 'active'
               and exists (
                 select 1
-                from app.entity_assignments as subject_assignment
-                inner join app.entity_assignments as observer_assignment
+                from active_assignments as subject_assignment
+                inner join active_assignments as observer_assignment
                   on observer_assignment.tenant_id = subject_assignment.tenant_id
                   and observer_assignment.entity_id = subject_assignment.entity_id
                 where subject_assignment.tenant_id = app_user.tenant_id
                   and subject_assignment.user_id = app_user.id
                   and subject_assignment.assignment_role in ('owner', 'collaborator')
-                  and subject_assignment.valid_from <= current_timestamp
-                  and (
-                    subject_assignment.valid_to is null
-                    or subject_assignment.valid_to > current_timestamp
-                  )
                   and observer_assignment.user_id = ${input.actor.userId}::uuid
                   and observer_assignment.assignment_role = 'management_observer'
-                  and observer_assignment.valid_from <= current_timestamp
-                  and (
-                    observer_assignment.valid_to is null
-                    or observer_assignment.valid_to > current_timestamp
-                  )
               )
           )
           select
@@ -183,7 +204,6 @@ export class KyselyManagementQueryRepository
   async runSalesWeeklyProgress(
     input: Parameters<ManagementQueryRepository["runSalesWeeklyProgress"]>[0],
   ): Promise<ManagementQueryResult> {
-    const queryId = this.queryIdFactory();
     const requestId = this.requestIdFactory();
 
     return withTenantTransaction(
@@ -191,6 +211,12 @@ export class KyselyManagementQueryRepository
       { ...input.actor, requestId },
       async (transaction) => {
         const scopeResult = await sql<SubjectScopeRow>`
+          with active_assignments as (
+            ${activeAssignmentsSql(
+              input.actor.tenantId,
+              sql`${input.queryNow}::timestamptz`,
+            )}
+          )
           select
             subject.id::text as user_id,
             subject.display_name,
@@ -198,38 +224,23 @@ export class KyselyManagementQueryRepository
               when subject.id = ${input.actor.userId}::uuid
                 and exists (
                   select 1
-                  from app.entity_assignments as self_assignment
+                  from active_assignments as self_assignment
                   where self_assignment.tenant_id = subject.tenant_id
                     and self_assignment.user_id = subject.id
                     and self_assignment.assignment_role in ('owner', 'collaborator')
-                    and self_assignment.valid_from <= ${input.queryNow}::timestamptz
-                    and (
-                      self_assignment.valid_to is null
-                      or self_assignment.valid_to > ${input.queryNow}::timestamptz
-                    )
                 )
               then 'self'
               when exists (
                 select 1
-                from app.entity_assignments as subject_assignment
-                inner join app.entity_assignments as observer_assignment
+                from active_assignments as subject_assignment
+                inner join active_assignments as observer_assignment
                   on observer_assignment.tenant_id = subject_assignment.tenant_id
                   and observer_assignment.entity_id = subject_assignment.entity_id
                 where subject_assignment.tenant_id = subject.tenant_id
                   and subject_assignment.user_id = subject.id
                   and subject_assignment.assignment_role in ('owner', 'collaborator')
-                  and subject_assignment.valid_from <= ${input.queryNow}::timestamptz
-                  and (
-                    subject_assignment.valid_to is null
-                    or subject_assignment.valid_to > ${input.queryNow}::timestamptz
-                  )
                   and observer_assignment.user_id = ${input.actor.userId}::uuid
                   and observer_assignment.assignment_role = 'management_observer'
-                  and observer_assignment.valid_from <= ${input.queryNow}::timestamptz
-                  and (
-                    observer_assignment.valid_to is null
-                    or observer_assignment.valid_to > ${input.queryNow}::timestamptz
-                  )
               )
               then 'observed_portfolio'
             end as scope_kind
@@ -246,30 +257,38 @@ export class KyselyManagementQueryRepository
         const entityResult =
           scope.scope_kind === "self"
             ? await sql<EntityRow>`
+                with active_assignments as (
+                  ${activeAssignmentsSql(
+                    input.actor.tenantId,
+                    sql`${input.queryNow}::timestamptz`,
+                  )}
+                )
                 select distinct
                   entity.id::text as entity_id,
                   entity.name as entity_name
-                from app.entity_assignments as assignment
+                from active_assignments as assignment
                 inner join app.business_entities as entity
                   on entity.tenant_id = assignment.tenant_id
                   and entity.id = assignment.entity_id
                 where assignment.tenant_id = ${input.actor.tenantId}::uuid
                   and assignment.user_id = ${input.subjectUserId}::uuid
                   and assignment.assignment_role in ('owner', 'collaborator')
-                  and assignment.valid_from <= ${input.queryNow}::timestamptz
-                  and (
-                    assignment.valid_to is null
-                    or assignment.valid_to > ${input.queryNow}::timestamptz
-                  )
                   and entity.status = 'active'
                 order by entity_name, entity_id
+                limit ${this.maxScopedEntities + 1}
               `.execute(transaction)
             : await sql<EntityRow>`
+                with active_assignments as (
+                  ${activeAssignmentsSql(
+                    input.actor.tenantId,
+                    sql`${input.queryNow}::timestamptz`,
+                  )}
+                )
                 select distinct
                   entity.id::text as entity_id,
                   entity.name as entity_name
-                from app.entity_assignments as subject_assignment
-                inner join app.entity_assignments as observer_assignment
+                from active_assignments as subject_assignment
+                inner join active_assignments as observer_assignment
                   on observer_assignment.tenant_id = subject_assignment.tenant_id
                   and observer_assignment.entity_id = subject_assignment.entity_id
                 inner join app.business_entities as entity
@@ -278,23 +297,28 @@ export class KyselyManagementQueryRepository
                 where subject_assignment.tenant_id = ${input.actor.tenantId}::uuid
                   and subject_assignment.user_id = ${input.subjectUserId}::uuid
                   and subject_assignment.assignment_role in ('owner', 'collaborator')
-                  and subject_assignment.valid_from <= ${input.queryNow}::timestamptz
-                  and (
-                    subject_assignment.valid_to is null
-                    or subject_assignment.valid_to > ${input.queryNow}::timestamptz
-                  )
                   and observer_assignment.user_id = ${input.actor.userId}::uuid
                   and observer_assignment.assignment_role = 'management_observer'
-                  and observer_assignment.valid_from <= ${input.queryNow}::timestamptz
-                  and (
-                    observer_assignment.valid_to is null
-                    or observer_assignment.valid_to > ${input.queryNow}::timestamptz
-                  )
                   and entity.status = 'active'
                 order by entity_name, entity_id
+                limit ${this.maxScopedEntities + 1}
               `.execute(transaction);
+        assertResultRowLimit(entityResult.rows.length, this.maxScopedEntities);
         const entities = entityResult.rows;
         const entityIds = entities.map((entity) => entity.entity_id);
+        const requestHash = managementQueryRequestHash(input, {
+          scopeKind: scope.scope_kind,
+          entityIds,
+        });
+        const replay = await beginIdempotentManagementQuery(transaction, {
+          tenantId: input.actor.tenantId,
+          userId: input.actor.userId,
+          idempotencyKey: input.idempotencyKey,
+          requestHash,
+          startedAt: input.queryNow,
+        });
+        if (replay) return replay;
+        const queryId = this.queryIdFactory();
         const aggregates = new Map<string, EntityAggregate>(
           entities.map((entity) => [
             entity.entity_id,
@@ -315,10 +339,17 @@ export class KyselyManagementQueryRepository
             )
             .where(
               "occurred_at",
+              "<",
+              sql<Date>`${input.periodEnd}::timestamptz`,
+            )
+            .where(
+              "occurred_at",
               "<=",
               sql<Date>`${input.dataCutoffAt}::timestamptz`,
             )
+            .limit(this.maxEventRowsPerKind + 1)
             .execute();
+          assertResultRowLimit(followups.length, this.maxEventRowsPerKind);
           for (const row of followups) {
             const aggregate = aggregates.get(row.entity_id);
             if (!aggregate) continue;
@@ -327,8 +358,8 @@ export class KyselyManagementQueryRepository
               kind: "followup",
               evidenceId: row.id,
               occurredAt: toIsoString(row.occurred_at),
-              label: row.summary,
-              deepLink: "/entities",
+              label: evidenceLabel(row.summary),
+              deepLink: `/battle-map?entityId=${row.entity_id}`,
             });
           }
 
@@ -345,10 +376,17 @@ export class KyselyManagementQueryRepository
             )
             .where(
               "occurred_at",
+              "<",
+              sql<Date>`${input.periodEnd}::timestamptz`,
+            )
+            .where(
+              "occurred_at",
               "<=",
               sql<Date>`${input.dataCutoffAt}::timestamptz`,
             )
+            .limit(this.maxEventRowsPerKind + 1)
             .execute();
+          assertResultRowLimit(facts.length, this.maxEventRowsPerKind);
           for (const row of facts) {
             const aggregate = aggregates.get(row.entity_id);
             if (!aggregate) continue;
@@ -357,8 +395,8 @@ export class KyselyManagementQueryRepository
               kind: "fact",
               evidenceId: row.id,
               occurredAt: toIsoString(row.occurred_at),
-              label: row.fact_value,
-              deepLink: "/entities",
+              label: evidenceLabel(row.fact_value),
+              deepLink: `/battle-map?entityId=${row.entity_id}`,
             });
           }
 
@@ -385,10 +423,17 @@ export class KyselyManagementQueryRepository
             )
             .where(
               "history.changed_at",
+              "<",
+              sql<Date>`${input.periodEnd}::timestamptz`,
+            )
+            .where(
+              "history.changed_at",
               "<=",
               sql<Date>`${input.dataCutoffAt}::timestamptz`,
             )
+            .limit(this.maxEventRowsPerKind + 1)
             .execute();
+          assertResultRowLimit(stageChanges.length, this.maxEventRowsPerKind);
           for (const row of stageChanges) {
             const aggregate = aggregates.get(row.entity_id);
             if (!aggregate) continue;
@@ -397,8 +442,10 @@ export class KyselyManagementQueryRepository
               kind: "stage_change",
               evidenceId: row.id,
               occurredAt: toIsoString(row.changed_at),
-              label: `${row.from_stage_code ?? "未设置"} → ${row.to_stage_code}`,
-              deepLink: "/entities",
+              label: evidenceLabel(
+                `${row.from_stage_code ?? "未设置"} → ${row.to_stage_code}`,
+              ),
+              deepLink: `/battle-map?entityId=${row.entity_id}`,
             });
           }
 
@@ -426,10 +473,20 @@ export class KyselyManagementQueryRepository
             )
             .where(
               "history.changed_at",
+              "<",
+              sql<Date>`${input.periodEnd}::timestamptz`,
+            )
+            .where(
+              "history.changed_at",
               "<=",
               sql<Date>`${input.dataCutoffAt}::timestamptz`,
             )
+            .limit(this.maxEventRowsPerKind + 1)
             .execute();
+          assertResultRowLimit(
+            completedActions.length,
+            this.maxEventRowsPerKind,
+          );
           for (const row of completedActions) {
             const aggregate = aggregates.get(row.entity_id);
             if (!aggregate) continue;
@@ -438,7 +495,7 @@ export class KyselyManagementQueryRepository
               kind: "action",
               evidenceId: row.id,
               occurredAt: toIsoString(row.changed_at),
-              label: row.title,
+              label: evidenceLabel(row.title),
               deepLink: `/actions?actionId=${row.id}`,
             });
           }
@@ -456,6 +513,7 @@ export class KyselyManagementQueryRepository
               from app.action_status_history as history
               where history.tenant_id = action.tenant_id
                 and history.action_id = action.id
+                and history.changed_at < ${input.periodEnd}::timestamptz
                 and history.changed_at <= ${input.dataCutoffAt}::timestamptz
               order by history.version_no desc
               limit 1
@@ -465,15 +523,21 @@ export class KyselyManagementQueryRepository
                 ${sql.join(entityIds.map((id) => sql`${id}::uuid`))}
               )
               and action.owner_user_id = ${input.subjectUserId}::uuid
+              and action.confirmed_at < ${input.periodEnd}::timestamptz
               and action.confirmed_at <= ${input.dataCutoffAt}::timestamptz
               and cutoff_status.to_status in ('planned', 'in_progress')
+            limit ${this.maxEventRowsPerKind - completedActions.length + 1}
           `.execute(transaction);
+          assertResultRowLimit(
+            completedActions.length + openActions.rows.length,
+            this.maxEventRowsPerKind,
+          );
           for (const row of openActions.rows) {
             const aggregate = aggregates.get(row.entity_id);
             if (!aggregate) continue;
             aggregate.openActionCount += 1;
             if (
-              new Date(row.planned_at).getTime() <
+              new Date(row.planned_at).getTime() <=
               Date.parse(input.dataCutoffAt)
             ) {
               aggregate.overdueActionCount += 1;
@@ -482,33 +546,27 @@ export class KyselyManagementQueryRepository
               kind: "action",
               evidenceId: row.id,
               occurredAt: toIsoString(row.confirmed_at),
-              label: row.title,
+              label: evidenceLabel(row.title),
               deepLink: `/actions?actionId=${row.id}`,
             });
           }
 
-          const states = await transaction
-            .selectFrom("app.battle_state_current as current")
-            .innerJoin("app.battle_state_versions as state", (join) =>
-              join
-                .onRef("state.tenant_id", "=", "current.tenant_id")
-                .onRef("state.id", "=", "current.battle_state_version_id"),
-            )
-            .select([
-              "state.id",
-              "state.entity_id",
-              "state.summary",
-              "state.effective_at",
-            ])
-            .where("current.tenant_id", "=", input.actor.tenantId)
-            .where("current.entity_id", "in", entityIds)
-            .where(
-              "state.effective_at",
-              "<=",
-              sql<Date>`${input.dataCutoffAt}::timestamptz`,
-            )
-            .execute();
-          for (const row of states) {
+          const states = await sql<BattleStateRow>`
+            select distinct on (state.entity_id)
+              state.id::text as id,
+              state.entity_id::text as entity_id,
+              state.summary,
+              state.effective_at
+            from app.battle_state_versions as state
+            where state.tenant_id = ${input.actor.tenantId}::uuid
+              and state.entity_id in (
+                ${sql.join(entityIds.map((id) => sql`${id}::uuid`))}
+              )
+              and state.effective_at < ${input.periodEnd}::timestamptz
+              and state.effective_at <= ${input.dataCutoffAt}::timestamptz
+            order by state.entity_id, state.effective_at desc, state.version_no desc
+          `.execute(transaction);
+          for (const row of states.rows) {
             const aggregate = aggregates.get(row.entity_id);
             if (!aggregate) continue;
             aggregate.hasBattleState = true;
@@ -516,7 +574,7 @@ export class KyselyManagementQueryRepository
               kind: "battle_state",
               evidenceId: row.id,
               occurredAt: toIsoString(row.effective_at),
-              label: row.summary,
+              label: evidenceLabel(row.summary),
               deepLink: `/battle-map?entityId=${row.entity_id}&stateVersion=${row.id}`,
             });
           }
@@ -558,6 +616,21 @@ export class KyselyManagementQueryRepository
         const limitedHighlights = highlights.slice(0, 50);
         const limitedDataGaps = dataGaps.slice(0, 50);
 
+        const result: ManagementQueryResult = {
+          queryId,
+          capability: "sales_weekly_progress",
+          subject: {
+            userId: scope.user_id,
+            displayName: scope.display_name,
+          },
+          period: { start: input.periodStart, end: input.periodEnd },
+          dataCutoffAt: input.dataCutoffAt,
+          scope: { kind: scope.scope_kind, entityCount: entities.length },
+          metrics,
+          highlights: limitedHighlights,
+          dataGaps: limitedDataGaps,
+        };
+
         await transaction
           .insertInto("app.audit_entries")
           .values({
@@ -584,21 +657,14 @@ export class KyselyManagementQueryRepository
             occurred_at: input.queryNow,
           })
           .executeTakeFirstOrThrow();
-
-        return {
+        await completeIdempotentManagementQuery(transaction, {
+          tenantId: input.actor.tenantId,
+          idempotencyKey: input.idempotencyKey,
+          completedAt: input.queryNow,
           queryId,
-          capability: "sales_weekly_progress",
-          subject: {
-            userId: scope.user_id,
-            displayName: scope.display_name,
-          },
-          period: { start: input.periodStart, end: input.periodEnd },
-          dataCutoffAt: input.dataCutoffAt,
-          scope: { kind: scope.scope_kind, entityCount: entities.length },
-          metrics,
-          highlights: limitedHighlights,
-          dataGaps: limitedDataGaps,
-        };
+          result,
+        });
+        return result;
       },
     );
   }
@@ -675,6 +741,153 @@ function compareEvidence(
     left.kind.localeCompare(right.kind) ||
     left.evidenceId.localeCompare(right.evidenceId)
   );
+}
+
+async function beginIdempotentManagementQuery(
+  transaction: DatabaseTransaction,
+  input: {
+    tenantId: string;
+    userId: string;
+    idempotencyKey: string;
+    requestHash: string;
+    startedAt: string;
+  },
+): Promise<ManagementQueryResult | null> {
+  let existing = await readManagementQueryIdempotency(transaction, input);
+  if (!existing) {
+    const inserted = await transaction
+      .insertInto("app.idempotency_records")
+      .values({
+        tenant_id: input.tenantId,
+        id: randomUUID(),
+        operation: "management_query.sales_weekly_progress",
+        idempotency_key: input.idempotencyKey,
+        request_hash: input.requestHash,
+        status: "in_progress",
+        response_payload: null,
+        resource_type: null,
+        resource_id: null,
+        created_by: input.userId,
+        created_at: input.startedAt,
+        completed_at: null,
+        expires_at: null,
+      })
+      .onConflict((conflict) =>
+        conflict
+          .columns(["tenant_id", "operation", "idempotency_key"])
+          .doNothing(),
+      )
+      .returning("id")
+      .executeTakeFirst();
+    if (inserted) return null;
+    existing = await readManagementQueryIdempotency(transaction, input);
+  }
+  if (
+    !existing ||
+    existing.request_hash !== input.requestHash ||
+    existing.status !== "completed" ||
+    !existing.response_payload
+  ) {
+    throw new ManagementQueryIdempotencyConflictError();
+  }
+  return existing.response_payload as unknown as ManagementQueryResult;
+}
+
+function readManagementQueryIdempotency(
+  transaction: DatabaseTransaction,
+  input: { tenantId: string; idempotencyKey: string },
+): Promise<IdempotencyRow | undefined> {
+  return transaction
+    .selectFrom("app.idempotency_records")
+    .select(["request_hash", "status", "response_payload"])
+    .where("tenant_id", "=", input.tenantId)
+    .where("operation", "=", "management_query.sales_weekly_progress")
+    .where("idempotency_key", "=", input.idempotencyKey)
+    .forUpdate()
+    .executeTakeFirst() as Promise<IdempotencyRow | undefined>;
+}
+
+async function completeIdempotentManagementQuery(
+  transaction: DatabaseTransaction,
+  input: {
+    tenantId: string;
+    idempotencyKey: string;
+    completedAt: string;
+    queryId: string;
+    result: ManagementQueryResult;
+  },
+): Promise<void> {
+  await transaction
+    .updateTable("app.idempotency_records")
+    .set({
+      status: "completed",
+      response_payload: jsonObject(input.result),
+      resource_type: "management_query",
+      resource_id: input.queryId,
+      completed_at: input.completedAt,
+    })
+    .where("tenant_id", "=", input.tenantId)
+    .where("operation", "=", "management_query.sales_weekly_progress")
+    .where("idempotency_key", "=", input.idempotencyKey)
+    .executeTakeFirstOrThrow();
+}
+
+function managementQueryRequestHash(
+  input: Parameters<ManagementQueryRepository["runSalesWeeklyProgress"]>[0],
+  authorization: {
+    scopeKind: "self" | "observed_portfolio";
+    entityIds: string[];
+  },
+): string {
+  return createHash("sha256")
+    .update(
+      JSON.stringify({
+        actorTenantId: input.actor.tenantId,
+        actorUserId: input.actor.userId,
+        capability: "sales_weekly_progress",
+        periodEnd: input.periodEnd,
+        periodStart: input.periodStart,
+        scopeEntityIds: [...authorization.entityIds].sort(),
+        scopeKind: authorization.scopeKind,
+        subjectUserId: input.subjectUserId,
+      }),
+    )
+    .digest("hex");
+}
+
+function jsonObject(value: object) {
+  return sql<Record<string, unknown>>`${JSON.stringify(value)}::jsonb`;
+}
+
+function activeAssignmentsSql(tenantId: string, activeAt: RawBuilder<unknown>) {
+  return sql`
+    select tenant_id, entity_id, user_id, assignment_role
+    from app.entity_assignments
+    where tenant_id = ${tenantId}::uuid
+      and valid_from <= ${activeAt}
+      and (valid_to is null or valid_to > ${activeAt})
+  `;
+}
+
+function evidenceLabel(value: string): string {
+  const normalized = value.trim();
+  if (normalized.length <= MAX_EVIDENCE_LABEL_LENGTH) return normalized;
+  return `${normalized.slice(0, MAX_EVIDENCE_LABEL_LENGTH - 1)}…`;
+}
+
+function assertResultRowLimit(actual: number, maximum: number): void {
+  if (actual > maximum) {
+    throw new ManagementQueryResultLimitExceededError();
+  }
+}
+
+function positiveLimit(value: number): number {
+  if (!Number.isSafeInteger(value) || value < 1) {
+    throw new TypeError(
+      "Management-query processing limits must be positive integers.",
+    );
+  }
+  return value;
 }
 
 function assertLimit(limit: number): void {

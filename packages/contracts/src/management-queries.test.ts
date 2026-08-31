@@ -11,6 +11,8 @@ const queryId = "90000000-0000-4000-8000-000000000081";
 const subjectUserId = "30000000-0000-4000-8000-000000000001";
 const entityId = "50000000-0000-4000-8000-000000000001";
 const evidenceId = "70000000-0000-4000-8000-000000000001";
+const actionEvidenceId = "d0000000-0000-4000-8000-000000000001";
+const stateEvidenceId = "b0000000-0000-4000-8000-000000000001";
 
 function result() {
   return {
@@ -54,7 +56,7 @@ function result() {
             evidenceId,
             occurredAt: "2026-08-31T03:00:00.000Z",
             label: "客户确认安全评审时间",
-            deepLink: "/entities",
+            deepLink: `/battle-map?entityId=${entityId}`,
           },
         ],
       },
@@ -154,6 +156,79 @@ describe("management-query contracts", () => {
     ).toBe(false);
   });
 
+  it("binds every evidence kind to its authorized route and identifiers", () => {
+    const cases = [
+      {
+        kind: "followup",
+        evidenceId,
+        deepLink: `/battle-map?entityId=${entityId}`,
+      },
+      {
+        kind: "fact",
+        evidenceId,
+        deepLink: `/battle-map?entityId=${entityId}`,
+      },
+      {
+        kind: "stage_change",
+        evidenceId,
+        deepLink: `/battle-map?entityId=${entityId}`,
+      },
+      {
+        kind: "action",
+        evidenceId: actionEvidenceId,
+        deepLink: `/actions?actionId=${actionEvidenceId}`,
+      },
+      {
+        kind: "battle_state",
+        evidenceId: stateEvidenceId,
+        deepLink: `/battle-map?entityId=${entityId}&stateVersion=${stateEvidenceId}`,
+      },
+    ] as const;
+
+    for (const evidence of cases) {
+      expect(
+        managementQueryResultSchema.safeParse({
+          ...result(),
+          highlights: [
+            {
+              ...result().highlights[0],
+              evidence: [
+                {
+                  ...result().highlights[0]?.evidence[0],
+                  ...evidence,
+                },
+              ],
+            },
+          ],
+        }).success,
+      ).toBe(true);
+    }
+
+    for (const deepLink of [
+      "/entities",
+      `/battle-map?entityId=50000000-0000-4000-8000-000000000099`,
+      `/actions?actionId=70000000-0000-4000-8000-000000000099`,
+      `/battle-map?entityId=${entityId}&stateVersion=70000000-0000-4000-8000-000000000099`,
+    ]) {
+      expect(
+        managementQueryResultSchema.safeParse({
+          ...result(),
+          highlights: [
+            {
+              ...result().highlights[0],
+              evidence: [
+                {
+                  ...result().highlights[0]?.evidence[0],
+                  deepLink,
+                },
+              ],
+            },
+          ],
+        }).success,
+      ).toBe(false);
+    }
+  });
+
   it("bounds subject pages and result collections", () => {
     expect(
       managementQuerySubjectPageSchema.parse({
@@ -193,5 +268,19 @@ describe("management-query contracts", () => {
         requestId: "request-1",
       }).code,
     ).toBe("MANAGEMENT_QUERY_SUBJECT_NOT_FOUND");
+    expect(
+      managementQueryApiErrorSchema.parse({
+        code: "MANAGEMENT_QUERY_RESULT_LIMIT_EXCEEDED",
+        message: "Management query result exceeds its processing limit.",
+        requestId: "request-2",
+      }).code,
+    ).toBe("MANAGEMENT_QUERY_RESULT_LIMIT_EXCEEDED");
+    expect(
+      managementQueryApiErrorSchema.parse({
+        code: "MANAGEMENT_QUERY_IDEMPOTENCY_CONFLICT",
+        message: "Management query idempotency key cannot be reused.",
+        requestId: "request-3",
+      }).code,
+    ).toBe("MANAGEMENT_QUERY_IDEMPOTENCY_CONFLICT");
   });
 });

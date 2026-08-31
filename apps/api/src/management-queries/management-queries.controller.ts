@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import {
+  idempotencyKeySchema,
   type ManagementQueryResult,
   type ManagementQuerySubjectPage,
   managementQueryRequestSchema,
@@ -13,12 +14,15 @@ import {
   InvalidManagementQueryPeriodError,
   InvalidManagementQuerySubjectLimitError,
   type ListManagementQuerySubjects,
+  ManagementQueryIdempotencyConflictError,
+  ManagementQueryResultLimitExceededError,
   ManagementQuerySubjectNotFoundError,
   type RunManagementQuery,
 } from "@battlefield/core";
 import {
   BadRequestException,
   Body,
+  ConflictException,
   Controller,
   Get,
   Headers,
@@ -27,6 +31,7 @@ import {
   Post,
   Query,
   ServiceUnavailableException,
+  UnprocessableEntityException,
 } from "@nestjs/common";
 
 import { developmentActor } from "../followup-drafts/followup-http.js";
@@ -77,6 +82,7 @@ export class ManagementQueriesController {
     @Body() body: unknown,
     @Headers("x-tenant-id") tenantId?: string,
     @Headers("x-user-id") userId?: string,
+    @Headers("idempotency-key") rawIdempotencyKey?: string,
   ): Promise<ManagementQueryResult> {
     const actor = developmentActor(tenantId, userId);
     const parsed = managementQueryRequestSchema.safeParse(body);
@@ -86,9 +92,20 @@ export class ManagementQueriesController {
         parsed.error.issues,
       );
     }
+    const idempotencyKey = idempotencyKeySchema.safeParse(rawIdempotencyKey);
+    if (!idempotencyKey.success) {
+      throw invalidManagementQuery(
+        "A valid Idempotency-Key header is required.",
+        idempotencyKey.error.issues,
+      );
+    }
     try {
       return managementQueryResultSchema.parse(
-        await this.runQuery.execute({ actor, ...parsed.data }),
+        await this.runQuery.execute({
+          actor,
+          idempotencyKey: idempotencyKey.data,
+          ...parsed.data,
+        }),
       );
     } catch (error) {
       return mapManagementQueryError(error);
@@ -108,6 +125,16 @@ function mapManagementQueryError(error: unknown): never {
   if (error instanceof ManagementQuerySubjectNotFoundError) {
     throw new NotFoundException(
       errorPayload("MANAGEMENT_QUERY_SUBJECT_NOT_FOUND", error.message),
+    );
+  }
+  if (error instanceof ManagementQueryIdempotencyConflictError) {
+    throw new ConflictException(
+      errorPayload("MANAGEMENT_QUERY_IDEMPOTENCY_CONFLICT", error.message),
+    );
+  }
+  if (error instanceof ManagementQueryResultLimitExceededError) {
+    throw new UnprocessableEntityException(
+      errorPayload("MANAGEMENT_QUERY_RESULT_LIMIT_EXCEEDED", error.message),
     );
   }
   if (error instanceof ManagementQueryUnavailableError) {

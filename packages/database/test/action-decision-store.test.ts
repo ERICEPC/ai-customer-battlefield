@@ -462,6 +462,7 @@ describe("Kysely action decision persistence", () => {
   });
 
   test("transitions forward with contiguous history and rejects stale or invalid moves", async () => {
+    await seedUnauthorizedDecisionActors(database);
     await store.accept(acceptanceInput(proposalId));
     await expect(
       store.transition({
@@ -513,6 +514,17 @@ describe("Kysely action decision persistence", () => {
       completed_at: new Date("2026-09-01T10:00:00.000Z"),
       history_count: 3,
     });
+    const reader = new KyselyActionQueryReader(database.db);
+    await expect(
+      reader.getAction({ actor: observerActor, actionId: ACTION_ID }),
+    ).resolves.toMatchObject({
+      actionId: ACTION_ID,
+      status: "completed",
+      canTransition: false,
+    });
+    await expect(
+      reader.listActions({ actor: observerActor, limit: 20 }),
+    ).resolves.toEqual({ items: [], nextCursor: null });
     await expect(
       store.transition({
         actor: otherActor,
@@ -521,6 +533,27 @@ describe("Kysely action decision persistence", () => {
         toStatus: "cancelled",
         changedAt: "2026-09-01T10:01:00.000Z",
       }),
+    ).rejects.toBeInstanceOf(BusinessActionNotFoundError);
+  });
+
+  test("keeps cancelled actions private from management observers", async () => {
+    await seedUnauthorizedDecisionActors(database);
+    await store.accept(acceptanceInput(proposalId));
+    await store.transition({
+      actor,
+      actionId: ACTION_ID,
+      versionNo: "1",
+      toStatus: "cancelled",
+      reason: "不再推进",
+      changedAt: "2026-09-01T09:00:00.000Z",
+    });
+
+    const reader = new KyselyActionQueryReader(database.db);
+    await expect(
+      reader.getAction({ actor, actionId: ACTION_ID }),
+    ).resolves.toMatchObject({ status: "cancelled" });
+    await expect(
+      reader.getAction({ actor: observerActor, actionId: ACTION_ID }),
     ).rejects.toBeInstanceOf(BusinessActionNotFoundError);
   });
 });

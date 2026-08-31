@@ -81,12 +81,15 @@ describe("management-query API client", () => {
     );
     vi.stubGlobal("fetch", fetchMock);
 
-    await expect(runManagementQuery(query)).resolves.toEqual(result);
+    await expect(
+      runManagementQuery(query, "management-query-key-1"),
+    ).resolves.toEqual(result);
     expect(fetchMock).toHaveBeenCalledWith(
       "http://localhost:3001/api/v1/management-queries",
       expect.objectContaining({
         method: "POST",
         headers: expect.objectContaining({
+          "Idempotency-Key": "management-query-key-1",
           "content-type": "application/json",
         }),
         body: JSON.stringify(query),
@@ -120,15 +123,18 @@ describe("management-query API client", () => {
         ),
     );
 
-    const error = await runManagementQuery(query).catch(
-      (caught: unknown) => caught,
-    );
+    const error = await runManagementQuery(
+      query,
+      "management-query-key-2",
+    ).catch((caught: unknown) => caught);
     expect(error).toBeInstanceOf(ManagementQueryApiError);
     expect(error).toMatchObject({
       status: 404,
       code: "MANAGEMENT_QUERY_SUBJECT_NOT_FOUND",
       requestId: "request-query-1",
     });
-    await expect(runManagementQuery(query)).rejects.toThrow();
+    await expect(
+      runManagementQuery(query, "management-query-key-3"),
+    ).rejects.toThrow();
   });
 });

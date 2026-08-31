@@ -1,9 +1,14 @@
+import { randomUUID } from "node:crypto";
 import { fileURLToPath } from "node:url";
 import {
   managementQueryApiErrorSchema,
   managementQueryResultSchema,
   managementQuerySubjectPageSchema,
 } from "@battlefield/contracts";
+import {
+  type ManagementQueryRepository,
+  ManagementQueryResultLimitExceededError,
+} from "@battlefield/core";
 import {
   type BattlefieldDatabase,
   type DatabaseHandle,
@@ -12,6 +17,7 @@ import {
 } from "@battlefield/database";
 import {
   createPgliteDatabase,
+  SYNTHETIC_ENTITY_ID,
   SYNTHETIC_OTHER_TENANT_ID,
   SYNTHETIC_OTHER_USER_ID,
   SYNTHETIC_TENANT_ID,
@@ -27,6 +33,7 @@ import { afterAll, beforeAll, describe, expect, test } from "vitest";
 import { AppModule } from "../src/app.module.js";
 import { DATABASE_HANDLE } from "../src/database/database.module.js";
 import { configureApp } from "../src/main.js";
+import { MANAGEMENT_QUERY_REPOSITORY } from "../src/management-queries/management-queries.providers.js";
 
 const MIGRATION_DIRECTORY = fileURLToPath(
   new URL("../../../packages/database/migrations", import.meta.url),
@@ -36,6 +43,8 @@ const FUTURE_USER_ID = "30000000-0000-4000-8000-000000000093";
 const ENDED_USER_ID = "30000000-0000-4000-8000-000000000094";
 const UNASSIGNED_USER_ID = "30000000-0000-4000-8000-000000000095";
 const REQUEST_ID = "90000000-0000-4000-8000-000000000092";
+const LONG_STATE_ID = "b0000000-0000-4000-8000-000000000092";
+const LONG_STATE_RUN_ID = "a0000000-0000-4000-8000-000000000092";
 const PERIOD = {
   capability: "sales_weekly_progress",
   subjectUserId: SYNTHETIC_USER_ID,
@@ -46,6 +55,7 @@ const PERIOD = {
 describe("controlled management-query API", () => {
   let app: INestApplication;
   let unavailableApp: INestApplication;
+  let limitExceededApp: INestApplication;
   let database: DatabaseHandle<BattlefieldDatabase>;
 
   beforeAll(async () => {
@@ -56,10 +66,17 @@ describe("controlled management-query API", () => {
     await seedQueryActors(database);
     app = await createApp(database);
     unavailableApp = await createApp(null);
+    limitExceededApp = await createApp(database, {
+      listSubjects: async () => ({ items: [], nextCursor: null }),
+      runSalesWeeklyProgress: async () => {
+        throw new ManagementQueryResultLimitExceededError();
+      },
+    });
   });
 
   afterAll(async () => {
     await unavailableApp?.close();
+    await limitExceededApp?.close();
     await app?.close();
   });
 
@@ -181,6 +198,11 @@ describe("controlled management-query API", () => {
         (evidence) => evidence.kind === "battle_state",
       ),
     ).toBe(true);
+    expect(
+      managerResult.highlights
+        .flatMap((highlight) => highlight.evidence)
+        .every((evidence) => evidence.label.length <= 500),
+    ).toBe(true);
 
     const selfResponse = await actorRequest(app, {
       tenantId: SYNTHETIC_TENANT_ID,
@@ -192,6 +214,31 @@ describe("controlled management-query API", () => {
     expect(
       managementQueryResultSchema.parse(selfResponse.body).scope.kind,
     ).toBe("self");
+  });
+
+  test("replays a lost management-query response without duplicating its audit", async () => {
+    const idempotencyKey = "management-query-lost-response";
+    const first = await managerRequest(app)
+      .post("/api/v1/management-queries", idempotencyKey)
+      .send(PERIOD)
+      .expect(201);
+    const replay = await managerRequest(app)
+      .post("/api/v1/management-queries", idempotencyKey)
+      .send(PERIOD)
+      .expect(201);
+    const firstResult = managementQueryResultSchema.parse(first.body);
+    expect(managementQueryResultSchema.parse(replay.body)).toEqual(firstResult);
+    expect(
+      await countManagementQueryAudits(database, firstResult.queryId),
+    ).toBe(1);
+
+    const conflict = await managerRequest(app)
+      .post("/api/v1/management-queries", idempotencyKey)
+      .send({ ...PERIOD, periodStart: "2026-08-26T00:00:00.000Z" })
+      .expect(409);
+    expect(managementQueryApiErrorSchema.parse(conflict.body).code).toBe(
+      "MANAGEMENT_QUERY_IDEMPOTENCY_CONFLICT",
+    );
   });
 
   test("unifies missing and unauthorized subjects without widening tenant scope", async () => {
@@ -222,6 +269,16 @@ describe("controlled management-query API", () => {
   });
 
   test("rejects invalid periods and fails closed without persistence", async () => {
+    const missingIdempotencyKey = await request(app.getHttpServer())
+      .post("/api/v1/management-queries")
+      .set("x-tenant-id", SYNTHETIC_TENANT_ID)
+      .set("x-user-id", MANAGER_ID)
+      .send(PERIOD)
+      .expect(400);
+    expect(
+      managementQueryApiErrorSchema.parse(missingIdempotencyKey.body).code,
+    ).toBe("INVALID_MANAGEMENT_QUERY");
+
     const invalidPeriod = await managerRequest(app)
       .post("/api/v1/management-queries")
       .send({ ...PERIOD, periodEnd: PERIOD.periodStart })
@@ -243,6 +300,14 @@ describe("controlled management-query API", () => {
     expect(
       managementQueryApiErrorSchema.parse(unavailableQuery.body).code,
     ).toBe("MANAGEMENT_QUERY_UNAVAILABLE");
+
+    const limitExceeded = await managerRequest(limitExceededApp)
+      .post("/api/v1/management-queries")
+      .send(PERIOD)
+      .expect(422);
+    expect(managementQueryApiErrorSchema.parse(limitExceeded.body).code).toBe(
+      "MANAGEMENT_QUERY_RESULT_LIMIT_EXCEEDED",
+    );
   });
 });
 
@@ -257,6 +322,56 @@ async function seedQueryActors(
       requestId: REQUEST_ID,
     },
     async (transaction) => {
+      const inputVersion = "d".repeat(64);
+      await transaction
+        .insertInto("app.analysis_runs")
+        .values({
+          tenant_id: SYNTHETIC_TENANT_ID,
+          id: LONG_STATE_RUN_ID,
+          entity_id: SYNTHETIC_ENTITY_ID,
+          trigger_event_id: null,
+          rule_version: "management-query-long-evidence-v1",
+          analyzer_config_version: "deterministic-v1",
+          input_version: inputVersion,
+          status: "completed",
+          error_code: null,
+          error_message: null,
+          started_at: "2026-08-31T00:01:00.000Z",
+          finished_at: "2026-08-31T00:01:00.000Z",
+          created_by: SYNTHETIC_USER_ID,
+        })
+        .executeTakeFirstOrThrow();
+      await transaction
+        .insertInto("app.battle_state_versions")
+        .values({
+          tenant_id: SYNTHETIC_TENANT_ID,
+          id: LONG_STATE_ID,
+          entity_id: SYNTHETIC_ENTITY_ID,
+          version_no: 2,
+          input_version: inputVersion,
+          relationship_score: 65,
+          potential_score: 70,
+          quadrant_code: "high_potential",
+          primary_opportunity_id: null,
+          risk_level: "low",
+          data_sufficiency: "sufficient",
+          data_gaps: JSON.stringify([]),
+          summary: `超长证据${"长".repeat(1_000)}`,
+          analysis_run_id: LONG_STATE_RUN_ID,
+          effective_at: "2026-08-31T00:01:00.000Z",
+        })
+        .executeTakeFirstOrThrow();
+      await transaction
+        .updateTable("app.battle_state_current")
+        .set({
+          battle_state_version_id: LONG_STATE_ID,
+          version_no: 2,
+          input_version: inputVersion,
+          updated_at: "2026-08-31T00:01:00.000Z",
+        })
+        .where("tenant_id", "=", SYNTHETIC_TENANT_ID)
+        .where("entity_id", "=", SYNTHETIC_ENTITY_ID)
+        .executeTakeFirstOrThrow();
       await transaction
         .insertInto("app.users")
         .values([
@@ -315,13 +430,17 @@ async function seedQueryActors(
 
 async function createApp(
   database: DatabaseHandle<BattlefieldDatabase> | null,
+  repository?: ManagementQueryRepository,
 ): Promise<INestApplication> {
-  const moduleReference = await Test.createTestingModule({
+  const builder = Test.createTestingModule({
     imports: [AppModule],
   })
     .overrideProvider(DATABASE_HANDLE)
-    .useValue(database)
-    .compile();
+    .useValue(database);
+  if (repository) {
+    builder.overrideProvider(MANAGEMENT_QUERY_REPOSITORY).useValue(repository);
+  }
+  const moduleReference = await builder.compile();
   const app = moduleReference.createNestApplication();
   configureApp(app);
   await app.init();
@@ -345,10 +464,33 @@ function actorRequest(
         .get(path)
         .set("x-tenant-id", actor.tenantId)
         .set("x-user-id", actor.userId),
-    post: (path: string) =>
+    post: (path: string, idempotencyKey: string = randomUUID()) =>
       request(app.getHttpServer())
         .post(path)
         .set("x-tenant-id", actor.tenantId)
-        .set("x-user-id", actor.userId),
+        .set("x-user-id", actor.userId)
+        .set("idempotency-key", idempotencyKey),
   };
+}
+
+async function countManagementQueryAudits(
+  database: DatabaseHandle<BattlefieldDatabase>,
+  queryId: string,
+): Promise<number> {
+  const result = await withTenantTransaction(
+    database.db,
+    {
+      tenantId: SYNTHETIC_TENANT_ID,
+      userId: SYNTHETIC_USER_ID,
+      requestId: REQUEST_ID,
+    },
+    (transaction) =>
+      transaction
+        .selectFrom("app.audit_entries")
+        .select((expression) => expression.fn.countAll<string>().as("count"))
+        .where("aggregate_type", "=", "management_query")
+        .where("aggregate_id", "=", queryId)
+        .executeTakeFirstOrThrow(),
+  );
+  return Number(result.count);
 }

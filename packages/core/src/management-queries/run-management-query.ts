@@ -10,6 +10,7 @@ const MAX_PERIOD_MS = 31 * 24 * 60 * 60 * 1_000;
 
 export interface RunManagementQueryInput {
   actor: ActorScope;
+  idempotencyKey: string;
   capability: "sales_weekly_progress";
   subjectUserId: string;
   periodStart: string;
@@ -50,6 +51,7 @@ export class RunManagementQuery {
     const dataCutoffAt = new Date(Math.min(end, nowTimestamp)).toISOString();
     return this.dependencies.repository.runSalesWeeklyProgress({
       actor: input.actor,
+      idempotencyKey: input.idempotencyKey,
       subjectUserId: input.subjectUserId,
       periodStart: input.periodStart,
       periodEnd: input.periodEnd,

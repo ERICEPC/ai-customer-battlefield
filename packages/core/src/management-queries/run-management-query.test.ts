@@ -66,6 +66,7 @@ describe("RunManagementQuery", () => {
     await expect(
       useCase.execute({
         actor,
+        idempotencyKey: "management-query-core-1",
         capability: "sales_weekly_progress",
         subjectUserId,
         periodStart: "2026-08-24T00:00:00.000Z",
@@ -74,6 +75,7 @@ describe("RunManagementQuery", () => {
     ).resolves.toEqual(result);
     expect(repo.runSalesWeeklyProgress).toHaveBeenCalledWith({
       actor,
+      idempotencyKey: "management-query-core-1",
       subjectUserId,
       periodStart: "2026-08-24T00:00:00.000Z",
       periodEnd: "2026-08-31T23:59:59.999Z",
@@ -96,6 +98,7 @@ describe("RunManagementQuery", () => {
       await expect(
         useCase.execute({
           actor,
+          idempotencyKey: "management-query-invalid-period",
           capability: "sales_weekly_progress",
           subjectUserId,
           periodStart,
@@ -117,6 +120,7 @@ describe("RunManagementQuery", () => {
     await expect(
       useCase.execute({
         actor,
+        idempotencyKey: "management-query-invalid-clock",
         capability: "sales_weekly_progress",
         subjectUserId,
         periodStart: "2026-08-24T00:00:00.000Z",

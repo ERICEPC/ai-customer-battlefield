@@ -56,13 +56,24 @@ export const managementQueryEvidenceKindSchema = z.enum([
   "battle_state",
 ]);
 
-export const managementQueryEvidenceSchema = z.strictObject({
-  kind: managementQueryEvidenceKindSchema,
+const managementQueryEvidenceBaseSchema = z.strictObject({
   evidenceId: z.uuid(),
   occurredAt: z.iso.datetime(),
   label: z.string().trim().min(1).max(500),
   deepLink: relativeDeepLinkSchema,
 });
+
+export const managementQueryEvidenceSchema = z.discriminatedUnion("kind", [
+  managementQueryEvidenceBaseSchema.extend({ kind: z.literal("followup") }),
+  managementQueryEvidenceBaseSchema.extend({ kind: z.literal("fact") }),
+  managementQueryEvidenceBaseSchema.extend({
+    kind: z.literal("stage_change"),
+  }),
+  managementQueryEvidenceBaseSchema.extend({ kind: z.literal("action") }),
+  managementQueryEvidenceBaseSchema.extend({
+    kind: z.literal("battle_state"),
+  }),
+]);
 
 export const managementQueryMetricsSchema = z.strictObject({
   confirmedFollowupCount: boundedCountSchema,
@@ -141,12 +152,15 @@ export const managementQueryResultSchema = z
     }
     requireUniqueEntityIds(result.highlights, "highlights", context);
     requireUniqueEntityIds(result.dataGaps, "dataGaps", context);
+    validateEvidenceRoutes(result.highlights, context);
   });
 
 export const managementQueryApiErrorSchema = z.strictObject({
   code: z.enum([
     "INVALID_MANAGEMENT_QUERY",
     "MANAGEMENT_QUERY_SUBJECT_NOT_FOUND",
+    "MANAGEMENT_QUERY_IDEMPOTENCY_CONFLICT",
+    "MANAGEMENT_QUERY_RESULT_LIMIT_EXCEEDED",
     "MANAGEMENT_QUERY_UNAVAILABLE",
   ]),
   message: z.string().trim().min(1).max(1_000),
@@ -190,6 +204,36 @@ function requireUniqueEntityIds(
       path: [path],
       message: "Each entity may appear at most once in this collection.",
     });
+  }
+}
+
+function validateEvidenceRoutes(
+  highlights: Array<z.infer<typeof managementQueryHighlightSchema>>,
+  context: z.RefinementCtx,
+): void {
+  for (const [highlightIndex, highlight] of highlights.entries()) {
+    for (const [evidenceIndex, evidence] of highlight.evidence.entries()) {
+      const expected =
+        evidence.kind === "action"
+          ? `/actions?actionId=${evidence.evidenceId}`
+          : evidence.kind === "battle_state"
+            ? `/battle-map?entityId=${highlight.entityId}&stateVersion=${evidence.evidenceId}`
+            : `/battle-map?entityId=${highlight.entityId}`;
+      if (evidence.deepLink !== expected) {
+        context.addIssue({
+          code: "custom",
+          path: [
+            "highlights",
+            highlightIndex,
+            "evidence",
+            evidenceIndex,
+            "deepLink",
+          ],
+          message:
+            "Evidence links must match their authorized entity and evidence identifiers.",
+        });
+      }
+    }
   }
 }
 

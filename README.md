@@ -106,7 +106,7 @@ Implemented today:
 - tenant-safe battle analysis, evidence/signal versioning, separately persisted action proposals, explicit accept/reject decisions, and formal action state transitions;
 - responsive battle-map and action workspaces with truthful partial-page counts, exact immutable source-version deep links, cursor-paged active-owner selection, timezone-safe planning, server-authoritative expired suggestions, and ambiguity-safe idempotent retries;
 - role-scoped sales/management homepage with actor-specific KPIs, bounded priority actions, current-versus-previous battle changes, data-gap summaries, exact authorized deep links, and responsive 390px navigation;
-- controlled `sales_weekly_progress` querying for a salesperson's current responsibility scope, with manager-observer intersection, explicit periods and cutoff, deterministic metrics, typed evidence, gaps, redacted audit metadata, unified denial, and responsive `/ask` UI;
+- controlled `sales_weekly_progress` querying for a salesperson's current responsibility scope, with manager-observer intersection, exclusive period end and historical cutoff reconstruction, bounded processing, retry-safe idempotent audit, identifier-bound evidence links, gaps, unified denial, and responsive `/ask` UI;
 - lease-based Outbox consumption, versioned due reminders, atomic in-app notification materialization, independently retryable channel deliveries, and a responsive notification center;
 - optional Feishu app-bot delivery through a tenant-bound credential/channel adapter, with the Web inbox remaining independent;
 - PGlite local tests and PostgreSQL 18 CI verification of the same SQL migrations.

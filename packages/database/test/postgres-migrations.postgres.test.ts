@@ -39,9 +39,12 @@ const MANAGER_ID = "30000000-0000-4000-8000-000000000013";
 const UNASSIGNED_USER_ID = "30000000-0000-4000-8000-000000000014";
 const MANAGER_QUERY_ID = "90000000-0000-4000-8000-000000000013";
 const SELLER_QUERY_ID = "90000000-0000-4000-8000-000000000014";
-const MANAGEMENT_QUERY_NOW = "2026-09-04T00:00:00.000Z";
+const CONCURRENT_MANAGER_QUERY_ID = "90000000-0000-4000-8000-000000000015";
+const MANAGEMENT_QUERY_NOW = "2026-09-06T00:00:00.000Z";
 const MANAGEMENT_PERIOD_START = "2026-08-31T00:00:00.000Z";
 const MANAGEMENT_PERIOD_END = "2026-09-05T00:00:00.000Z";
+const MANAGEMENT_DATA_CUTOFF = MANAGEMENT_PERIOD_END;
+const FUTURE_MANAGEMENT_STATE_ID = "b0000000-0000-4000-8000-000000000013";
 
 describe("PostgreSQL migrations", () => {
   let database: DatabaseHandle<BattlefieldDatabase>;
@@ -257,6 +260,7 @@ describe("PostgreSQL migrations", () => {
       actor,
       now: "2026-09-04T00:00:00.000Z",
     });
+    await seedSyntheticBoundaryEvidence(database, confirmation.followupId);
     const queryIds = [MANAGER_QUERY_ID, SELLER_QUERY_ID];
     const managementRepository = new KyselyManagementQueryRepository(
       database.db,
@@ -272,28 +276,48 @@ describe("PostgreSQL migrations", () => {
     ]);
     const managerProgress = await managementRepository.runSalesWeeklyProgress({
       actor: manager,
+      idempotencyKey: "postgres-management-query-manager",
       subjectUserId: SYNTHETIC_USER_ID,
       periodStart: MANAGEMENT_PERIOD_START,
       periodEnd: MANAGEMENT_PERIOD_END,
       queryNow: MANAGEMENT_QUERY_NOW,
-      dataCutoffAt: MANAGEMENT_QUERY_NOW,
+      dataCutoffAt: MANAGEMENT_DATA_CUTOFF,
     });
     const sellerProgress = await managementRepository.runSalesWeeklyProgress({
       actor,
+      idempotencyKey: "postgres-management-query-seller",
       subjectUserId: SYNTHETIC_USER_ID,
       periodStart: MANAGEMENT_PERIOD_START,
       periodEnd: MANAGEMENT_PERIOD_END,
       queryNow: MANAGEMENT_QUERY_NOW,
-      dataCutoffAt: MANAGEMENT_QUERY_NOW,
+      dataCutoffAt: MANAGEMENT_DATA_CUTOFF,
     });
+    const concurrentRepository = new KyselyManagementQueryRepository(
+      database.db,
+      { queryIdFactory: () => CONCURRENT_MANAGER_QUERY_ID },
+    );
+    const concurrentInput = {
+      actor: manager,
+      idempotencyKey: "postgres-management-query-concurrent",
+      subjectUserId: SYNTHETIC_USER_ID,
+      periodStart: MANAGEMENT_PERIOD_START,
+      periodEnd: MANAGEMENT_PERIOD_END,
+      queryNow: MANAGEMENT_QUERY_NOW,
+      dataCutoffAt: MANAGEMENT_DATA_CUTOFF,
+    };
+    const [concurrentFirst, concurrentSecond] = await Promise.all([
+      concurrentRepository.runSalesWeeklyProgress(concurrentInput),
+      concurrentRepository.runSalesWeeklyProgress(concurrentInput),
+    ]);
     await expect(
       managementRepository.runSalesWeeklyProgress({
         actor: manager,
+        idempotencyKey: "postgres-management-query-unassigned",
         subjectUserId: UNASSIGNED_USER_ID,
         periodStart: MANAGEMENT_PERIOD_START,
         periodEnd: MANAGEMENT_PERIOD_END,
         queryNow: MANAGEMENT_QUERY_NOW,
-        dataCutoffAt: MANAGEMENT_QUERY_NOW,
+        dataCutoffAt: MANAGEMENT_DATA_CUTOFF,
       }),
     ).rejects.toBeInstanceOf(ManagementQuerySubjectNotFoundError);
     await expect(
@@ -302,11 +326,12 @@ describe("PostgreSQL migrations", () => {
           tenantId: SYNTHETIC_OTHER_TENANT_ID,
           userId: SYNTHETIC_OTHER_USER_ID,
         },
+        idempotencyKey: "postgres-management-query-foreign",
         subjectUserId: SYNTHETIC_USER_ID,
         periodStart: MANAGEMENT_PERIOD_START,
         periodEnd: MANAGEMENT_PERIOD_END,
         queryNow: MANAGEMENT_QUERY_NOW,
-        dataCutoffAt: MANAGEMENT_QUERY_NOW,
+        dataCutoffAt: MANAGEMENT_DATA_CUTOFF,
       }),
     ).rejects.toBeInstanceOf(ManagementQuerySubjectNotFoundError);
     const managementAudits = await readManagementQueryAudits(database);
@@ -421,12 +446,24 @@ describe("PostgreSQL migrations", () => {
     expect(
       new Set(managerProgress.highlights[0]?.evidence.map((item) => item.kind)),
     ).toEqual(new Set(["followup", "fact", "action", "battle_state"]));
+    expect(
+      managerProgress.highlights[0]?.evidence.some(
+        (item) => item.evidenceId === stateDetail.state.battleStateVersionId,
+      ),
+    ).toBe(true);
+    expect(
+      managerProgress.highlights[0]?.evidence.some(
+        (item) => item.evidenceId === FUTURE_MANAGEMENT_STATE_ID,
+      ),
+    ).toBe(false);
     expect(sellerProgress).toMatchObject({
       queryId: SELLER_QUERY_ID,
       scope: { kind: "self", entityCount: 1 },
       metrics: managerProgress.metrics,
     });
-    expect(managementAudits).toHaveLength(2);
+    expect(concurrentFirst).toEqual(concurrentSecond);
+    expect(concurrentFirst.queryId).toBe(CONCURRENT_MANAGER_QUERY_ID);
+    expect(managementAudits).toHaveLength(3);
     expect(
       managementAudits.map((audit) => ({
         aggregate_id: audit.aggregate_id,
@@ -442,6 +479,11 @@ describe("PostgreSQL migrations", () => {
       {
         aggregate_id: SELLER_QUERY_ID,
         actor_user_id: SYNTHETIC_USER_ID,
+        action: "management_query.executed",
+      },
+      {
+        aggregate_id: CONCURRENT_MANAGER_QUERY_ID,
+        actor_user_id: MANAGER_ID,
         action: "management_query.executed",
       },
     ]);
@@ -529,14 +571,16 @@ async function readWorkspacePlanEvidence(
           from app.action_status_history as history
           where history.tenant_id = action.tenant_id
             and history.action_id = action.id
-            and history.changed_at <= ${MANAGEMENT_QUERY_NOW}::timestamptz
+            and history.changed_at < ${MANAGEMENT_PERIOD_END}::timestamptz
+            and history.changed_at <= ${MANAGEMENT_DATA_CUTOFF}::timestamptz
           order by history.version_no desc
           limit 1
         ) as cutoff_status on true
         where action.tenant_id = ${SYNTHETIC_TENANT_ID}::uuid
           and action.entity_id = ${SYNTHETIC_ENTITY_ID}::uuid
           and action.owner_user_id = ${SYNTHETIC_USER_ID}::uuid
-          and action.confirmed_at <= ${MANAGEMENT_QUERY_NOW}::timestamptz
+          and action.confirmed_at < ${MANAGEMENT_PERIOD_END}::timestamptz
+          and action.confirmed_at <= ${MANAGEMENT_DATA_CUTOFF}::timestamptz
           and cutoff_status.to_status in ('planned', 'in_progress')
       `.execute(transaction);
       return {
@@ -605,6 +649,90 @@ async function seedSyntheticManagementScope(
           is_primary: false,
           valid_from: "2026-08-01T00:00:00.000Z",
           valid_to: null,
+        })
+        .executeTakeFirstOrThrow();
+    },
+  );
+}
+
+async function seedSyntheticBoundaryEvidence(
+  database: DatabaseHandle<BattlefieldDatabase>,
+  followupId: string,
+): Promise<void> {
+  await withTenantTransaction(
+    database.db,
+    {
+      tenantId: SYNTHETIC_TENANT_ID,
+      userId: SYNTHETIC_USER_ID,
+      requestId: "90000000-0000-4000-8000-000000000017",
+    },
+    async (transaction) => {
+      const runId = "a0000000-0000-4000-8000-000000000013";
+      const inputVersion = "f".repeat(64);
+      await transaction
+        .insertInto("app.analysis_runs")
+        .values({
+          tenant_id: SYNTHETIC_TENANT_ID,
+          id: runId,
+          entity_id: SYNTHETIC_ENTITY_ID,
+          trigger_event_id: null,
+          rule_version: "postgres-boundary-v2",
+          analyzer_config_version: "deterministic-v1",
+          input_version: inputVersion,
+          status: "completed",
+          error_code: null,
+          error_message: null,
+          started_at: MANAGEMENT_PERIOD_END,
+          finished_at: MANAGEMENT_PERIOD_END,
+          created_by: SYNTHETIC_USER_ID,
+        })
+        .executeTakeFirstOrThrow();
+      await transaction
+        .insertInto("app.battle_state_versions")
+        .values({
+          tenant_id: SYNTHETIC_TENANT_ID,
+          id: FUTURE_MANAGEMENT_STATE_ID,
+          entity_id: SYNTHETIC_ENTITY_ID,
+          version_no: 2,
+          input_version: inputVersion,
+          relationship_score: 88,
+          potential_score: 77,
+          quadrant_code: "boundary_state",
+          primary_opportunity_id: null,
+          risk_level: "low",
+          data_sufficiency: "sufficient",
+          data_gaps: JSON.stringify([]),
+          summary: "Boundary state must belong to the next period.",
+          analysis_run_id: runId,
+          effective_at: MANAGEMENT_PERIOD_END,
+        })
+        .executeTakeFirstOrThrow();
+      await transaction
+        .updateTable("app.battle_state_current")
+        .set({
+          battle_state_version_id: FUTURE_MANAGEMENT_STATE_ID,
+          version_no: 2,
+          input_version: inputVersion,
+          updated_at: MANAGEMENT_PERIOD_END,
+        })
+        .where("tenant_id", "=", SYNTHETIC_TENANT_ID)
+        .where("entity_id", "=", SYNTHETIC_ENTITY_ID)
+        .executeTakeFirstOrThrow();
+      await transaction
+        .insertInto("app.business_facts")
+        .values({
+          tenant_id: SYNTHETIC_TENANT_ID,
+          id: "70000000-0000-4000-8000-000000000013",
+          entity_id: SYNTHETIC_ENTITY_ID,
+          opportunity_id: null,
+          followup_id: followupId,
+          fact_type: "boundary.note",
+          fact_value: "Boundary fact must belong to the next period.",
+          occurred_at: MANAGEMENT_PERIOD_END,
+          confirmed_at: MANAGEMENT_PERIOD_END,
+          confirmed_by: SYNTHETIC_USER_ID,
+          valid_status: "valid",
+          supersedes_fact_id: null,
         })
         .executeTakeFirstOrThrow();
     },
