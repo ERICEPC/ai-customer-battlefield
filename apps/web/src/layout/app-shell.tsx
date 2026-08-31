@@ -11,7 +11,7 @@ const navigation = [
   { label: "经营动作", href: "/actions" },
   { label: "通知中心", href: "/inbox" },
   { label: "管理问数", href: "/ask" },
-  { label: "周报中心", href: "#" },
+  { label: "周报中心", href: "/reports" },
 ] as const;
 
 type NavigationLabel = (typeof navigation)[number]["label"];
@@ -33,6 +33,7 @@ const mobileNavigation: ReadonlyArray<{
   { label: "动作", href: "/actions", activeItem: "经营动作", mark: "动" },
   { label: "通知", href: "/inbox", activeItem: "通知中心", mark: "信" },
   { label: "问数", href: "/ask", activeItem: "管理问数", mark: "问" },
+  { label: "周报", href: "/reports", activeItem: "周报中心", mark: "报" },
 ];
 
 export function AppShell({
