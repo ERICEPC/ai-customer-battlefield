@@ -95,6 +95,9 @@ describe("AppShell", () => {
     expect(
       within(desktop).getByRole("link", { name: "周报中心" }),
     ).toHaveAttribute("href", "/reports");
+    expect(
+      within(desktop).getByRole("link", { name: "系统管理" }),
+    ).toHaveAttribute("href", "/admin");
 
     const mobile = screen.getByRole("navigation", { name: "移动端主导航" });
     expect(within(mobile).getByRole("link", { name: "今日" })).toHaveAttribute(
@@ -154,6 +157,12 @@ describe("AppShell", () => {
         { name: "管理问数" },
       ),
     ).not.toBeInTheDocument();
+    expect(
+      within(screen.getByRole("navigation", { name: "主导航" })).queryByRole(
+        "link",
+        { name: "系统管理" },
+      ),
+    ).not.toBeInTheDocument();
     fireEvent.click(screen.getByLabelText("打开账号菜单"));
     expect(screen.getAllByText("销售身份").length).toBeGreaterThan(0);
     expect(screen.getByText("商业化一部")).toBeVisible();
@@ -175,6 +184,10 @@ describe("AppShell", () => {
     expect(screen.getByText("团队成员")).toBeVisible();
     expect(screen.getByText("销售1")).toBeVisible();
     expect(screen.getByRole("button", { name: "退出登录" })).toBeEnabled();
+    expect(screen.getAllByRole("link", { name: "系统管理" })).toHaveLength(2);
+    expect(
+      screen.getAllByRole("link", { name: "系统管理" })[0],
+    ).toHaveAttribute("href", "/admin");
   });
 
   it("blocks a sales user that opens the leader-only route directly", () => {
@@ -191,5 +204,20 @@ describe("AppShell", () => {
       screen.getByRole("link", { name: "返回我的工作台" }),
     ).toHaveAttribute("href", "/workspace");
     expect(screen.queryByText("不应渲染的管理内容")).not.toBeInTheDocument();
+  });
+
+  it("blocks a sales user that opens system management directly", () => {
+    render(
+      <SessionProvider initialSession={salesSession}>
+        <AppShell activeItem="系统管理" breadcrumb="管理工作台 / 系统管理">
+          <p>不应渲染的系统管理内容</p>
+        </AppShell>
+      </SessionProvider>,
+    );
+
+    expect(screen.getByText("当前身份不能使用系统管理。")).toBeVisible();
+    expect(
+      screen.queryByText("不应渲染的系统管理内容"),
+    ).not.toBeInTheDocument();
   });
 });

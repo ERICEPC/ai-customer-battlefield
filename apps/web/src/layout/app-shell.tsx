@@ -35,6 +35,7 @@ const navigation = [
     href: "/reports",
     roles: ["sales", "department_leader"],
   },
+  { label: "系统管理", href: "/admin", roles: ["department_leader"] },
 ] as const;
 
 type NavigationLabel = (typeof navigation)[number]["label"];
@@ -128,10 +129,13 @@ export function AppShell({
       </main>
     );
   }
-  if (session.role === "sales" && activeItem === "管理问数") {
+  if (
+    session.role === "sales" &&
+    (activeItem === "管理问数" || activeItem === "系统管理")
+  ) {
     return (
       <main className="session-state">
-        <p>当前身份不能使用管理问数。</p>
+        <p>当前身份不能使用{activeItem}。</p>
         <Link href="/workspace">返回我的工作台</Link>
       </main>
     );
@@ -245,6 +249,11 @@ export function AppShell({
                 <Link className="account-settings-link" href="/settings">
                   个人设置
                 </Link>
+                {session.role === "department_leader" ? (
+                  <Link className="account-settings-link" href="/admin">
+                    系统管理
+                  </Link>
+                ) : null}
                 {logoutError ? <p role="alert">{logoutError}</p> : null}
                 <button type="button" onClick={() => void handleLogout()}>
                   退出登录
