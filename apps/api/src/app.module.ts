@@ -5,6 +5,7 @@ import { BusinessActionsModule } from "./business-actions/business-actions.modul
 import { BusinessEntitiesModule } from "./business-entities/business-entities.module.js";
 import { FollowupDraftsModule } from "./followup-drafts/followup-drafts.module.js";
 import { HealthController } from "./health/health.controller.js";
+import { ManagementQueriesModule } from "./management-queries/management-queries.module.js";
 import { NotificationsModule } from "./notifications/notifications.module.js";
 import { WorkspaceModule } from "./workspace/workspace.module.js";
 
@@ -16,6 +17,7 @@ import { WorkspaceModule } from "./workspace/workspace.module.js";
     BusinessActionsModule,
     NotificationsModule,
     WorkspaceModule,
+    ManagementQueriesModule,
   ],
   controllers: [HealthController],
 })

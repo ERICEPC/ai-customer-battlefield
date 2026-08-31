@@ -84,6 +84,8 @@ Evidence kinds are limited to `followup`, `fact`, `stage_change`, `action` and `
 3. Wire the core use case and database adapter; do not accept tenant, actor, role or raw SQL fields from the request body.
 4. Return the repository's stable `queryId`/audit ID for traceability.
 
+**Local evidence:** The new E2E suite first received 404 because neither endpoint existed. The GREEN module now exposes only strict `GET /api/v1/management-query-subjects` and `POST /api/v1/management-queries`, derives the actor from the existing server-side development identity boundary, rejects tenant/user/scope/SQL overrides, maps invalid input to 400, unifies missing and unauthorized subjects as 404, and fails closed with 503 when persistence is absent. The focused suite passes 5/5 and the complete API E2E set passes 35/35 with API typecheck and Biome green.
+
 ## Task 4: Deliver the `/ask` Web experience
 
 **Files:**
