@@ -8,3 +8,4 @@ export {
   SYNTHETIC_USER_ID,
   seedSyntheticBusinessEntityDirectory,
 } from "./synthetic-directory.js";
+export { seedSyntheticReminderConfiguration } from "./synthetic-reminders.js";

@@ -388,6 +388,35 @@ export class KyselyReminderStore implements ReminderStore {
     await this.completeFailure(input, "dead_lettered");
   }
 
+  async recoverExpiredClaims(input: {
+    actor: { tenantId: string; userId: string };
+    expiredBefore: string;
+    availableAt: string;
+  }): Promise<{ recovered: number }> {
+    return withTenantTransaction(
+      this.database,
+      { ...input.actor, requestId: randomUUID() },
+      async (transaction) => {
+        const result = await transaction
+          .updateTable("app.reminder_instances")
+          .set({
+            status: "failed",
+            available_at: input.availableAt,
+            claim_token: null,
+            claimed_at: null,
+            last_error_code: "REMINDER_LEASE_EXPIRED",
+            last_error_message: "Reminder processing lease expired.",
+            updated_at: sql`greatest(updated_at, ${input.availableAt}::timestamptz)`,
+          })
+          .where("tenant_id", "=", input.actor.tenantId)
+          .where("status", "=", "processing")
+          .where("claimed_at", "<=", new Date(input.expiredBefore))
+          .executeTakeFirst();
+        return { recovered: Number(result.numUpdatedRows) };
+      },
+    );
+  }
+
   private async completeFailure(
     input:
       | Parameters<ReminderStore["reschedule"]>[0]

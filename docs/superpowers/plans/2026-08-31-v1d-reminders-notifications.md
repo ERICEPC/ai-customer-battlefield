@@ -385,7 +385,7 @@ Commit: `feat: persist outbox reminders and notifications`
 - Production worker consumes tenant scope from `WORKER_TENANT_ID` and `WORKER_USER_ID`; future tenant orchestration can launch the same worker per tenant without changing handlers.
 - Handles `action_proposal.accepted.v1` by querying the created action and scheduling reminders; handles `business_action.status_changed.v1` by cancelling pending reminders for `completed`/`cancelled`.
 
-- [ ] **Step 1: Write failing worker orchestration tests**
+- [x] **Step 1: Write failing worker orchestration tests**
 
 Prove one batch schedules one due reminder, repeated Outbox handling creates no duplicate, completion before due cancels it, an unknown topic dead-letters without crashing later rows, a transient handler failure reschedules, and a lease-expired row becomes claimable.
 
@@ -399,13 +399,13 @@ await worker.tick();
 expect(await readReminder(actionId)).toMatchObject({ status: "cancelled" });
 ```
 
-- [ ] **Step 2: Run worker tests and verify RED**
+- [x] **Step 2: Run worker tests and verify RED**
 
 Run: `pnpm --filter @battlefield/worker test -- --run`
 
 Expected: FAIL because the worker package does not exist.
 
-- [ ] **Step 3: Implement a bounded polling loop**
+- [x] **Step 3: Implement a bounded polling loop**
 
 ```ts
 while (!signal.aborted) {
@@ -416,11 +416,11 @@ while (!signal.aborted) {
 
 Validate UUIDs and positive intervals at startup. Handle SIGINT/SIGTERM, await the active tick, then close the database. Do not use recursive timers or overlap ticks.
 
-- [ ] **Step 4: Reuse the same worker in the synthetic demo process**
+- [x] **Step 4: Reuse the same worker in the synthetic demo process**
 
 `dev/demo-server.ts` owns the PGlite handle, so create the worker against that handle and run a cancellable 250ms demo poller in the same process. Seed a due-only policy/template and active Feishu address only with synthetic IDs; do not enable real external delivery.
 
-- [ ] **Step 5: Document explicit worker configuration**
+- [x] **Step 5: Document explicit worker configuration**
 
 Add:
 
@@ -434,7 +434,7 @@ WORKER_LEASE_MS=60000
 
 Document that API and worker are separate production processes and both use the same migrated PostgreSQL database.
 
-- [ ] **Step 6: Verify and commit**
+- [x] **Step 6: Verify and commit**
 
 Run: `pnpm --filter @battlefield/worker test -- --run && pnpm --filter @battlefield/worker typecheck && pnpm --filter @battlefield/worker build`
 

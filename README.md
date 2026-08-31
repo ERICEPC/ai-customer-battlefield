@@ -8,6 +8,7 @@ The repository now contains a connected operating loop: a persistent tenant-scop
 
 - `apps/web`: browser experience built on the public API contract
 - `apps/api`: versioned HTTP API and infrastructure adapters
+- `apps/worker`: lease-based Outbox, reminder, and notification processing
 - `packages/contracts`: transport schemas shared by API clients and servers
 - `packages/core`: framework-free domain and application behavior
 - `packages/database`: SQL migrations and replaceable Kysely PostgreSQL/PGlite adapters
@@ -45,9 +46,10 @@ For a PostgreSQL-backed environment, use a dedicated PostgreSQL 17+ database, ap
 export DATABASE_URL=postgresql://user:password@localhost:5432/battlefield
 pnpm --filter @battlefield/database migrate
 pnpm --filter @battlefield/api dev
+pnpm --filter @battlefield/worker dev
 ```
 
-The API never auto-creates or auto-migrates production schema. `DATABASE_URL` is mandatory when `NODE_ENV=production`; production authentication remains intentionally fail-closed until the OIDC adapter is implemented. See [`.env.example`](.env.example) for development variables.
+The API and worker are separate production processes connected only through the same migrated PostgreSQL database. Neither process auto-creates or auto-migrates production schema. `DATABASE_URL` is mandatory; the worker also requires explicit tenant/system-user scope and bounded polling/lease values. Production authentication remains intentionally fail-closed until the OIDC adapter is implemented. See [`.env.example`](.env.example) for development variables.
 
 Before pushing to `main`:
 
@@ -92,9 +94,10 @@ Implemented today:
 - responsive Web confirmation workbench with explicit human acknowledgement, optimistic-conflict recovery, stable retry idempotency, and confirmed source/actor receipt;
 - tenant-safe battle analysis, evidence/signal versioning, separately persisted action proposals, explicit accept/reject decisions, and formal action state transitions;
 - responsive battle-map and action workspaces with truthful partial-page counts, exact immutable source-version deep links, cursor-paged active-owner selection, timezone-safe planning, server-authoritative expired suggestions, and ambiguity-safe idempotent retries;
+- lease-based Outbox consumption, versioned due reminders, atomic in-app notification materialization, and independently retryable channel deliveries;
 - PGlite local tests and PostgreSQL 18 CI verification of the same SQL migrations.
 
-Still in progress for V1: Outbox workers and notifications, configurable prompts/models/rules, reminders, reports, management queries, import tools, production OIDC, field-level masking for real customer evidence, and deploy/operations acceptance. Their adapters must preserve the boundaries established here.
+Still in progress for V1: the notification-center UI/API, Feishu adapter, configurable prompts/models/rules, reports, management queries, import tools, production OIDC, field-level masking for real customer evidence, and deploy/operations acceptance. Their adapters must preserve the boundaries established here.
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) before proposing a change.
 

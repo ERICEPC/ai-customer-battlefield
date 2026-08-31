@@ -279,6 +279,60 @@ export class KyselyNotificationStore implements NotificationStore {
     );
   }
 
+  async listAvailableDeliveryIds(input: {
+    actor: { tenantId: string; userId: string };
+    now: string;
+    limit: number;
+  }): Promise<string[]> {
+    return withTenantTransaction(
+      this.database,
+      { ...input.actor, requestId: randomUUID() },
+      async (transaction) => {
+        const rows = await transaction
+          .selectFrom("app.notification_deliveries")
+          .select("id")
+          .where("tenant_id", "=", input.actor.tenantId)
+          .where("channel", "in", ["feishu", "email"])
+          .where("status", "in", ["pending", "failed"])
+          .where("available_at", "<=", new Date(input.now))
+          .orderBy("available_at", "asc")
+          .orderBy("id", "asc")
+          .limit(input.limit)
+          .execute();
+        return rows.map((row) => row.id);
+      },
+    );
+  }
+
+  async recoverExpiredClaims(input: {
+    actor: { tenantId: string; userId: string };
+    expiredBefore: string;
+    availableAt: string;
+  }): Promise<{ recovered: number }> {
+    return withTenantTransaction(
+      this.database,
+      { ...input.actor, requestId: randomUUID() },
+      async (transaction) => {
+        const result = await transaction
+          .updateTable("app.notification_deliveries")
+          .set({
+            status: "failed",
+            available_at: input.availableAt,
+            claim_token: null,
+            claimed_at: null,
+            last_error_code: "NOTIFICATION_LEASE_EXPIRED",
+            last_error_message: "Notification delivery lease expired.",
+            updated_at: sql`greatest(updated_at, ${input.availableAt}::timestamptz)`,
+          })
+          .where("tenant_id", "=", input.actor.tenantId)
+          .where("status", "=", "processing")
+          .where("claimed_at", "<=", new Date(input.expiredBefore))
+          .executeTakeFirst();
+        return { recovered: Number(result.numUpdatedRows) };
+      },
+    );
+  }
+
   private async completeClaim(
     input: {
       actor: { tenantId: string; userId: string };

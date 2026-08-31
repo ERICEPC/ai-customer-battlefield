@@ -121,6 +121,76 @@ describe("Kysely Outbox, reminder, and notification stores", () => {
     expect(claimedAgain[0]).toMatchObject({ attemptCount: 2 });
   });
 
+  test("recovers expired reminder and delivery leases for the next worker tick", async () => {
+    const reminderStore = new KyselyReminderStore(database.db);
+    await new ScheduleActionReminders({
+      store: reminderStore,
+    }).onActionAccepted({
+      actor,
+      actionId,
+      occurredAt: "2026-09-01T00:00:00.000Z",
+    });
+    const [firstReminderClaim] = await reminderStore.claimDueBatch({
+      actor,
+      now: plannedAt,
+      limit: 1,
+      leaseMs: 60_000,
+    });
+    expect(firstReminderClaim).toMatchObject({ attemptCount: 1 });
+    expect(
+      await reminderStore.recoverExpiredClaims({
+        actor,
+        expiredBefore: "2026-09-01T01:01:00.000Z",
+        availableAt: "2026-09-01T01:01:00.000Z",
+      }),
+    ).toEqual({ recovered: 1 });
+    const [secondReminderClaim] = await reminderStore.claimDueBatch({
+      actor,
+      now: "2026-09-01T01:01:00.000Z",
+      limit: 1,
+      leaseMs: 60_000,
+    });
+    expect(secondReminderClaim).toMatchObject({ attemptCount: 2 });
+
+    await reminderStore.materializeDueReminder({
+      actor,
+      reminderId: secondReminderClaim?.reminderId ?? "",
+      claimToken: secondReminderClaim?.claimToken ?? "",
+      notifiedAt: "2026-09-01T01:01:01.000Z",
+    });
+    const notificationStore = new KyselyNotificationStore(database.db);
+    const deliveryId = await readFeishuDeliveryId(database);
+    const firstDeliveryClaim = await notificationStore.claimDelivery({
+      actor,
+      deliveryId,
+      now: "2026-09-01T01:01:01.000Z",
+      leaseMs: 60_000,
+    });
+    expect(firstDeliveryClaim).toMatchObject({ attemptCount: 1 });
+    expect(
+      await notificationStore.recoverExpiredClaims({
+        actor,
+        expiredBefore: "2026-09-01T01:02:01.000Z",
+        availableAt: "2026-09-01T01:02:01.000Z",
+      }),
+    ).toEqual({ recovered: 1 });
+    await expect(
+      notificationStore.listAvailableDeliveryIds({
+        actor,
+        now: "2026-09-01T01:02:01.000Z",
+        limit: 1,
+      }),
+    ).resolves.toEqual([deliveryId]);
+    await expect(
+      notificationStore.claimDelivery({
+        actor,
+        deliveryId,
+        now: "2026-09-01T01:02:01.000Z",
+        leaseMs: 60_000,
+      }),
+    ).resolves.toMatchObject({ attemptCount: 2 });
+  });
+
   test("schedules one stable due reminder and materializes inbox truth atomically", async () => {
     const reminderStore = new KyselyReminderStore(database.db);
     const scheduler = new ScheduleActionReminders({ store: reminderStore });

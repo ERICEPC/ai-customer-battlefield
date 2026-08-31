@@ -1,0 +1,29 @@
+{
+  "name": "@battlefield/worker",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "prebuild": "pnpm --filter @battlefield/core build && pnpm --filter @battlefield/database build",
+    "build": "tsc -p tsconfig.build.json",
+    "pretypecheck": "pnpm --filter @battlefield/core build && pnpm --filter @battlefield/database build",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "pretest": "pnpm --filter @battlefield/core build && pnpm --filter @battlefield/database build",
+    "test": "vitest run",
+    "dev": "tsx src/main.ts"
+  },
+  "dependencies": {
+    "@battlefield/core": "workspace:*",
+    "@battlefield/database": "workspace:*",
+    "kysely": "^0.29.5"
+  },
+  "devDependencies": {
+    "tsx": "^4.23.12"
+  }
+}
