@@ -70,10 +70,16 @@ export type {
   SourceEvidenceTable,
   SourceInputTable,
   TenantTable,
+  UserCredentialTable,
   UserMembershipTable,
+  UserSessionTable,
   UserTable,
 } from "./database-types.js";
 export { KyselyFollowupConfirmationStore } from "./followup-confirmation/kysely-followup-confirmation-store.js";
+export {
+  KyselyIdentityStore,
+  type KyselyIdentityStoreOptions,
+} from "./identity/kysely-identity-store.js";
 export * from "./management-queries/index.js";
 export {
   MigrationFailedError,

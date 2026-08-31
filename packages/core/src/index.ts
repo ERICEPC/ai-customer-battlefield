@@ -15,6 +15,27 @@ export type {
   FollowupDraftAgent,
   FollowupDraftCandidate,
 } from "./followup-drafts/followup-draft-agent.js";
+export type {
+  IdentityPerson,
+  IdentityProfile,
+  IdentityRole,
+  IdentityStore,
+  LoginAccount,
+  StoredSessionIdentity,
+} from "./identity/identity-store.js";
+export {
+  type AuthenticatedIdentity,
+  AuthenticateSession,
+  hashPassword,
+  hashSessionToken,
+  InvalidCredentialsError,
+  InvalidSessionConfigurationError,
+  ResolveSession,
+  RevokeSession,
+  randomSessionToken,
+  type SessionProfile,
+  verifyPassword,
+} from "./identity/manage-session.js";
 export * from "./management-queries/index.js";
 export * from "./notifications/notification-delivery.js";
 export * from "./reminders/reminder-scheduler.js";

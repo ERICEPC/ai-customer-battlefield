@@ -86,6 +86,28 @@ export interface UserMembershipTable {
   created_at: Timestamp;
 }
 
+export interface UserCredentialTable {
+  tenant_id: string;
+  user_id: string;
+  password_hash: string;
+  password_updated_at: Timestamp;
+  failed_attempt_count: Generated<number>;
+  locked_until: NullableTimestamp;
+  created_at: Timestamp;
+  updated_at: Timestamp;
+}
+
+export interface UserSessionTable {
+  tenant_id: string;
+  id: Generated<string>;
+  user_id: string;
+  token_hash: string;
+  expires_at: Timestamp;
+  last_used_at: Timestamp;
+  revoked_at: NullableTimestamp;
+  created_at: Timestamp;
+}
+
 export interface ChannelAddressTable {
   tenant_id: string;
   id: Generated<string>;
@@ -741,6 +763,8 @@ export interface BattlefieldDatabase {
   "app.org_units": OrgUnitTable;
   "app.users": UserTable;
   "app.user_memberships": UserMembershipTable;
+  "app.user_credentials": UserCredentialTable;
+  "app.user_sessions": UserSessionTable;
   "app.channel_addresses": ChannelAddressTable;
   "app.business_entity_types": BusinessEntityTypeTable;
   "app.business_entities": BusinessEntityTable;
