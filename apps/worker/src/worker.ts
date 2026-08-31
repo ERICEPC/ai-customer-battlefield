@@ -219,7 +219,10 @@ export function createReminderWorker(input: {
 }): ReminderWorker {
   const clock = input.clock ?? { now: () => new Date() };
   const outboxStore = new KyselyOutboxStore(input.database);
-  const reminderStore = new KyselyReminderStore(input.database);
+  const channels = input.channels ?? [];
+  const reminderStore = new KyselyReminderStore(input.database, {
+    enabledExternalChannels: channels.map((channel) => channel.channel),
+  });
   const notificationStore = new KyselyNotificationStore(input.database);
   const scheduler = new ScheduleActionReminders({ store: reminderStore });
   const canceller = new CancelActionReminders({ store: reminderStore });
@@ -243,7 +246,7 @@ export function createReminderWorker(input: {
     deliveryQueue: notificationStore,
     notificationDelivery: new NotificationDelivery({
       store: notificationStore,
-      channels: input.channels ?? [],
+      channels,
       clock,
     }),
   });

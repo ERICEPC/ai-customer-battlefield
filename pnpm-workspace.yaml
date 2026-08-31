@@ -7,3 +7,5 @@ onlyBuiltDependencies:
   - esbuild
 allowBuilds:
   esbuild: true
+  # Reviewed: this script only emits dependency version-scheme warnings.
+  protobufjs: false

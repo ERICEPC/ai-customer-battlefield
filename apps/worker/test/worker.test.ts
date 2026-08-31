@@ -58,6 +58,40 @@ describe("reminder worker", () => {
     ).toThrow();
   });
 
+  test("disables Feishu with empty credentials and rejects partial or unsafe configuration", () => {
+    const base = {
+      DATABASE_URL: "postgresql://synthetic.invalid/battlefield",
+      WORKER_TENANT_ID: actor.tenantId,
+      WORKER_USER_ID: actor.userId,
+    };
+    expect(loadWorkerConfig(base).feishu).toBeNull();
+    expect(() =>
+      loadWorkerConfig({ ...base, FEISHU_APP_ID: "cli_synthetic" }),
+    ).toThrow("configured together");
+    expect(() =>
+      loadWorkerConfig({
+        ...base,
+        FEISHU_APP_ID: "cli_synthetic",
+        FEISHU_APP_SECRET: "synthetic-secret",
+        PUBLIC_WEB_BASE_URL: "http://battlefield.example.com",
+      }),
+    ).toThrow("HTTPS");
+    expect(
+      loadWorkerConfig({
+        ...base,
+        FEISHU_APP_ID: "cli_synthetic",
+        FEISHU_APP_SECRET: "synthetic-secret",
+        PUBLIC_WEB_BASE_URL: "https://battlefield.example.com/app/",
+        FEISHU_RECEIVE_ID_TYPE: "open_id",
+      }).feishu,
+    ).toEqual({
+      appId: "cli_synthetic",
+      appSecret: "synthetic-secret",
+      publicWebBaseUrl: "https://battlefield.example.com/app",
+      receiveIdType: "open_id",
+    });
+  });
+
   test("maps accepted and terminal action events without treating in-progress as terminal", async () => {
     const events: unknown[] = [];
     const handlers = createOutboxHandlers({

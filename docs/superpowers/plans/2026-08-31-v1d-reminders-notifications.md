@@ -519,13 +519,13 @@ Commit: `feat: add durable in-app notification center`
 - `FeishuCredentialProvider.get(tenantId)` returns `{ appId, appSecret } | null`; the environment implementation is explicitly single-tenant.
 - `FeishuMessenger.sendCard` receives `open_id`, a 50-character-or-shorter UUID, and an interactive card JSON object; tests inject a fake messenger and never call Feishu.
 
-- [ ] **Step 1: Add and lock the official SDK**
+- [x] **Step 1: Add and lock the official SDK**
 
 Run: `pnpm --filter @battlefield/worker add @larksuiteoapi/node-sdk@1.73.0`
 
 Expected: worker manifest and `pnpm-lock.yaml` contain the pinned resolved dependency.
 
-- [ ] **Step 2: Write adapter tests for success and error classification**
+- [x] **Step 2: Write adapter tests for success and error classification**
 
 ```ts
 expect(await channel.send(notification)).toEqual({
@@ -544,15 +544,15 @@ await expect(channel.send(userOptedOut)).rejects.toMatchObject({
 
 Map network/5xx/429 to retryable; map missing active address, cross-tenant recipient, app scope/opt-out codes including `230038` and `230053`, and invalid card/input to permanent errors.
 
-- [ ] **Step 3: Implement a summary-plus-deep-link card**
+- [x] **Step 3: Implement a summary-plus-deep-link card**
 
 The card displays notification title, body, priority label, created time, and one button whose URL is `PUBLIC_WEB_BASE_URL + deepLink`. It has no business mutation callback. Pass delivery dedupe key as Feishu message `uuid`; do not include evidence text beyond the already persisted notification body.
 
-- [ ] **Step 4: Integrate channel registry without making Feishu mandatory**
+- [x] **Step 4: Integrate channel registry without making Feishu mandatory**
 
 If credentials or an active Feishu `channel_address` are absent, create no Feishu delivery and keep the in-app notification delivered. If a Feishu delivery exists, the worker claims and sends it independently; provider downtime changes only that delivery row.
 
-- [ ] **Step 5: Document credentials and safe operating boundary**
+- [x] **Step 5: Document credentials and safe operating boundary**
 
 ```dotenv
 PUBLIC_WEB_BASE_URL=https://battlefield.example.com
@@ -563,7 +563,7 @@ FEISHU_RECEIVE_ID_TYPE=open_id
 
 Document application bot scope, `im:message:send_as_bot`, user availability requirements, Secret Manager expectations, rate-limit retry, and that empty credentials disable Feishu without disabling Web/inbox.
 
-- [ ] **Step 6: Verify and commit**
+- [x] **Step 6: Verify and commit**
 
 Run: `pnpm --filter @battlefield/worker test -- --run && pnpm --filter @battlefield/worker typecheck && pnpm check:public`
 

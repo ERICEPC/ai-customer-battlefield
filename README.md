@@ -51,6 +51,12 @@ pnpm --filter @battlefield/worker dev
 
 The API and worker are separate production processes connected only through the same migrated PostgreSQL database. Neither process auto-creates or auto-migrates production schema. `DATABASE_URL` is mandatory; the worker also requires explicit tenant/system-user scope and bounded polling/lease values. Production authentication remains intentionally fail-closed until the OIDC adapter is implemented. See [`.env.example`](.env.example) for development variables.
 
+### Optional Feishu notifications
+
+Feishu is an outbound adapter, not the application entry point or source of truth. The Web inbox works without Feishu. To enable app-bot delivery for the worker's configured tenant, provision a self-built Feishu app with bot capability and the `im:message:send_as_bot` permission, make the app available to the intended users, persist each recipient's active `open_id` as a tenant-scoped channel address, and set all four values shown in [`.env.example`](.env.example). The public Web base URL must use HTTPS.
+
+Leave both credential values empty to disable Feishu. A partial credential pair fails worker startup. Production credentials belong in the deployment platform's Secret Manager and must never be committed, logged, or returned by an API. The worker sends summary-only interactive cards with a Web deep link through the pinned official SDK; it performs no business mutation from card callbacks. Rate limits, network failures, and provider 5xx responses are retried on the delivery row, while unavailable recipients and permission/input failures are dead-lettered without changing the in-app notification.
+
 Before pushing to `main`:
 
 ```bash
@@ -94,10 +100,11 @@ Implemented today:
 - responsive Web confirmation workbench with explicit human acknowledgement, optimistic-conflict recovery, stable retry idempotency, and confirmed source/actor receipt;
 - tenant-safe battle analysis, evidence/signal versioning, separately persisted action proposals, explicit accept/reject decisions, and formal action state transitions;
 - responsive battle-map and action workspaces with truthful partial-page counts, exact immutable source-version deep links, cursor-paged active-owner selection, timezone-safe planning, server-authoritative expired suggestions, and ambiguity-safe idempotent retries;
-- lease-based Outbox consumption, versioned due reminders, atomic in-app notification materialization, and independently retryable channel deliveries;
+- lease-based Outbox consumption, versioned due reminders, atomic in-app notification materialization, independently retryable channel deliveries, and a responsive notification center;
+- optional Feishu app-bot delivery through a tenant-bound credential/channel adapter, with the Web inbox remaining independent;
 - PGlite local tests and PostgreSQL 18 CI verification of the same SQL migrations.
 
-Still in progress for V1: the notification-center UI/API, Feishu adapter, configurable prompts/models/rules, reports, management queries, import tools, production OIDC, field-level masking for real customer evidence, and deploy/operations acceptance. Their adapters must preserve the boundaries established here.
+Still in progress for V1: configurable prompts/models/rules, reports, management queries, import tools, production OIDC, field-level masking for real customer evidence, and deploy/operations acceptance. Their adapters must preserve the boundaries established here.
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) before proposing a change.
 

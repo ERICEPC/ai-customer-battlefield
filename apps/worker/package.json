@@ -21,6 +21,7 @@
   "dependencies": {
     "@battlefield/core": "workspace:*",
     "@battlefield/database": "workspace:*",
+    "@larksuiteoapi/node-sdk": "1.73.0",
     "kysely": "^0.29.5"
   },
   "devDependencies": {

@@ -238,6 +238,63 @@ describe("Kysely Outbox, reminder, and notification stores", () => {
     });
   });
 
+  test("does not enqueue an external delivery when its adapter is disabled", async () => {
+    const reminderStore = new KyselyReminderStore(database.db, {
+      enabledExternalChannels: [],
+    });
+    await new ScheduleActionReminders({
+      store: reminderStore,
+    }).onActionAccepted({
+      actor,
+      actionId,
+      occurredAt: "2026-09-01T00:00:00.000Z",
+    });
+    await new DispatchDueReminders({
+      store: reminderStore,
+      clock: { now: () => new Date(plannedAt) },
+    }).runOnce({ actor, limit: 50, leaseMs: 60_000 });
+
+    expect(await readNotificationCounts(database)).toMatchObject({
+      event_count: 1,
+      in_app_count: 1,
+      feishu_count: 0,
+    });
+  });
+
+  test("does not enqueue an external delivery without an active tenant address", async () => {
+    await withTenantTransaction(
+      database.db,
+      { ...actor, requestId },
+      async (transaction) => {
+        await transaction
+          .updateTable("app.channel_addresses")
+          .set({ status: "disabled" })
+          .where("tenant_id", "=", actor.tenantId)
+          .where("user_id", "=", actor.userId)
+          .where("channel", "=", "feishu")
+          .executeTakeFirstOrThrow();
+      },
+    );
+    const reminderStore = new KyselyReminderStore(database.db);
+    await new ScheduleActionReminders({
+      store: reminderStore,
+    }).onActionAccepted({
+      actor,
+      actionId,
+      occurredAt: "2026-09-01T00:00:00.000Z",
+    });
+    await new DispatchDueReminders({
+      store: reminderStore,
+      clock: { now: () => new Date(plannedAt) },
+    }).runOnce({ actor, limit: 50, leaseMs: 60_000 });
+
+    expect(await readNotificationCounts(database)).toMatchObject({
+      event_count: 1,
+      in_app_count: 1,
+      feishu_count: 0,
+    });
+  });
+
   test("keeps the due reminder valid when the action advances to in progress", async () => {
     const reminderStore = new KyselyReminderStore(database.db);
     await new ScheduleActionReminders({

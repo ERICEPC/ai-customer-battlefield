@@ -1,3 +1,5 @@
+import type { FeishuChannelConfig } from "./channels/channel-registry.js";
+
 export interface WorkerConfig {
   databaseUrl: string;
   actor: { tenantId: string; userId: string };
@@ -5,6 +7,7 @@ export interface WorkerConfig {
   idlePollMs: number;
   busyPollMs: number;
   leaseMs: number;
+  feishu: FeishuChannelConfig | null;
 }
 
 const UUID_PATTERN =
@@ -40,7 +43,46 @@ export function loadWorkerConfig(
       1_000,
       3_600_000,
     ),
+    feishu: loadFeishuConfig(environment),
   };
+}
+
+function loadFeishuConfig(
+  environment: Record<string, string | undefined>,
+): FeishuChannelConfig | null {
+  const appId = optional(environment.FEISHU_APP_ID);
+  const appSecret = optional(environment.FEISHU_APP_SECRET);
+  if (!appId && !appSecret) {
+    return null;
+  }
+  if (!appId || !appSecret) {
+    throw new Error(
+      "FEISHU_APP_ID and FEISHU_APP_SECRET must be configured together.",
+    );
+  }
+  const receiveIdType =
+    optional(environment.FEISHU_RECEIVE_ID_TYPE) ?? "open_id";
+  if (receiveIdType !== "open_id") {
+    throw new Error("FEISHU_RECEIVE_ID_TYPE must be open_id.");
+  }
+  const publicWebBaseUrl = normalizePublicWebBaseUrl(
+    required(environment, "PUBLIC_WEB_BASE_URL"),
+  );
+  return { appId, appSecret, publicWebBaseUrl, receiveIdType };
+}
+
+function normalizePublicWebBaseUrl(value: string): string {
+  const parsed = new URL(value);
+  if (
+    parsed.protocol !== "https:" ||
+    parsed.username ||
+    parsed.password ||
+    parsed.search ||
+    parsed.hash
+  ) {
+    throw new Error("PUBLIC_WEB_BASE_URL must be an absolute HTTPS URL.");
+  }
+  return `${parsed.origin}${parsed.pathname.replace(/\/$/, "")}`;
 }
 
 function required(
@@ -52,6 +94,11 @@ function required(
     throw new Error(`${name} is required.`);
   }
   return value;
+}
+
+function optional(value: string | undefined): string | null {
+  const trimmed = value?.trim();
+  return trimmed ? trimmed : null;
 }
 
 function boundedInteger(

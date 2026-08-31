@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import type {
+  ExternalNotificationChannel,
   ReminderPolicyNode,
   ReminderSchedulingContext,
   ReminderStore,
@@ -24,7 +25,18 @@ export class InvalidPersistedReminderPolicyError extends Error {
 }
 
 export class KyselyReminderStore implements ReminderStore {
-  constructor(private readonly database: Kysely<BattlefieldDatabase>) {}
+  private readonly enabledExternalChannels: ReadonlySet<ExternalNotificationChannel>;
+
+  constructor(
+    private readonly database: Kysely<BattlefieldDatabase>,
+    options: {
+      enabledExternalChannels?: ExternalNotificationChannel[];
+    } = {},
+  ) {
+    this.enabledExternalChannels = new Set(
+      options.enabledExternalChannels ?? ["feishu", "email"],
+    );
+  }
 
   async loadSchedulingContext(
     input: Parameters<ReminderStore["loadSchedulingContext"]>[0],
@@ -313,7 +325,10 @@ export class KyselyReminderStore implements ReminderStore {
           )
           .executeTakeFirst();
         const channels = decodeChannels(reminder.channels);
-        if (channels.includes("feishu")) {
+        if (
+          channels.includes("feishu") &&
+          this.enabledExternalChannels.has("feishu")
+        ) {
           const address = await transaction
             .selectFrom("app.channel_addresses")
             .select("id")
@@ -333,7 +348,7 @@ export class KyselyReminderStore implements ReminderStore {
                 channel: "feishu",
                 address_id: address.id,
                 status: "pending",
-                dedupe_key: `notification:${eventId}:channel:feishu`,
+                dedupe_key: `feishu:${eventId}`,
                 available_at: input.notifiedAt,
                 attempt_count: 0,
                 claim_token: null,
