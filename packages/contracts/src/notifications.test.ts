@@ -4,6 +4,7 @@ import {
   inboxPageSchema,
   inboxQuerySchema,
   markNotificationReadResponseSchema,
+  notificationEventTypeSchema,
   notificationPrioritySchema,
 } from "./notifications.js";
 
@@ -24,6 +25,12 @@ function inboxItem() {
 }
 
 describe("notification contracts", () => {
+  it("accepts action and weekly-report notification event types", () => {
+    expect(notificationEventTypeSchema.parse("action_due")).toBe("action_due");
+    expect(notificationEventTypeSchema.parse("weekly_report_published")).toBe(
+      "weekly_report_published",
+    );
+  });
   it("coerces only explicit boolean query values and bounds pagination", () => {
     expect(inboxQuerySchema.parse({ unreadOnly: "true", limit: "50" })).toEqual(
       { unreadOnly: true, limit: 50 },

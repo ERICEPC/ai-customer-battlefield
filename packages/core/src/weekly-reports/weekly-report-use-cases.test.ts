@@ -25,7 +25,8 @@ const detail: WeeklyReportDetail = {
   reportId: "91000000-0000-4000-8000-000000000001",
   versionId,
   reportType: "personal",
-  versionNo: 1,
+  revisionNo: 1,
+  lockVersion: 1,
   status: "in_review",
   title: "个人周报",
   note: "",
@@ -158,7 +159,7 @@ describe("weekly-report lifecycle use cases", () => {
     await new ReviewWeeklyReport({ repository: repo }).execute({
       actor,
       versionId,
-      versionNo: 1,
+      lockVersion: 1,
       note: "保留风险说明。",
       items: [
         {
@@ -170,13 +171,13 @@ describe("weekly-report lifecycle use cases", () => {
     await new PublishWeeklyReport({ repository: repo }).execute({
       actor,
       versionId,
-      versionNo: 2,
+      lockVersion: 2,
       idempotencyKey: "publish-report-1",
     });
     await new ReviseWeeklyReport({ repository: repo }).execute({
       actor,
       versionId,
-      versionNo: 2,
+      lockVersion: 2,
       idempotencyKey: "revise-report-1",
     });
 
@@ -189,7 +190,7 @@ describe("weekly-report lifecycle use cases", () => {
     expect(repo.review).toHaveBeenCalledWith({
       actor,
       versionId,
-      versionNo: 1,
+      lockVersion: 1,
       note: "保留风险说明。",
       items: [
         {
@@ -201,13 +202,13 @@ describe("weekly-report lifecycle use cases", () => {
     expect(repo.publish).toHaveBeenCalledWith({
       actor,
       versionId,
-      versionNo: 2,
+      lockVersion: 2,
       idempotencyKey: "publish-report-1",
     });
     expect(repo.revise).toHaveBeenCalledWith({
       actor,
       versionId,
-      versionNo: 2,
+      lockVersion: 2,
       idempotencyKey: "revise-report-1",
     });
   });

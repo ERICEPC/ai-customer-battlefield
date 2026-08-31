@@ -96,11 +96,11 @@ export class ReviewWeeklyReport {
   async execute(input: {
     actor: ActorScope;
     versionId: string;
-    versionNo: number;
+    lockVersion: number;
     note: string;
     items: Array<{ itemId: string; included: boolean }>;
   }) {
-    validatePositiveVersion(input.versionNo);
+    validatePositiveVersion(input.lockVersion);
     if (input.note.length > 2_000 || input.items.length > 400) {
       throw new InvalidWeeklyReportReviewError();
     }
@@ -122,10 +122,10 @@ export class PublishWeeklyReport {
   async execute(input: {
     actor: ActorScope;
     versionId: string;
-    versionNo: number;
+    lockVersion: number;
     idempotencyKey: string;
   }) {
-    validatePositiveVersion(input.versionNo);
+    validatePositiveVersion(input.lockVersion);
     return this.dependencies.repository.publish(input);
   }
 }
@@ -138,10 +138,10 @@ export class ReviseWeeklyReport {
   async execute(input: {
     actor: ActorScope;
     versionId: string;
-    versionNo: number;
+    lockVersion: number;
     idempotencyKey: string;
   }) {
-    validatePositiveVersion(input.versionNo);
+    validatePositiveVersion(input.lockVersion);
     return this.dependencies.repository.revise(input);
   }
 }
@@ -184,8 +184,8 @@ export class InvalidWeeklyReportVersionError extends Error {
   }
 }
 
-function validatePositiveVersion(versionNo: number): void {
-  if (!Number.isInteger(versionNo) || versionNo < 1) {
+function validatePositiveVersion(lockVersion: number): void {
+  if (!Number.isInteger(lockVersion) || lockVersion < 1) {
     throw new InvalidWeeklyReportVersionError();
   }
 }

@@ -50,7 +50,7 @@ export const generateWeeklyReportRequestSchema = z
   );
 
 export const reviewWeeklyReportRequestSchema = z.strictObject({
-  versionNo: z.number().int().positive(),
+  lockVersion: z.number().int().positive(),
   note: z.string().max(2_000),
   items: z
     .array(
@@ -71,7 +71,7 @@ export const reviewWeeklyReportRequestSchema = z.strictObject({
 });
 
 export const weeklyReportTransitionRequestSchema = z.strictObject({
-  versionNo: z.number().int().positive(),
+  lockVersion: z.number().int().positive(),
 });
 
 export const weeklyReportListQuerySchema = z.strictObject({
@@ -128,7 +128,8 @@ export const weeklyReportDetailSchema = z
     reportId: z.uuid(),
     versionId: z.uuid(),
     reportType: weeklyReportTypeSchema,
-    versionNo: z.number().int().positive(),
+    revisionNo: z.number().int().positive(),
+    lockVersion: z.number().int().positive(),
     status: weeklyReportStatusSchema,
     title: z.string().trim().min(1).max(200),
     note: z.string().max(2_000),
@@ -220,7 +221,7 @@ export const weeklyReportListItemSchema = z
     reportId: z.uuid(),
     versionId: z.uuid(),
     reportType: weeklyReportTypeSchema,
-    versionNo: z.number().int().positive(),
+    revisionNo: z.number().int().positive(),
     status: weeklyReportStatusSchema,
     title: z.string().trim().min(1).max(200),
     period: z.strictObject({

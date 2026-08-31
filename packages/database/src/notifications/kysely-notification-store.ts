@@ -16,7 +16,7 @@ interface InboxCursor {
 export interface InboxPage {
   items: Array<{
     notificationId: string;
-    eventType: "action_due";
+    eventType: "action_due" | "weekly_report_published";
     title: string;
     body: string;
     deepLink: string;

@@ -12,7 +12,10 @@ const applicationRelativePathSchema = z
   .max(2_000)
   .regex(/^\/(?!\/)[^\r\n]*$/);
 
-export const notificationEventTypeSchema = z.enum(["action_due"]);
+export const notificationEventTypeSchema = z.enum([
+  "action_due",
+  "weekly_report_published",
+]);
 export const notificationPrioritySchema = z.enum([
   "low",
   "medium",

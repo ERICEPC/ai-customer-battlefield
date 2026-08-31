@@ -598,14 +598,111 @@ export interface NotificationEventTable {
   tenant_id: string;
   id: Generated<string>;
   recipient_user_id: string;
-  reminder_id: string;
-  event_type: "action_due";
+  reminder_id: string | null;
+  report_version_id: string | null;
+  event_type: "action_due" | "weekly_report_published";
   title: string;
   body: string;
   deep_link: string;
   priority: "low" | "medium" | "high" | "urgent";
   read_at: NullableTimestamp;
   dedupe_key: string;
+  created_at: Timestamp;
+}
+
+export interface WeeklyReportTable {
+  tenant_id: string;
+  id: Generated<string>;
+  report_type: "personal" | "managed_portfolio";
+  owner_user_id: string;
+  subject_user_id: string | null;
+  period_start: Timestamp;
+  period_end: Timestamp;
+  created_by: string;
+  created_at: Timestamp;
+}
+
+export interface WeeklyReportVersionTable {
+  tenant_id: string;
+  id: Generated<string>;
+  report_id: string;
+  revision_no: VersionNumber;
+  lock_version: VersionNumber;
+  status: "draft" | "in_review" | "published" | "cancelled";
+  data_cutoff_at: Timestamp;
+  title: string;
+  note: string;
+  scope_fingerprint: string;
+  scope_entity_count: number;
+  contributor_count: number;
+  confirmed_followup_count: number;
+  valid_fact_count: number;
+  stage_change_count: number;
+  completed_action_count: number;
+  open_action_count: number;
+  overdue_action_count: number;
+  generator_kind: "deterministic" | "agent";
+  generator_version: string;
+  previous_version_id: string | null;
+  created_by: string;
+  created_at: Timestamp;
+  published_by: string | null;
+  published_at: NullableTimestamp;
+  updated_at: Timestamp;
+}
+
+export interface WeeklyReportScopeEntityTable {
+  tenant_id: string;
+  report_version_id: string;
+  entity_id: string;
+  sort_order: number;
+  created_at: Timestamp;
+}
+
+export interface WeeklyReportItemTable {
+  tenant_id: string;
+  id: Generated<string>;
+  report_version_id: string;
+  section_type: "progress" | "risk" | "next_action" | "data_gap";
+  entity_id: string;
+  title: string;
+  summary: string;
+  severity: "positive" | "info" | "warning" | "critical";
+  occurred_at: NullableTimestamp;
+  included: Generated<boolean>;
+  sort_order: number;
+  created_at: Timestamp;
+}
+
+export interface ReportEvidenceLinkTable {
+  tenant_id: string;
+  report_item_id: string;
+  evidence_type:
+    | "followup"
+    | "fact"
+    | "stage_change"
+    | "action"
+    | "battle_state";
+  evidence_id: string;
+  occurred_at: Timestamp;
+  label: string;
+  deep_link: string;
+  created_at: Timestamp;
+}
+
+export interface WeeklyReportItemContributorTable {
+  tenant_id: string;
+  report_item_id: string;
+  user_id: string;
+  display_name: string;
+  created_at: Timestamp;
+}
+
+export interface WeeklyReportAudienceTable {
+  tenant_id: string;
+  report_version_id: string;
+  user_id: string;
+  audience_role: "reviewer" | "recipient";
   created_at: Timestamp;
 }
 
@@ -679,4 +776,11 @@ export interface BattlefieldDatabase {
   "app.reminder_instances": ReminderInstanceTable;
   "app.notification_events": NotificationEventTable;
   "app.notification_deliveries": NotificationDeliveryTable;
+  "app.weekly_reports": WeeklyReportTable;
+  "app.weekly_report_versions": WeeklyReportVersionTable;
+  "app.weekly_report_scope_entities": WeeklyReportScopeEntityTable;
+  "app.weekly_report_items": WeeklyReportItemTable;
+  "app.report_evidence_links": ReportEvidenceLinkTable;
+  "app.weekly_report_item_contributors": WeeklyReportItemContributorTable;
+  "app.weekly_report_audiences": WeeklyReportAudienceTable;
 }

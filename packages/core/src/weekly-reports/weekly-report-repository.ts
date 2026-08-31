@@ -48,7 +48,8 @@ export interface WeeklyReportDetail {
   reportId: string;
   versionId: string;
   reportType: WeeklyReportType;
-  versionNo: number;
+  revisionNo: number;
+  lockVersion: number;
   status: WeeklyReportStatus;
   title: string;
   note: string;
@@ -72,7 +73,7 @@ export interface WeeklyReportListItem {
   reportId: string;
   versionId: string;
   reportType: WeeklyReportType;
-  versionNo: number;
+  revisionNo: number;
   status: WeeklyReportStatus;
   title: string;
   period: { start: string; end: string };
@@ -106,20 +107,20 @@ export interface WeeklyReportRepository {
   review(input: {
     actor: ActorScope;
     versionId: string;
-    versionNo: number;
+    lockVersion: number;
     note: string;
     items: Array<{ itemId: string; included: boolean }>;
   }): Promise<WeeklyReportDetail>;
   publish(input: {
     actor: ActorScope;
     versionId: string;
-    versionNo: number;
+    lockVersion: number;
     idempotencyKey: string;
   }): Promise<WeeklyReportDetail>;
   revise(input: {
     actor: ActorScope;
     versionId: string;
-    versionNo: number;
+    lockVersion: number;
     idempotencyKey: string;
   }): Promise<WeeklyReportDetail>;
 }

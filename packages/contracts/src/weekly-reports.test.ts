@@ -26,7 +26,8 @@ function detail() {
     reportId,
     versionId,
     reportType: "managed_portfolio" as const,
-    versionNo: 1,
+    revisionNo: 1,
+    lockVersion: 1,
     status: "in_review" as const,
     title: "管理范围周报",
     note: "请重点关注逾期动作。",
@@ -251,25 +252,25 @@ describe("weekly-report contracts", () => {
   it("validates review and transition concurrency inputs", () => {
     expect(
       reviewWeeklyReportRequestSchema.parse({
-        versionNo: 3,
+        lockVersion: 3,
         note: "保留风险说明。",
         items: [{ itemId: itemIds.risk, included: true }],
       }),
     ).toEqual({
-      versionNo: 3,
+      lockVersion: 3,
       note: "保留风险说明。",
       items: [{ itemId: itemIds.risk, included: true }],
     });
     expect(
       reviewWeeklyReportRequestSchema.safeParse({
-        versionNo: 0,
+        lockVersion: 0,
         note: "x",
         items: [],
       }).success,
     ).toBe(false);
     expect(
       weeklyReportTransitionRequestSchema.safeParse({
-        versionNo: 1,
+        lockVersion: 1,
         force: true,
       }).success,
     ).toBe(false);
@@ -289,7 +290,7 @@ describe("weekly-report contracts", () => {
           reportId,
           versionId,
           reportType: "personal",
-          versionNo: 1,
+          revisionNo: 1,
           status: "in_review",
           title: "个人周报",
           period: detail().period,
