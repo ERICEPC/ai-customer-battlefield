@@ -23,6 +23,7 @@ import {
   SYNTHETIC_USER_ID,
   seedSyntheticBusinessEntityDirectory,
 } from "../src/testing/synthetic-directory.js";
+import { KyselyWorkspaceReader } from "../src/workspace/kysely-workspace-reader.js";
 
 const MIGRATION_DIRECTORY = fileURLToPath(
   new URL("../migrations", import.meta.url),
@@ -238,6 +239,11 @@ describe("PostgreSQL migrations", () => {
       where namespace.nspname = 'app'
         and class.relkind = 'r'
     `.execute(database.db);
+    const workspace = await new KyselyWorkspaceReader(database.db).read({
+      actor,
+      now: "2026-09-04T00:00:00.000Z",
+    });
+    const workspacePlans = await readWorkspacePlanEvidence(database);
 
     expect(firstRun.map((migration) => migration.name)).toEqual([
       "0001_foundation",
@@ -274,6 +280,31 @@ describe("PostgreSQL migrations", () => {
     expect(actionPage.items.map((item) => item.actionId)).toEqual([
       action.actionId,
     ]);
+    expect(workspace).toMatchObject({
+      scopeMode: "personal",
+      kpis: {
+        assignedEntityCount: 1,
+        pendingDraftCount: 0,
+        pendingProposalCount: 0,
+        overdueActionCount: 1,
+        unreadNotificationCount: 0,
+        highRiskEntityCount: 0,
+        dataIncompleteEntityCount: 0,
+      },
+      priorityActions: [
+        expect.objectContaining({
+          actionId: action.actionId,
+          isOverdue: true,
+        }),
+      ],
+      quadrantDistribution: [
+        { quadrantCode: "high_relationship_high_potential", count: 1 },
+      ],
+    });
+    expect(workspacePlans.assignment).toContain(
+      "entity_assignments_user_current_idx",
+    );
+    expect(workspacePlans.action).toContain("business_actions_owner_due_idx");
     expect(confirmationCounts).toEqual({
       action_count: 1,
       followup_count: 1,
@@ -283,6 +314,50 @@ describe("PostgreSQL migrations", () => {
     });
   });
 });
+
+async function readWorkspacePlanEvidence(
+  database: DatabaseHandle<BattlefieldDatabase>,
+): Promise<{ assignment: string; action: string }> {
+  return withTenantTransaction(
+    database.db,
+    {
+      tenantId: SYNTHETIC_TENANT_ID,
+      userId: SYNTHETIC_USER_ID,
+      requestId: "90000000-0000-4000-8000-000000000012",
+    },
+    async (transaction) => {
+      await sql`set local enable_seqscan = off`.execute(transaction);
+      const assignmentPlan = await sql<{ "QUERY PLAN": unknown }>`
+        explain (format json)
+        select assignment.entity_id
+        from app.entity_assignments as assignment
+        where assignment.tenant_id = ${SYNTHETIC_TENANT_ID}::uuid
+          and assignment.user_id = ${SYNTHETIC_USER_ID}::uuid
+          and assignment.valid_from <= '2026-09-04T00:00:00.000Z'::timestamptz
+          and (
+            assignment.valid_to is null
+            or assignment.valid_to > '2026-09-04T00:00:00.000Z'::timestamptz
+          )
+      `.execute(transaction);
+      const actionPlan = await sql<{ "QUERY PLAN": unknown }>`
+        explain (format json)
+        select action.id
+        from app.business_actions as action
+        where action.tenant_id = ${SYNTHETIC_TENANT_ID}::uuid
+          and action.owner_user_id = ${SYNTHETIC_USER_ID}::uuid
+          and action.status in ('planned', 'in_progress')
+        order by action.planned_at, action.id
+        limit 5
+      `.execute(transaction);
+      return {
+        assignment: JSON.stringify(
+          assignmentPlan.rows[0]?.["QUERY PLAN"] ?? null,
+        ),
+        action: JSON.stringify(actionPlan.rows[0]?.["QUERY PLAN"] ?? null),
+      };
+    },
+  );
+}
 
 async function resetApplicationSchemas(
   database: DatabaseHandle<BattlefieldDatabase>,

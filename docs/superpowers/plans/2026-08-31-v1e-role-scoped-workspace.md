@@ -96,11 +96,11 @@ Commit: `feat: define role-scoped workspace contract`
 - Implements `WorkspaceReader` with `withTenantTransaction` and an injected `Clock`/`now` value.
 - Reuses existing tables and indexes; this task must not add cached counters or a migration.
 
-- [ ] **Step 1: Seed a two-tenant, mixed-assignment scenario and verify RED**
+- [x] **Step 1: Seed a two-tenant, mixed-assignment scenario and verify RED**
 
 Include an owned entity, an observed entity, an unassigned same-tenant entity and a foreign-tenant entity. Add own/team actions, pending drafts/proposals, read/unread notifications, entities without analysis, and two state versions with a quadrant/score change.
 
-- [ ] **Step 2: Prove scope and count invariants**
+- [x] **Step 2: Prove scope and count invariants**
 
 Required tests:
 
@@ -115,7 +115,7 @@ Required tests:
 - missing analysis contributes to data-incomplete count;
 - all lists remain bounded and stably ordered.
 
-- [ ] **Step 3: Implement one consistent read transaction**
+- [x] **Step 3: Implement one consistent read transaction**
 
 Prefer a small number of explicit aggregate/list queries over one unmaintainable mega-query. Every query must repeat `tenant_id`, use assignment `exists`/deduplicated scope, and run under forced RLS actor context.
 
@@ -126,6 +126,8 @@ Use PostgreSQL 18 integration or equivalent fixture queries to verify existing a
 - [ ] **Step 5: Run database tests, real PostgreSQL checks, typecheck and commit**
 
 Commit: `feat: project role-scoped workspace data`
+
+**Local evidence:** the focused suite first failed because the workspace reader module did not exist. After implementation, its mixed personal/observer, same-tenant unassigned, ended-assignment, cross-tenant, count, bounded-order and invalid-clock cases passed 4/4; the full PGlite database suite passed 86/86 across 14 files, and database typecheck/Biome/diff checks passed. PostgreSQL 18 query-plan evidence remains the remote close condition.
 
 ---
 

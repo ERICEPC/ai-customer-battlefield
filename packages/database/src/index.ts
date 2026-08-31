@@ -100,3 +100,8 @@ export {
   InvalidActorDatabaseContextError,
   withTenantTransaction,
 } from "./tenant-session.js";
+export {
+  InvalidWorkspaceNowError,
+  KyselyWorkspaceReader,
+  type KyselyWorkspaceReaderOptions,
+} from "./workspace/kysely-workspace-reader.js";
