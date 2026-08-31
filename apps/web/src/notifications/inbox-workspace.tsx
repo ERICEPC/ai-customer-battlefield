@@ -36,6 +36,9 @@ export function InboxWorkspace({
   const [markingIds, setMarkingIds] = useState<ReadonlySet<string>>(new Set());
   const [reloadVersion, setReloadVersion] = useState(0);
   const requestVersion = useRef(0);
+  const visibleItems = unreadOnly
+    ? items.filter((item) => item.readAt === null)
+    : items;
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: reloadVersion intentionally triggers recovery.
   useEffect(() => {
@@ -146,7 +149,7 @@ export function InboxWorkspace({
           </button>
         </div>
       ) : null}
-      {!isLoading && !loadError && items.length === 0 ? (
+      {!isLoading && !loadError && visibleItems.length === 0 ? (
         <div className="battle-empty">
           <span aria-hidden="true">✓</span>
           <h2>暂时没有通知</h2>
@@ -155,9 +158,9 @@ export function InboxWorkspace({
           </p>
         </div>
       ) : null}
-      {!isLoading && !loadError && items.length > 0 ? (
+      {!isLoading && !loadError && visibleItems.length > 0 ? (
         <div className="inbox-list">
-          {items.map((item) => {
+          {visibleItems.map((item) => {
             const marking = markingIds.has(item.notificationId);
             const readError = readErrors[item.notificationId];
             return (

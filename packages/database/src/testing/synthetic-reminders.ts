@@ -30,14 +30,17 @@ export async function seedSyntheticReminderConfiguration(
           version_no: 1,
           name: "默认动作到期提醒",
           status: "published",
-          nodes: [
+          // Serialize JSONB explicitly so both PGlite and node-postgres use the
+          // same wire representation. node-postgres otherwise encodes a plain
+          // JavaScript array as a PostgreSQL array literal, which JSONB rejects.
+          nodes: JSON.stringify([
             {
               kind: "due",
               offsetMinutes: 0,
               recipient: "owner",
               channels: ["in_app", "feishu"],
             },
-          ],
+          ]),
           effective_at: "2026-08-31T00:00:00.000Z",
           published_by: SYNTHETIC_USER_ID,
         })

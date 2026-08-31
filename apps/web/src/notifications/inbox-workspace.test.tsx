@@ -150,6 +150,30 @@ describe("InboxWorkspace", () => {
     expect(markRead).toHaveBeenCalledTimes(2);
   });
 
+  test("removes a read notification immediately from the unread-only view", async () => {
+    const list = vi
+      .fn()
+      .mockResolvedValueOnce({
+        items: [firstNotification],
+        nextCursor: null,
+      })
+      .mockResolvedValueOnce({
+        items: [firstNotification],
+        nextCursor: null,
+      });
+    render(<InboxWorkspace api={api({ list })} />);
+    await screen.findByText(firstNotification.title);
+
+    fireEvent.click(screen.getByRole("checkbox", { name: "只看未读" }));
+    await waitFor(() =>
+      expect(list).toHaveBeenLastCalledWith({ unreadOnly: true, limit: 50 }),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "标为已读" }));
+
+    expect(await screen.findByText("暂时没有通知")).toBeVisible();
+    expect(screen.queryByText(firstNotification.title)).not.toBeInTheDocument();
+  });
+
   test("never exposes a non-application deep link", async () => {
     render(
       <InboxWorkspace
