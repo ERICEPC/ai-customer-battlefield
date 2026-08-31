@@ -1,4 +1,5 @@
 import { Module } from "@nestjs/common";
+import { AccessControlModule } from "./access-control/access-control.module.js";
 import { AiRuntimeConfigModule } from "./ai-runtime-config/ai-runtime-config.module.js";
 import { AuditLogModule } from "./audit-log/audit-log.module.js";
 import { AuthModule } from "./auth/auth.module.js";
@@ -17,6 +18,7 @@ import { WorkspaceModule } from "./workspace/workspace.module.js";
 @Module({
   imports: [
     AuthModule,
+    AccessControlModule,
     AiRuntimeConfigModule,
     AuditLogModule,
     BusinessEntitiesModule,

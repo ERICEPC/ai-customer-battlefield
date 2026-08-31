@@ -87,4 +87,24 @@
 - [x] Apply migrations `0014` and `0015` to the real PostgreSQL database and verify five current leader grants and zero sales grants without printing credentials. `0015` repairs existing tenants through the non-RLS login directory after real PostgreSQL exposed the original force-RLS backfill gap.
 - [x] Log in as sales and leader; prove sales receives no management capability and leader receives all five while organization relationships remain unchanged.
 - [x] Run public-boundary and staged-diff checks.
-- [ ] Commit the focused slice, push directly to `main`, and continue with audited capability-grant mutation endpoints.
+- [x] Commit the focused slice, push directly to `main`, and continue with audited capability-grant mutation endpoints.
+
+### Task 5: Audited role-capability management backend
+
+**Files:**
+- Create: `packages/contracts/src/access-control.ts`
+- Create: `packages/core/src/authorization/access-control-manager.ts`
+- Create: `packages/database/src/authorization/kysely-access-control-manager.ts`
+- Create: `apps/api/src/access-control/*`
+- Modify: package exports and `apps/api/src/app.module.ts`
+
+**Interfaces:**
+- Produces: a current capability/role snapshot and an idempotent full-replacement role-grant operation.
+
+- [x] Add RED contract and core validation tests for closed capability sets, strict requests, reason, role code, and idempotency key.
+- [x] Add RED database tests for listing, grant/revoke, immediate session effect, authorization, idempotent replay, conflict, tenant isolation, audit payload, and tenant lockout prevention.
+- [x] Implement the deep access-control manager over the existing RLS grant projection, generic idempotency ledger, and audit log.
+- [x] Add capability-protected REST endpoints and focused API E2E coverage.
+- [x] Apply no schema migration: this slice intentionally reuses the already deployed grant, idempotency, and audit tables.
+- [x] Run affected package typechecks, focused tests, differential Biome, public-boundary and staged-diff checks.
+- [ ] Commit and push directly to `main`, then add the permission card to the existing system-management page.

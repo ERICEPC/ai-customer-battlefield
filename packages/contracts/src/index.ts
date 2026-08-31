@@ -1,4 +1,20 @@
 export {
+  type AccessControlApiError,
+  type AccessControlRoleCode,
+  type AccessControlSnapshot,
+  accessControlApiErrorSchema,
+  accessControlRoleCodeSchema,
+  accessControlSnapshotSchema,
+  type ManagementCapabilityDefinition,
+  managementCapabilityDefinitionSchema,
+  type ReplaceRoleCapabilitiesRequest,
+  type RoleCapabilityProjection,
+  type RoleCapabilityUpdate,
+  replaceRoleCapabilitiesRequestSchema,
+  roleCapabilityProjectionSchema,
+  roleCapabilityUpdateSchema,
+} from "./access-control.js";
+export {
   type AiRuntimeConfigApiError,
   type AiRuntimeConfigKey,
   type AiRuntimeConfigVersion,

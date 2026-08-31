@@ -19,6 +19,10 @@ export {
   KyselyAuditLogReader,
   type KyselyAuditLogReaderOptions,
 } from "./audit/kysely-audit-log-reader.js";
+export {
+  KyselyAccessControlManager,
+  type KyselyAccessControlManagerOptions,
+} from "./authorization/kysely-access-control-manager.js";
 export { actorHasManagementCapability } from "./authorization/management-capabilities.js";
 export {
   KyselyBattleAnalysisStore,

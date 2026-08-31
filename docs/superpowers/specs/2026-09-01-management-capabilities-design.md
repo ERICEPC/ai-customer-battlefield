@@ -34,3 +34,13 @@ Replace fixed `department_leader` checks for governance functions with tenant-sc
 - API tests prove a leader with the same role loses access immediately after capability revocation.
 - Existing AI configuration and Worker tests prove sales remains denied inside database adapters.
 - Web shell tests prove navigation and direct-route behavior follows capabilities rather than the role label.
+
+## Audited grant management extension
+
+- `GET /api/v1/access-control/role-capabilities` returns the closed capability catalog and the current grant projection for roles that have active memberships or existing grants.
+- `PUT /api/v1/access-control/roles/:roleCode/capabilities` uses full-replacement semantics. The body contains the complete desired capability set plus a mandatory reason; the request also requires an `Idempotency-Key` header.
+- Only actors with `access_control.manage` may read or mutate grants. The database adapter rechecks that capability inside the same tenant transaction.
+- All tenant role changes share one advisory lock. A mutation is rejected if its resulting projection would leave no active tenant member with `access_control.manage`, preventing accidental tenant lockout while still allowing a controlled transfer to another role.
+- The generic idempotency ledger stores a canonical request hash and the exact response. Reusing a key for a different role, capability set, or reason returns a conflict.
+- Actual changes append `access_control.role_capabilities_updated` with a deterministic role aggregate ID, before/after capability snapshots, actor, request ID, and reason. A no-op request is idempotently completed but does not create misleading change audit.
+- This interface manages functional entry permissions only. It does not create roles, alter organization membership, or change business-object responsibility assignments.
