@@ -66,11 +66,20 @@ describe("BusinessEntityDirectory", () => {
     expect(within(auroraRow).getByText("年度平台项目")).toBeVisible();
     expect(within(auroraRow).getByText("proposal · 30.00%")).toBeVisible();
     expect(within(auroraRow).getByText("T0")).toBeVisible();
+    expect(
+      within(auroraRow).getByRole("link", {
+        name: "客户确认预算，并要求下周提交 POC 排期。",
+      }),
+    ).toHaveAttribute(
+      "href",
+      "/followups/80000000-0000-4000-8000-000000000001",
+    );
 
     const beaconRow = await findEntityRow(beacon.id);
     expect(within(beaconRow).getByText("待补充负责人")).toBeVisible();
     expect(within(beaconRow).getByText("暂无主商机")).toBeVisible();
     expect(within(beaconRow).getByText("待补充阶段")).toBeVisible();
+    expect(within(beaconRow).getByText("暂无正式跟进")).toBeVisible();
   });
 
   it("renders an actionable empty state", async () => {
@@ -208,6 +217,13 @@ function createItem(input: {
           name: input.opportunity,
           stageCode: "proposal",
           stageProgress: "30.00",
+        }
+      : null,
+    latestFollowup: input.id.endsWith("0001")
+      ? {
+          followupId: "80000000-0000-4000-8000-000000000001",
+          summary: "客户确认预算，并要求下周提交 POC 排期。",
+          confirmedAt: "2026-08-31T04:00:00.000Z",
         }
       : null,
     updatedAt: "2026-08-31T03:30:00.000Z",

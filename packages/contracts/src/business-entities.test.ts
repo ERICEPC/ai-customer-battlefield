@@ -19,6 +19,11 @@ const validItem = {
     stageCode: "proposal",
     stageProgress: "30.00",
   },
+  latestFollowup: {
+    followupId: "80000000-0000-4000-8000-000000000001",
+    summary: "客户确认预算，并要求下周提交 POC 排期。",
+    confirmedAt: "2026-08-31T04:00:00.000Z",
+  },
   updatedAt: "2026-08-31T03:30:00.000Z",
   versionNo: "3",
 };
@@ -69,6 +74,10 @@ describe("businessEntityPageSchema", () => {
   it.each([
     { ...validItem, id: "not-a-uuid" },
     { ...validItem, updatedAt: "not-a-timestamp" },
+    {
+      ...validItem,
+      latestFollowup: { ...validItem.latestFollowup, summary: "x".repeat(501) },
+    },
     { ...validItem, versionNo: "0" },
     {
       ...validItem,

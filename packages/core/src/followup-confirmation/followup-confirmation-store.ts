@@ -51,6 +51,34 @@ export interface FollowupConfirmationResult {
   confirmedAt: string;
 }
 
+export interface FollowupAutomationStatus {
+  eventId: string;
+  followupId: string;
+  overallStatus: "processing" | "completed" | "failed";
+  battleMapStatus: "queued" | "processing" | "completed" | "failed";
+  leaderNotificationStatus: "waiting" | "completed" | "failed";
+  outboxStatus:
+    | "pending"
+    | "processing"
+    | "published"
+    | "failed"
+    | "cancelled"
+    | "dead_lettered";
+  battleStateVersionId: string | null;
+  leaderNotificationCount: number;
+  attemptCount: number;
+  errorMessage: string | null;
+  updatedAt: string;
+}
+
+export interface FollowupAutomationStatusReader {
+  getAutomationStatus(input: {
+    actor: ActorScope;
+    followupId: string;
+    eventId: string;
+  }): Promise<FollowupAutomationStatus>;
+}
+
 export interface FormalFollowupRecord {
   followupId: string;
   sourceDraftId: string;

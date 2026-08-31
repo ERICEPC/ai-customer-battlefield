@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, test } from "vitest";
 import { KyselyBusinessEntityReader } from "../src/business-entities/kysely-business-entity-reader.js";
 import type { DatabaseHandle } from "../src/database-handle.js";
 import type { BattlefieldDatabase } from "../src/database-types.js";
+import { KyselyFollowupConfirmationStore } from "../src/followup-confirmation/kysely-followup-confirmation-store.js";
 import { migrateDatabase } from "../src/migrate.js";
 import { withTenantTransaction } from "../src/tenant-session.js";
 import { createPgliteDatabase } from "../src/testing/pglite-database.js";
@@ -24,6 +25,7 @@ const ENTITY_BEACON = "50000000-0000-4000-8000-000000000002";
 const ENTITY_CEDAR = "50000000-0000-4000-8000-000000000003";
 const ENTITY_HIDDEN = "50000000-0000-4000-8000-000000000004";
 const REQUEST_ID = "90000000-0000-4000-8000-000000000001";
+const CEDAR_DRAFT_ID = "70000000-0000-4000-8000-000000000081";
 
 const actorAlpha = { tenantId: TENANT_ALPHA, userId: USER_ALPHA };
 
@@ -35,6 +37,30 @@ describe("KyselyBusinessEntityReader", () => {
     database = await createPgliteDatabase<BattlefieldDatabase>();
     await migrateDatabase(database.migrations, MIGRATION_DIRECTORY);
     await seedDirectory(database);
+    const followups = new KyselyFollowupConfirmationStore(database.db);
+    await followups.create({
+      actor: actorAlpha,
+      draftId: CEDAR_DRAFT_ID,
+      rawInput: "Cedar 客户确认项目预算并要求下周提交 POC 排期。",
+      candidate: {
+        entityId: ENTITY_CEDAR,
+        summary: "客户确认预算，并要求下周提交 POC 排期。",
+        occurredAt: "2026-08-31T04:00:00.000Z",
+        followupType: "meeting",
+        relatedOpportunityIds: [],
+        primaryOpportunityId: null,
+        facts: [],
+      },
+      createdAt: "2026-08-31T04:00:00.000Z",
+      expiresAt: "2026-08-31T05:00:00.000Z",
+    });
+    await followups.confirm({
+      actor: actorAlpha,
+      draftId: CEDAR_DRAFT_ID,
+      versionNo: "1",
+      idempotencyKey: "directory-latest-followup-001",
+      confirmedAt: "2026-08-31T04:01:00.000Z",
+    });
     reader = new KyselyBusinessEntityReader(database.db, {
       requestIdFactory: () => REQUEST_ID,
     });
@@ -58,10 +84,15 @@ describe("KyselyBusinessEntityReader", () => {
     });
 
     expect(page.items.map((item) => item.id)).toEqual([
+      ENTITY_CEDAR,
       ENTITY_AURORA,
       ENTITY_BEACON,
-      ENTITY_CEDAR,
     ]);
+    expect(page.items[0]?.latestFollowup).toMatchObject({
+      summary: "客户确认预算，并要求下周提交 POC 排期。",
+      confirmedAt: "2026-08-31T04:01:00.000Z",
+    });
+    expect(page.items[0]?.updatedAt).toBe("2026-08-31T04:01:00.000Z");
     expect(page.items.some((item) => item.id === ENTITY_HIDDEN)).toBe(false);
     expect(searchPage.items).toEqual([
       {
@@ -78,6 +109,7 @@ describe("KyselyBusinessEntityReader", () => {
           stageCode: "proposal",
           stageProgress: "30.00",
         },
+        latestFollowup: null,
         updatedAt: "2026-08-31T03:00:00.000Z",
         versionNo: "3",
       },
@@ -88,8 +120,8 @@ describe("KyselyBusinessEntityReader", () => {
   test("paginates by updated time and id without duplicates or gaps", async () => {
     const firstPage = await reader.list({ actor: actorAlpha, limit: 2 });
     expect(firstPage.items.map((item) => item.id)).toEqual([
+      ENTITY_CEDAR,
       ENTITY_AURORA,
-      ENTITY_BEACON,
     ]);
     expect(firstPage.nextCursor).not.toBeNull();
 
@@ -98,7 +130,7 @@ describe("KyselyBusinessEntityReader", () => {
       cursor: firstPage.nextCursor ?? undefined,
       limit: 2,
     });
-    expect(secondPage.items.map((item) => item.id)).toEqual([ENTITY_CEDAR]);
+    expect(secondPage.items.map((item) => item.id)).toEqual([ENTITY_BEACON]);
     expect(secondPage.nextCursor).toBeNull();
     expect(
       new Set([...firstPage.items, ...secondPage.items].map((item) => item.id))
@@ -173,6 +205,23 @@ async function seedDirectory(
           ${TENANT_ALPHA}::uuid,
           '60000000-0000-4000-8000-000000000001'::uuid,
           ${ENTITY_AURORA}::uuid,
+          ${USER_ALPHA}::uuid,
+          'owner',
+          true
+        )
+      `.execute(transaction);
+      await sql`
+        insert into app.entity_assignments (
+          tenant_id,
+          id,
+          entity_id,
+          user_id,
+          assignment_role,
+          is_primary
+        ) values (
+          ${TENANT_ALPHA}::uuid,
+          '60000000-0000-4000-8000-000000000002'::uuid,
+          ${ENTITY_CEDAR}::uuid,
           ${USER_ALPHA}::uuid,
           'owner',
           true

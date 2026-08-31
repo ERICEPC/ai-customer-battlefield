@@ -157,6 +157,27 @@ export const followupConfirmationResponseSchema = z.strictObject({
   confirmedAt: z.iso.datetime(),
 });
 
+export const followupAutomationStatusSchema = z.strictObject({
+  eventId: z.uuid(),
+  followupId: z.uuid(),
+  overallStatus: z.enum(["processing", "completed", "failed"]),
+  battleMapStatus: z.enum(["queued", "processing", "completed", "failed"]),
+  leaderNotificationStatus: z.enum(["waiting", "completed", "failed"]),
+  outboxStatus: z.enum([
+    "pending",
+    "processing",
+    "published",
+    "failed",
+    "cancelled",
+    "dead_lettered",
+  ]),
+  battleStateVersionId: z.uuid().nullable(),
+  leaderNotificationCount: z.number().int().min(0).max(10_000),
+  attemptCount: z.number().int().min(0).max(1_000),
+  errorMessage: z.string().trim().min(1).max(500).nullable(),
+  updatedAt: z.iso.datetime(),
+});
+
 export const formalFollowupRecordSchema = z.strictObject({
   followupId: z.uuid(),
   sourceDraftId: z.uuid(),
@@ -227,5 +248,8 @@ export type ConfirmFollowupDraftRequest = z.infer<
 export type FollowupDraftResponse = z.infer<typeof followupDraftResponseSchema>;
 export type FollowupConfirmationResponse = z.infer<
   typeof followupConfirmationResponseSchema
+>;
+export type FollowupAutomationStatus = z.infer<
+  typeof followupAutomationStatusSchema
 >;
 export type FormalFollowupRecord = z.infer<typeof formalFollowupRecordSchema>;

@@ -62,6 +62,7 @@ describe("AppShell", () => {
     );
 
     expect(screen.getByText("开发环境 · PostgreSQL")).toBeVisible();
+    expect(screen.getByRole("button", { name: /打开消息抽屉/ })).toBeVisible();
     expect(screen.queryByText("演示环境 · 合成数据")).not.toBeInTheDocument();
   });
 

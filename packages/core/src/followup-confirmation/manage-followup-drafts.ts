@@ -8,6 +8,8 @@ import type {
   FollowupDraftAgent,
 } from "../followup-drafts/followup-draft-agent.js";
 import type {
+  FollowupAutomationStatus,
+  FollowupAutomationStatusReader,
   FollowupConfirmationResult,
   FollowupConfirmationStore,
   FormalFollowupRecord,
@@ -108,6 +110,18 @@ export class GetFormalFollowup {
     followupId: string;
   }): Promise<FormalFollowupRecord> {
     return this.store.getFollowup(input);
+  }
+}
+
+export class GetFollowupAutomationStatus {
+  constructor(private readonly reader: FollowupAutomationStatusReader) {}
+
+  async execute(input: {
+    actor: ActorScope;
+    followupId: string;
+    eventId: string;
+  }): Promise<FollowupAutomationStatus> {
+    return this.reader.getAutomationStatus(input);
   }
 }
 

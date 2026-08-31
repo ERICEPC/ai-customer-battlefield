@@ -58,7 +58,7 @@ describe("InboxWorkspace", () => {
     expect(within(card).getByText("高优先级")).toBeVisible();
     expect(within(card).getByText(/2026/)).toBeVisible();
     expect(
-      within(card).getByRole("link", { name: "查看相关动作" }),
+      within(card).getByRole("link", { name: "查看详情" }),
     ).toHaveAttribute("href", firstNotification.deepLink);
     expect(within(card).getByText("未读")).toBeVisible();
   });
@@ -193,8 +193,8 @@ describe("InboxWorkspace", () => {
 
     await screen.findByText(firstNotification.title);
     expect(
-      screen.queryByRole("link", { name: "查看相关动作" }),
+      screen.queryByRole("link", { name: "查看详情" }),
     ).not.toBeInTheDocument();
-    expect(screen.getByText("关联动作链接不可用")).toBeVisible();
+    expect(screen.getByText("关联记录链接不可用")).toBeVisible();
   });
 });

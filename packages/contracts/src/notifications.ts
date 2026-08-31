@@ -15,6 +15,7 @@ const applicationRelativePathSchema = z
 export const notificationEventTypeSchema = z.enum([
   "action_due",
   "weekly_report_published",
+  "sales_progress_updated",
 ]);
 export const notificationPrioritySchema = z.enum([
   "low",

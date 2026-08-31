@@ -25,6 +25,12 @@ const primaryOpportunitySchema = z.strictObject({
   stageProgress: stageProgressSchema,
 });
 
+const latestFollowupSchema = z.strictObject({
+  followupId: z.uuid(),
+  summary: z.string().trim().min(1).max(500),
+  confirmedAt: z.iso.datetime(),
+});
+
 export const businessEntityListItemSchema = z.strictObject({
   id: z.uuid(),
   typeCode: z
@@ -37,6 +43,7 @@ export const businessEntityListItemSchema = z.strictObject({
   isT0: z.boolean(),
   primaryOwnerName: z.string().trim().min(1).max(200).nullable(),
   primaryOpportunity: primaryOpportunitySchema.nullable(),
+  latestFollowup: latestFollowupSchema.nullable(),
   updatedAt: z.iso.datetime(),
   versionNo: z.string().regex(/^[1-9]\d*$/),
 });

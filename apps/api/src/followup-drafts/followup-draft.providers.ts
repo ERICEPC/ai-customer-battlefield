@@ -5,6 +5,7 @@ import {
   CreatePersistentFollowupDraft,
   type FollowupConfirmationStore,
   type FollowupDraftAgent,
+  GetFollowupAutomationStatus,
   GetFollowupDraft,
   GetFormalFollowup,
   ReviseFollowupDraft,
@@ -14,6 +15,11 @@ import { type Provider, ServiceUnavailableException } from "@nestjs/common";
 
 import type { ApplicationDatabaseHandle } from "../database/database.module.js";
 import { DATABASE_HANDLE } from "../database/database.module.js";
+import {
+  type ApplicationUserAiSettingsService,
+  USER_AI_SETTINGS_SERVICE,
+} from "../user-ai-settings/user-ai-settings.providers.js";
+import { UserAiSettingsError } from "../user-ai-settings/user-ai-settings.service.js";
 import { DeterministicFollowupDraftAgent } from "./deterministic-followup-draft-agent.js";
 import {
   SenseAudioFollowupDraftAgent,
@@ -30,6 +36,9 @@ export const REVISE_FOLLOWUP_DRAFT = Symbol("REVISE_FOLLOWUP_DRAFT");
 export const CANCEL_FOLLOWUP_DRAFT = Symbol("CANCEL_FOLLOWUP_DRAFT");
 export const CONFIRM_FOLLOWUP_DRAFT = Symbol("CONFIRM_FOLLOWUP_DRAFT");
 export const GET_FORMAL_FOLLOWUP = Symbol("GET_FORMAL_FOLLOWUP");
+export const GET_FOLLOWUP_AUTOMATION_STATUS = Symbol(
+  "GET_FOLLOWUP_AUTOMATION_STATUS",
+);
 
 const unavailableStore: FollowupConfirmationStore = {
   create: unavailable,
@@ -70,6 +79,51 @@ export function createConfiguredFollowupDraftAgent(
 
   const apiKey = environment.SENSEAUDIO_API_KEY?.trim();
   if (!apiKey) return new UnavailableFollowupDraftAgent();
+  return createSenseAudioAgent(environment, {
+    apiKey,
+    ...(environment.FOLLOWUP_AGENT_MODEL?.trim()
+      ? { model: environment.FOLLOWUP_AGENT_MODEL.trim() }
+      : {}),
+  });
+}
+
+export function createUserConfiguredFollowupDraftAgent(
+  settings: ApplicationUserAiSettingsService,
+  environment: NodeJS.ProcessEnv,
+): FollowupDraftAgent {
+  const fallback = createConfiguredFollowupDraftAgent(environment);
+  if (
+    !settings ||
+    environment.FOLLOWUP_AGENT_PROVIDER?.trim() === "deterministic"
+  ) {
+    return fallback;
+  }
+  return {
+    async propose(input) {
+      try {
+        const credential = await settings.resolveCredential(input.actor);
+        return createSenseAudioAgent(environment, credential).propose(input);
+      } catch (error) {
+        if (
+          error instanceof UserAiSettingsError &&
+          error.code === "AI_KEY_NOT_CONFIGURED"
+        ) {
+          return fallback.propose(input);
+        }
+        if (error instanceof SenseAudioFollowupDraftAgentError) throw error;
+        throw new SenseAudioFollowupDraftAgentError(
+          "not_configured",
+          "The personal SenseAudio credential could not be resolved.",
+        );
+      }
+    },
+  };
+}
+
+function createSenseAudioAgent(
+  environment: NodeJS.ProcessEnv,
+  credential: { apiKey: string; model?: string },
+): FollowupDraftAgent {
   const timeoutMs = boundedInteger(
     environment.FOLLOWUP_AGENT_TIMEOUT_MS,
     1_000,
@@ -82,13 +136,11 @@ export function createConfiguredFollowupDraftAgent(
   );
 
   return new SenseAudioFollowupDraftAgent({
-    apiKey,
+    apiKey: credential.apiKey,
     ...(environment.SENSEAUDIO_BASE_URL?.trim()
       ? { baseUrl: environment.SENSEAUDIO_BASE_URL.trim() }
       : {}),
-    ...(environment.FOLLOWUP_AGENT_MODEL?.trim()
-      ? { model: environment.FOLLOWUP_AGENT_MODEL.trim() }
-      : {}),
+    ...(credential.model?.trim() ? { model: credential.model.trim() } : {}),
     ...(environment.FOLLOWUP_AGENT_PROMPT?.trim()
       ? { prompt: environment.FOLLOWUP_AGENT_PROMPT.trim() }
       : {}),
@@ -113,8 +165,11 @@ function boundedInteger(
 export const followupDraftProviders: Provider[] = [
   {
     provide: FOLLOWUP_DRAFT_AGENT,
-    useFactory: (): FollowupDraftAgent =>
-      createConfiguredFollowupDraftAgent(process.env),
+    inject: [USER_AI_SETTINGS_SERVICE],
+    useFactory: (
+      settings: ApplicationUserAiSettingsService,
+    ): FollowupDraftAgent =>
+      createUserConfiguredFollowupDraftAgent(settings, process.env),
   },
   {
     provide: FOLLOWUP_CONFIRMATION_STORE,
@@ -166,5 +221,18 @@ export const followupDraftProviders: Provider[] = [
     inject: [FOLLOWUP_CONFIRMATION_STORE],
     useFactory: (store: FollowupConfirmationStore) =>
       new GetFormalFollowup(store),
+  },
+  {
+    provide: GET_FOLLOWUP_AUTOMATION_STATUS,
+    inject: [DATABASE_HANDLE],
+    useFactory: (database: ApplicationDatabaseHandle) =>
+      new GetFollowupAutomationStatus({
+        getAutomationStatus: database
+          ? (input) =>
+              new KyselyFollowupConfirmationStore(
+                database.db,
+              ).getAutomationStatus(input)
+          : unavailable,
+      }),
   },
 ];

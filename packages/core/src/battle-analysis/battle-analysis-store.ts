@@ -85,6 +85,11 @@ export interface BattleAnalyzer {
 }
 
 export interface BattleAnalysisStore {
+  findByTriggerEvent(input: {
+    actor: ActorScope;
+    triggerEventId: string;
+    entityId: string;
+  }): Promise<BattleAnalysisResult | null>;
   start(input: {
     actor: ActorScope;
     analysisRunId: string;
@@ -93,6 +98,7 @@ export interface BattleAnalysisStore {
     ruleVersion: string;
     analyzerConfigVersion: string;
     startedAt: string;
+    triggerEventId?: string;
   }): Promise<void>;
   complete(input: {
     actor: ActorScope;

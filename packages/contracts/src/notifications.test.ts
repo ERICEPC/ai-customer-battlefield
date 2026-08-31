@@ -25,10 +25,13 @@ function inboxItem() {
 }
 
 describe("notification contracts", () => {
-  it("accepts action and weekly-report notification event types", () => {
+  it("accepts action, weekly-report, and sales-progress event types", () => {
     expect(notificationEventTypeSchema.parse("action_due")).toBe("action_due");
     expect(notificationEventTypeSchema.parse("weekly_report_published")).toBe(
       "weekly_report_published",
+    );
+    expect(notificationEventTypeSchema.parse("sales_progress_updated")).toBe(
+      "sales_progress_updated",
     );
   });
   it("coerces only explicit boolean query values and bounds pagination", () => {

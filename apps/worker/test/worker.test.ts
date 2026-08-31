@@ -15,6 +15,10 @@ const actor = {
 const actionId = "d0000000-0000-4000-8000-000000000001";
 const reportId = "91000000-0000-4000-8000-000000000001";
 const reportVersionId = "92000000-0000-4000-8000-000000000001";
+const followupId = "80000000-0000-4000-8000-000000000001";
+const draftId = "81000000-0000-4000-8000-000000000001";
+const entityId = "50000000-0000-4000-8000-000000000001";
+const eventId = "82000000-0000-4000-8000-000000000001";
 
 function message(
   topic: string,
@@ -114,6 +118,7 @@ describe("reminder worker", () => {
           return { status: "materialized" };
         },
       },
+      followupAutomation: { execute: vi.fn() },
     });
 
     await handlers["action_proposal.accepted.v1"]?.handle(
@@ -159,6 +164,7 @@ describe("reminder worker", () => {
       scheduler: { onActionAccepted: vi.fn() },
       canceller: { execute: vi.fn() },
       reportNotifier: { execute },
+      followupAutomation: { execute: vi.fn() },
     });
 
     await handlers["weekly_report.published.v1"]?.handle(
@@ -182,6 +188,40 @@ describe("reminder worker", () => {
       recipientUserId: actor.userId,
       reportType: "personal",
       publishedAt: "2026-09-01T00:00:00.000Z",
+    });
+  });
+
+  test("routes a confirmed follow-up event into the durable automation pipeline", async () => {
+    const execute = vi.fn().mockResolvedValue({ status: "processed" });
+    const handlers = createOutboxHandlers({
+      scheduler: { onActionAccepted: vi.fn() },
+      canceller: { execute: vi.fn() },
+      reportNotifier: { execute: vi.fn() },
+      followupAutomation: { execute },
+    });
+
+    await handlers["followup.confirmed.v1"]?.handle(
+      {
+        ...message("followup.confirmed.v1", {
+          eventId,
+          followupId,
+          draftId,
+          entityId,
+          versionNo: "1",
+        }),
+        aggregateType: "followup",
+        aggregateId: followupId,
+      },
+      actor,
+    );
+
+    expect(execute).toHaveBeenCalledWith({
+      actor,
+      eventId,
+      followupId,
+      draftId,
+      entityId,
+      confirmedAt: "2026-09-01T00:00:00.000Z",
     });
   });
 

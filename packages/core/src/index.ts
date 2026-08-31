@@ -2,6 +2,7 @@ export * from "./action-decisions/index.js";
 export * from "./async-work/outbox-processor.js";
 export * from "./battle-analysis/index.js";
 export * from "./business-entities/index.js";
+export * from "./followup-automation/index.js";
 export * from "./followup-confirmation/index.js";
 export {
   type Clock,

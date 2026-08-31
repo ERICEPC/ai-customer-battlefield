@@ -1,5 +1,7 @@
+import { randomUUID } from "node:crypto";
 import {
   CancelActionReminders,
+  DeterministicBattleAnalyzer,
   DispatchDueReminders,
   MaterializePublishedWeeklyReportNotification,
   type NotificationChannel,
@@ -7,12 +9,16 @@ import {
   type OutboxMessage,
   type OutboxTopicHandler,
   PermanentOutboxError,
+  ProcessConfirmedFollowup,
   ProcessOutboxBatch,
   PublishedWeeklyReportNotFoundError,
+  RequestBattleAnalysis,
   ScheduleActionReminders,
 } from "@battlefield/core";
 import {
   type BattlefieldDatabase,
+  KyselyBattleAnalysisStore,
+  KyselyConfirmedFactSnapshotReader,
   KyselyNotificationStore,
   KyselyOutboxStore,
   KyselyReminderStore,
@@ -174,6 +180,16 @@ export function createOutboxHandlers(input: {
   scheduler: Pick<ScheduleActionReminders, "onActionAccepted">;
   canceller: Pick<CancelActionReminders, "execute">;
   reportNotifier: Pick<MaterializePublishedWeeklyReportNotification, "execute">;
+  followupAutomation: {
+    execute(input: {
+      actor: { tenantId: string; userId: string };
+      eventId: string;
+      followupId: string;
+      draftId: string;
+      entityId: string;
+      confirmedAt: string;
+    }): Promise<unknown>;
+  };
 }): Readonly<Record<string, OutboxTopicHandler>> {
   return {
     "action_proposal.accepted.v1": {
@@ -208,7 +224,29 @@ export function createOutboxHandlers(input: {
       },
     },
     "action_proposal.rejected.v1": noOperationHandler(),
-    "followup.confirmed.v1": noOperationHandler(),
+    "followup.confirmed.v1": {
+      async handle(message, actor) {
+        const payload = objectPayload(message);
+        const eventId = uuidField(payload, "eventId");
+        const followupId = uuidField(payload, "followupId");
+        const draftId = uuidField(payload, "draftId");
+        const entityId = uuidField(payload, "entityId");
+        if (
+          message.aggregateType !== "followup" ||
+          message.aggregateId !== followupId
+        ) {
+          throw invalidPayload();
+        }
+        await input.followupAutomation.execute({
+          actor,
+          eventId,
+          followupId,
+          draftId,
+          entityId,
+          confirmedAt: message.occurredAt,
+        });
+      },
+    },
     "weekly_report.published.v1": {
       async handle(message, actor) {
         const payload = objectPayload(message);
@@ -268,6 +306,18 @@ export function createReminderWorker(input: {
   const reportNotifier = new MaterializePublishedWeeklyReportNotification({
     store: notificationStore,
   });
+  const followupAutomation = new ProcessConfirmedFollowup({
+    analysis: new RequestBattleAnalysis({
+      reader: new KyselyConfirmedFactSnapshotReader(input.database),
+      analyzer: new DeterministicBattleAnalyzer(),
+      store: new KyselyBattleAnalysisStore(input.database),
+      idGenerator: { next: randomUUID },
+      clock,
+      ruleVersion: "deterministic-battle-rules-v1",
+      analyzerConfigVersion: "deterministic-development-v1",
+    }),
+    notificationStore,
+  });
   return new ReminderWorker({
     actor: input.actor,
     batchSize: input.batchSize,
@@ -278,7 +328,12 @@ export function createReminderWorker(input: {
     deliveryRecovery: notificationStore,
     outboxProcessor: new ProcessOutboxBatch({
       store: outboxStore,
-      handlers: createOutboxHandlers({ scheduler, canceller, reportNotifier }),
+      handlers: createOutboxHandlers({
+        scheduler,
+        canceller,
+        reportNotifier,
+        followupAutomation,
+      }),
       clock,
     }),
     reminderDispatcher: new DispatchDueReminders({

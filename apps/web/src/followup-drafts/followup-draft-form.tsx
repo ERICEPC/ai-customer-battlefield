@@ -4,6 +4,7 @@ import type {
   BusinessEntityPage,
   ConfirmFollowupDraftRequest,
   CreateFollowupDraftRequest,
+  FollowupAutomationStatus,
   FollowupConfirmationResponse,
   FollowupDraftCandidate,
   FollowupDraftResponse,
@@ -19,6 +20,7 @@ import {
   confirmFollowupDraft,
   createFollowupDraft,
   FollowupApiError,
+  getFollowupAutomationStatus,
   getFollowupDraft,
   getFormalFollowup,
   reviseFollowupDraft,
@@ -31,6 +33,10 @@ export interface FollowupWorkbenchApi {
   ): Promise<FollowupDraftResponse>;
   getDraft(draftId: string): Promise<FollowupDraftResponse>;
   getFormalFollowup(followupId: string): Promise<FormalFollowupRecord>;
+  getAutomationStatus(
+    followupId: string,
+    eventId: string,
+  ): Promise<FollowupAutomationStatus>;
   reviseDraft(
     draftId: string,
     request: ReviseFollowupDraftRequest,
@@ -52,6 +58,7 @@ const defaultApi: FollowupWorkbenchApi = {
   createDraft: createFollowupDraft,
   getDraft: getFollowupDraft,
   getFormalFollowup,
+  getAutomationStatus: getFollowupAutomationStatus,
   reviseDraft: reviseFollowupDraft,
   cancelDraft: cancelFollowupDraft,
   confirmDraft: confirmFollowupDraft,
@@ -78,6 +85,11 @@ export function FollowupDraftForm({
     useState<FollowupConfirmationResponse | null>(null);
   const [formalFollowup, setFormalFollowup] =
     useState<FormalFollowupRecord | null>(null);
+  const [automationStatus, setAutomationStatus] =
+    useState<FollowupAutomationStatus | null>(null);
+  const [automationLoadState, setAutomationLoadState] = useState<
+    "idle" | "loading" | "ready" | "error"
+  >("idle");
   const [formalLoadState, setFormalLoadState] = useState<
     "idle" | "loading" | "ready" | "error"
   >("idle");
@@ -102,6 +114,37 @@ export function FollowupDraftForm({
   useEffect(() => {
     void loadEntities();
   }, [loadEntities]);
+
+  useEffect(() => {
+    if (!confirmation) return;
+    const activeConfirmation = confirmation;
+    let stopped = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+
+    async function poll(): Promise<void> {
+      setAutomationLoadState("loading");
+      try {
+        const status = await api.getAutomationStatus(
+          activeConfirmation.followupId,
+          activeConfirmation.eventId,
+        );
+        if (stopped) return;
+        setAutomationStatus(status);
+        setAutomationLoadState("ready");
+        if (status.overallStatus === "processing") {
+          timer = setTimeout(() => void poll(), 1_500);
+        }
+      } catch {
+        if (!stopped) setAutomationLoadState("error");
+      }
+    }
+
+    void poll();
+    return () => {
+      stopped = true;
+      if (timer) clearTimeout(timer);
+    };
+  }, [api, confirmation]);
 
   const canCreate =
     entityLoadState === "ready" &&
@@ -158,6 +201,8 @@ export function FollowupDraftForm({
     setConfirmation(null);
     setFormalFollowup(null);
     setFormalLoadState("idle");
+    setAutomationStatus(null);
+    setAutomationLoadState("idle");
     try {
       const nextDraft = await api.createDraft({
         entityId,
@@ -354,6 +399,13 @@ export function FollowupDraftForm({
             formalFollowup={formalFollowup}
             formalLoadState={formalLoadState}
             onReload={() => void loadFormalFollowup(confirmation.followupId)}
+            automationStatus={automationStatus}
+            automationLoadState={automationLoadState}
+            onReloadAutomation={() => {
+              setAutomationStatus(null);
+              setAutomationLoadState("idle");
+              setConfirmation({ ...confirmation });
+            }}
           />
         ) : draft?.status === "cancelled" ? (
           <TerminalDraft />
@@ -584,11 +636,17 @@ function ConfirmationReceipt({
   formalFollowup,
   formalLoadState,
   onReload,
+  automationStatus,
+  automationLoadState,
+  onReloadAutomation,
 }: {
   confirmation: FollowupConfirmationResponse;
   formalFollowup: FormalFollowupRecord | null;
   formalLoadState: "idle" | "loading" | "ready" | "error";
   onReload: () => void;
+  automationStatus: FollowupAutomationStatus | null;
+  automationLoadState: "idle" | "loading" | "ready" | "error";
+  onReloadAutomation: () => void;
 }) {
   return (
     <article className="result-card confirmation-receipt">
@@ -642,11 +700,90 @@ function ConfirmationReceipt({
             )}
           </section>
         ) : null}
+        <section className="automation-receipt" aria-label="后续自动处理进度">
+          <div className="formal-write-heading">
+            <h3>后续自动处理</h3>
+            <span>
+              {automationStatus?.overallStatus === "completed"
+                ? "全部完成"
+                : automationStatus?.overallStatus === "failed"
+                  ? "需要处理"
+                  : "正在处理"}
+            </span>
+          </div>
+          <ol>
+            <AutomationStep label="正式记录已落库" status="completed" />
+            <AutomationStep
+              label="作战地图已自动更新"
+              status={automationStatus?.battleMapStatus ?? "processing"}
+            />
+            <AutomationStep
+              label="领导消息已送达"
+              status={
+                automationStatus?.leaderNotificationStatus ?? "processing"
+              }
+            />
+          </ol>
+          {automationLoadState === "loading" && !automationStatus ? (
+            <p className="automation-note" role="status">
+              正在读取 Worker 处理进度…
+            </p>
+          ) : null}
+          {automationLoadState === "error" ? (
+            <div className="error-message" role="alert">
+              <span>自动处理进度暂时读取失败，正式记录不受影响。</span>
+              <button
+                className="inline-button"
+                type="button"
+                onClick={onReloadAutomation}
+              >
+                重新读取进度
+              </button>
+            </div>
+          ) : null}
+          {automationStatus?.errorMessage ? (
+            <p className="automation-error">{automationStatus.errorMessage}</p>
+          ) : null}
+          {automationStatus?.battleStateVersionId ? (
+            <div className="automation-links">
+              <a href={`/followups/${confirmation.followupId}`}>查看正式记录</a>
+              <a
+                href={`/battle-map?entityId=${formalFollowup?.entityId ?? ""}`}
+              >
+                查看作战地图
+              </a>
+            </div>
+          ) : null}
+        </section>
         <p className="boundary-note">
           经营事实已留痕；风险、提醒和建议动作仍需单独确认。
         </p>
       </div>
     </article>
+  );
+}
+
+function AutomationStep({
+  label,
+  status,
+}: {
+  label: string;
+  status: "queued" | "waiting" | "processing" | "completed" | "failed";
+}) {
+  const visibleStatus =
+    status === "completed"
+      ? "完成"
+      : status === "failed"
+        ? "失败"
+        : status === "queued" || status === "waiting"
+          ? "等待中"
+          : "处理中";
+  return (
+    <li className={`automation-step is-${status}`}>
+      <span aria-hidden="true">{status === "completed" ? "✓" : "·"}</span>
+      <strong>{label}</strong>
+      <small>{visibleStatus}</small>
+    </li>
   );
 }
 

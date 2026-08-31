@@ -113,13 +113,13 @@ export async function projectWeeklyProgress(
       evidenceId: row.id,
       occurredAt: toIso(row.occurred_at),
       label: evidenceLabel(row.summary),
-      deepLink: `/battle-map?entityId=${row.entity_id}`,
+      deepLink: `/followups/${row.id}`,
     });
   }
 
   const facts = await transaction
     .selectFrom("app.business_facts")
-    .select(["id", "entity_id", "occurred_at", "fact_value"])
+    .select(["id", "entity_id", "followup_id", "occurred_at", "fact_value"])
     .where("tenant_id", "=", input.tenantId)
     .where("entity_id", "in", entityIds)
     .where("valid_status", "=", "valid")
@@ -139,7 +139,7 @@ export async function projectWeeklyProgress(
       evidenceId: row.id,
       occurredAt: toIso(row.occurred_at),
       label: evidenceLabel(row.fact_value),
-      deepLink: `/battle-map?entityId=${row.entity_id}`,
+      deepLink: `/followups/${row.followup_id}`,
     });
   }
 

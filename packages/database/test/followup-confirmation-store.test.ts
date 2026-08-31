@@ -6,6 +6,7 @@ import {
   type FollowupDraftNotPendingError,
   type FollowupDraftVersionConflictError,
   FollowupIdempotencyConflictError,
+  FollowupNotFoundError,
   type FollowupRelatedRecordNotFoundError,
   type PersistentFollowupDraftCandidate,
 } from "@battlefield/core";
@@ -32,6 +33,8 @@ const ENTITY_ID = "50000000-0000-4000-8000-000000000001";
 const DRAFT_ID = "70000000-0000-4000-8000-000000000001";
 const OTHER_DRAFT_ID = "70000000-0000-4000-8000-000000000002";
 const REQUEST_ID = "90000000-0000-4000-8000-000000000001";
+const OBSERVER_USER_ID = "30000000-0000-4000-8000-000000000071";
+const UNASSIGNED_USER_ID = "30000000-0000-4000-8000-000000000072";
 const CREATED_AT = "2026-08-31T02:30:00.000Z";
 const EXPIRES_AT = "2026-09-07T02:30:00.000Z";
 const actor = { tenantId: SYNTHETIC_TENANT_ID, userId: SYNTHETIC_USER_ID };
@@ -256,11 +259,71 @@ describe("KyselyFollowupConfirmationStore", () => {
       business_facts: 1,
       source_evidence: 1,
       fact_evidence_links: 1,
-      audit_entries: 1,
+      audit_entries: 2,
       domain_events: 1,
       outbox_messages: 1,
       idempotency_records: 1,
     });
+    expect(await readConfirmedOutboxPayload(database)).toMatchObject({
+      eventId: confirmed.eventId,
+      followupId: confirmed.followupId,
+      draftId: DRAFT_ID,
+      entityId: ENTITY_ID,
+      versionNo: "1",
+    });
+    expect(
+      await readFollowupAccessAudits(database, confirmed.followupId),
+    ).toEqual([
+      expect.objectContaining({
+        action: "followup.viewed",
+        actor_user_id: actor.userId,
+        after_payload: expect.objectContaining({ accessScope: "owner" }),
+      }),
+    ]);
+  });
+
+  test("authorizes formal follow-up reads by current responsibility and audits allowed or denied access", async () => {
+    await createDraft(store, candidate());
+    const confirmed = await store.confirm({
+      actor,
+      draftId: DRAFT_ID,
+      versionNo: "1",
+      idempotencyKey: "confirm-access-controlled-followup",
+      confirmedAt: "2026-08-31T02:35:00.000Z",
+    });
+    await seedFollowupAccessActors(database);
+
+    await expect(
+      store.getFollowup({
+        actor: { tenantId: actor.tenantId, userId: OBSERVER_USER_ID },
+        followupId: confirmed.followupId,
+      }),
+    ).resolves.toMatchObject({ followupId: confirmed.followupId });
+    await expect(
+      store.getFollowup({
+        actor: { tenantId: actor.tenantId, userId: UNASSIGNED_USER_ID },
+        followupId: confirmed.followupId,
+      }),
+    ).rejects.toBeInstanceOf(FollowupNotFoundError);
+
+    expect(
+      await readFollowupAccessAudits(database, confirmed.followupId),
+    ).toEqual([
+      expect.objectContaining({
+        action: "followup.viewed",
+        actor_user_id: OBSERVER_USER_ID,
+        after_payload: expect.objectContaining({
+          accessScope: "management_observer",
+          outcome: "allowed",
+        }),
+      }),
+      expect.objectContaining({
+        action: "followup.view_denied",
+        actor_user_id: UNASSIGNED_USER_ID,
+        after_payload: expect.objectContaining({ outcome: "denied" }),
+        reason: "outside_authorized_scope_or_missing",
+      }),
+    ]);
   });
 
   test("rejects reuse of an idempotency key for a different confirmation", async () => {
@@ -357,6 +420,84 @@ function candidate(
     facts: [],
     ...overrides,
   };
+}
+
+async function readConfirmedOutboxPayload(
+  database: DatabaseHandle<BattlefieldDatabase>,
+): Promise<Record<string, unknown>> {
+  return withTenantTransaction(
+    database.db,
+    { ...actor, requestId: "90000000-0000-4000-8000-000000000092" },
+    async (transaction) => {
+      const row = await transaction
+        .selectFrom("app.outbox_messages")
+        .select("payload")
+        .where("topic", "=", "followup.confirmed.v1")
+        .executeTakeFirstOrThrow();
+      return (
+        typeof row.payload === "string" ? JSON.parse(row.payload) : row.payload
+      ) as Record<string, unknown>;
+    },
+  );
+}
+
+async function seedFollowupAccessActors(
+  database: DatabaseHandle<BattlefieldDatabase>,
+): Promise<void> {
+  await withTenantTransaction(
+    database.db,
+    { ...actor, requestId: REQUEST_ID },
+    async (transaction) => {
+      await transaction
+        .insertInto("app.users")
+        .values([
+          {
+            tenant_id: actor.tenantId,
+            id: OBSERVER_USER_ID,
+            display_name: "alpha-manager",
+          },
+          {
+            tenant_id: actor.tenantId,
+            id: UNASSIGNED_USER_ID,
+            display_name: "alpha-unassigned",
+          },
+        ])
+        .execute();
+      await transaction
+        .insertInto("app.entity_assignments")
+        .values({
+          tenant_id: actor.tenantId,
+          entity_id: ENTITY_ID,
+          user_id: OBSERVER_USER_ID,
+          assignment_role: "management_observer",
+          is_primary: false,
+          valid_from: "2026-08-30T00:00:00.000Z",
+          valid_to: null,
+        })
+        .executeTakeFirstOrThrow();
+    },
+  );
+}
+
+async function readFollowupAccessAudits(
+  database: DatabaseHandle<BattlefieldDatabase>,
+  followupId: string,
+) {
+  return withTenantTransaction(
+    database.db,
+    { ...actor, requestId: REQUEST_ID },
+    (transaction) =>
+      transaction
+        .selectFrom("app.audit_entries")
+        .select(["action", "actor_user_id", "after_payload", "reason"])
+        .where("tenant_id", "=", actor.tenantId)
+        .where("aggregate_type", "=", "followup")
+        .where("aggregate_id", "=", followupId)
+        .where("action", "in", ["followup.viewed", "followup.view_denied"])
+        .orderBy("occurred_at")
+        .orderBy("id")
+        .execute(),
+  );
 }
 
 async function createDraft(

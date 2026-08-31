@@ -4,6 +4,7 @@ import Link from "next/link";
 import { type ReactNode, useEffect, useState } from "react";
 
 import { useSession } from "../auth/session-provider";
+import { NotificationBell } from "../notifications/notification-bell";
 
 const navigation = [
   {
@@ -202,52 +203,55 @@ export function AppShell({
       <main>
         <header className="topbar">
           <span className="breadcrumb">{visibleBreadcrumb}</span>
-          <details className="account-menu">
-            <summary className="user-chip" aria-label="打开账号菜单">
-              <span aria-hidden="true">
-                {session.user.displayName.slice(0, 1)}
-              </span>
-              <span>
+          <div className="topbar-actions">
+            <NotificationBell />
+            <details className="account-menu">
+              <summary className="user-chip" aria-label="打开账号菜单">
+                <span aria-hidden="true">
+                  {session.user.displayName.slice(0, 1)}
+                </span>
+                <span>
+                  <strong>{session.user.displayName}</strong>
+                  <small>{roleLabel}</small>
+                </span>
+              </summary>
+              <div className="account-popover">
+                <p className="account-role">{roleLabel}</p>
                 <strong>{session.user.displayName}</strong>
-                <small>{roleLabel}</small>
-              </span>
-            </summary>
-            <div className="account-popover">
-              <p className="account-role">{roleLabel}</p>
-              <strong>{session.user.displayName}</strong>
-              <span>{session.user.email}</span>
-              <dl>
-                <div>
-                  <dt>所属部门</dt>
-                  <dd>{session.department.name}</dd>
-                </div>
-                {session.role === "sales" ? (
+                <span>{session.user.email}</span>
+                <dl>
                   <div>
-                    <dt>直属领导</dt>
-                    <dd>{session.directLeader?.displayName ?? "暂未配置"}</dd>
+                    <dt>所属部门</dt>
+                    <dd>{session.department.name}</dd>
                   </div>
-                ) : (
-                  <div>
-                    <dt>团队成员</dt>
-                    <dd>
-                      {session.teamMembers.length > 0
-                        ? session.teamMembers
-                            .map((member) => member.displayName)
-                            .join("、")
-                        : "暂无销售"}
-                    </dd>
-                  </div>
-                )}
-              </dl>
-              <Link className="account-settings-link" href="/settings">
-                个人设置
-              </Link>
-              {logoutError ? <p role="alert">{logoutError}</p> : null}
-              <button type="button" onClick={() => void handleLogout()}>
-                退出登录
-              </button>
-            </div>
-          </details>
+                  {session.role === "sales" ? (
+                    <div>
+                      <dt>直属领导</dt>
+                      <dd>{session.directLeader?.displayName ?? "暂未配置"}</dd>
+                    </div>
+                  ) : (
+                    <div>
+                      <dt>团队成员</dt>
+                      <dd>
+                        {session.teamMembers.length > 0
+                          ? session.teamMembers
+                              .map((member) => member.displayName)
+                              .join("、")
+                          : "暂无销售"}
+                      </dd>
+                    </div>
+                  )}
+                </dl>
+                <Link className="account-settings-link" href="/settings">
+                  个人设置
+                </Link>
+                {logoutError ? <p role="alert">{logoutError}</p> : null}
+                <button type="button" onClick={() => void handleLogout()}>
+                  退出登录
+                </button>
+              </div>
+            </details>
+          </div>
         </header>
         {children}
       </main>

@@ -177,6 +177,7 @@ export function BusinessEntityDirectory({
                 <th scope="col">主商机</th>
                 <th scope="col">阶段</th>
                 <th scope="col">状态</th>
+                <th scope="col">最新跟进</th>
                 <th scope="col">最近更新</th>
               </tr>
             </thead>
@@ -240,6 +241,20 @@ function BusinessEntityRow({ item }: { item: BusinessEntityListItem }) {
         <span className={`status-badge status-${item.status}`}>
           {statusLabel[item.status]}
         </span>
+      </td>
+      <td data-label="最新跟进" className="latest-followup-cell">
+        {item.latestFollowup ? (
+          <div>
+            <a href={`/followups/${item.latestFollowup.followupId}`}>
+              {item.latestFollowup.summary}
+            </a>
+            <time dateTime={item.latestFollowup.confirmedAt}>
+              {formatDate(item.latestFollowup.confirmedAt)}
+            </time>
+          </div>
+        ) : (
+          <span className="data-gap">暂无正式跟进</span>
+        )}
       </td>
       <td data-label="最近更新">
         <time dateTime={item.updatedAt}>{formatDate(item.updatedAt)}</time>

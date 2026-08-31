@@ -67,7 +67,16 @@ export class RequestBattleAnalysis {
     actor: ActorScope;
     entityId: string;
     expectedInputVersion?: string;
+    triggerEventId?: string;
   }): Promise<BattleAnalysisResult> {
+    if (input.triggerEventId) {
+      const existing = await this.dependencies.store.findByTriggerEvent({
+        actor: input.actor,
+        triggerEventId: input.triggerEventId,
+        entityId: input.entityId,
+      });
+      if (existing) return existing;
+    }
     const snapshot = await this.dependencies.reader.read({
       actor: input.actor,
       entityId: input.entityId,
@@ -89,6 +98,7 @@ export class RequestBattleAnalysis {
       ruleVersion: this.dependencies.ruleVersion,
       analyzerConfigVersion: this.dependencies.analyzerConfigVersion,
       startedAt,
+      ...(input.triggerEventId ? { triggerEventId: input.triggerEventId } : {}),
     });
 
     let candidate: BattleAnalysisCandidate;

@@ -4,10 +4,12 @@ import {
   cancelFollowupDraftRequestSchema,
   confirmFollowupDraftRequestSchema,
   createFollowupDraftRequestSchema,
+  type FollowupAutomationStatus,
   type FollowupConfirmationResponse,
   type FollowupDraftResponse,
   type FormalFollowupRecord,
   followupApiErrorSchema,
+  followupAutomationStatusSchema,
   followupConfirmationResponseSchema,
   followupDraftResponseSchema,
   formalFollowupRecordSchema,
@@ -137,6 +139,17 @@ export async function getFormalFollowup(
   return formalFollowupRecordSchema.parse(
     await sendFollowupRequest(
       `/api/v1/followups/${encodeURIComponent(followupId)}`,
+    ),
+  );
+}
+
+export async function getFollowupAutomationStatus(
+  followupId: string,
+  eventId: string,
+): Promise<FollowupAutomationStatus> {
+  return followupAutomationStatusSchema.parse(
+    await sendFollowupRequest(
+      `/api/v1/followups/${encodeURIComponent(followupId)}/automation-status/${encodeURIComponent(eventId)}`,
     ),
   );
 }

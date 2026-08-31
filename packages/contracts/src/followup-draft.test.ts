@@ -5,6 +5,7 @@ import {
   createFollowupDraftRequestSchema,
   followupAgentExecutionSchema,
   followupApiErrorSchema,
+  followupAutomationStatusSchema,
   followupConfirmationResponseSchema,
   followupDraftCandidateSchema,
   followupDraftResponseSchema,
@@ -174,6 +175,27 @@ describe("follow-up draft responses", () => {
         followupId: null,
       }).success,
     ).toBe(false);
+  });
+
+  it("accepts a visible completed follow-up automation receipt", () => {
+    expect(
+      followupAutomationStatusSchema.parse({
+        eventId: "90000000-0000-4000-8000-000000000001",
+        followupId: "80000000-0000-4000-8000-000000000001",
+        overallStatus: "completed",
+        battleMapStatus: "completed",
+        leaderNotificationStatus: "completed",
+        outboxStatus: "published",
+        battleStateVersionId: "b0000000-0000-4000-8000-000000000001",
+        leaderNotificationCount: 1,
+        attemptCount: 1,
+        errorMessage: null,
+        updatedAt: "2026-09-01T03:00:00.000Z",
+      }),
+    ).toMatchObject({
+      overallStatus: "completed",
+      leaderNotificationCount: 1,
+    });
   });
 });
 

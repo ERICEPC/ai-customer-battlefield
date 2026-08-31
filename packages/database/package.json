@@ -20,6 +20,7 @@
     "build": "tsc -p tsconfig.json",
     "premigrate": "pnpm build",
     "migrate": "node dist/cli/migrate.js",
+    "seed:v1": "node dist/cli/seed-v1-scenario.js",
     "pretypecheck": "pnpm --filter @battlefield/core build",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "pretest": "pnpm --filter @battlefield/core build",

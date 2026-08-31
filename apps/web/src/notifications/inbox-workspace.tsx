@@ -190,9 +190,9 @@ export function InboxWorkspace({
                   <p>{item.body}</p>
                   <div className="inbox-card-actions">
                     {isSafeApplicationPath(item.deepLink) ? (
-                      <Link href={item.deepLink}>查看相关动作</Link>
+                      <Link href={item.deepLink}>查看详情</Link>
                     ) : (
-                      <span>关联动作链接不可用</span>
+                      <span>关联记录链接不可用</span>
                     )}
                     {!item.readAt ? (
                       <button

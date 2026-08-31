@@ -84,6 +84,7 @@ function dependencies(
     ...overrides.analyzer,
   } satisfies BattleAnalyzer;
   const store = {
+    findByTriggerEvent: vi.fn().mockResolvedValue(null),
     start: vi.fn().mockResolvedValue(undefined),
     complete: vi.fn().mockResolvedValue({
       analysisRunId,

@@ -2,6 +2,7 @@ import "@testing-library/jest-dom/vitest";
 
 import type {
   BusinessEntityPage,
+  FollowupAutomationStatus,
   FollowupConfirmationResponse,
   FollowupDraftResponse,
   FormalFollowupRecord,
@@ -29,6 +30,7 @@ const entities: BusinessEntityPage = {
       isT0: true,
       primaryOwnerName: "alpha-owner",
       primaryOpportunity: null,
+      latestFollowup: null,
       updatedAt: "2026-08-31T02:30:00.000Z",
       versionNo: "1",
     },
@@ -103,12 +105,27 @@ const formalFollowup: FormalFollowupRecord = {
   ],
 };
 
+const automationStatus: FollowupAutomationStatus = {
+  eventId: confirmation.eventId,
+  followupId,
+  overallStatus: "completed",
+  battleMapStatus: "completed",
+  leaderNotificationStatus: "completed",
+  outboxStatus: "published",
+  battleStateVersionId: "b0000000-0000-4000-8000-000000000001",
+  leaderNotificationCount: 1,
+  attemptCount: 1,
+  errorMessage: null,
+  updatedAt: "2026-08-31T02:35:05.000Z",
+};
+
 function api(overrides: Partial<FollowupWorkbenchApi> = {}) {
   return {
     listEntities: vi.fn().mockResolvedValue(entities),
     createDraft: vi.fn().mockResolvedValue(pendingDraft()),
     getDraft: vi.fn().mockResolvedValue(pendingDraft()),
     getFormalFollowup: vi.fn().mockResolvedValue(formalFollowup),
+    getAutomationStatus: vi.fn().mockResolvedValue(automationStatus),
     reviseDraft: vi.fn().mockImplementation(async (_draftId, request) =>
       pendingDraft({
         candidate: request.candidate,
@@ -248,6 +265,9 @@ describe("FollowupDraftForm", () => {
       await screen.findByText("30000000-0000-4000-8000-000000000001"),
     ).toBeVisible();
     expect(workbenchApi.getFormalFollowup).toHaveBeenCalledWith(followupId);
+    expect(await screen.findByText("全部完成")).toBeVisible();
+    expect(screen.getByText("作战地图已自动更新")).toBeVisible();
+    expect(screen.getByText("领导消息已送达")).toBeVisible();
     expect(screen.getByText(/建议动作仍需单独确认/)).toBeVisible();
   });
 

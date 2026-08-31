@@ -54,6 +54,13 @@ export function followupIdentifier(value: string): string {
   return value;
 }
 
+export function eventIdentifier(value: string): string {
+  if (!UUID_PATTERN.test(value)) {
+    throw invalidRequest("Event identifier must be a UUID.");
+  }
+  return value;
+}
+
 export function idempotencyKey(value?: string): string {
   const parsed = idempotencyKeySchema.safeParse(value);
   if (!parsed.success) {

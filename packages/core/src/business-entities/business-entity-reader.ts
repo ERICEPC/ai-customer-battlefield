@@ -16,6 +16,11 @@ export interface BusinessEntityListItem {
     stageCode: string;
     stageProgress: string;
   } | null;
+  latestFollowup: {
+    followupId: string;
+    summary: string;
+    confirmedAt: string;
+  } | null;
   updatedAt: string;
   versionNo: string;
 }

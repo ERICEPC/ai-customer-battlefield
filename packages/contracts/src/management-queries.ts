@@ -218,8 +218,12 @@ function validateEvidenceRoutes(
           ? `/actions?actionId=${evidence.evidenceId}`
           : evidence.kind === "battle_state"
             ? `/battle-map?entityId=${highlight.entityId}&stateVersion=${evidence.evidenceId}`
-            : `/battle-map?entityId=${highlight.entityId}`;
-      if (evidence.deepLink !== expected) {
+            : evidence.kind === "followup"
+              ? `/followups/${evidence.evidenceId}`
+              : `/battle-map?entityId=${highlight.entityId}`;
+      const validFactLink =
+        evidence.kind === "fact" && isFormalFollowupPath(evidence.deepLink);
+      if (!validFactLink && evidence.deepLink !== expected) {
         context.addIssue({
           code: "custom",
           path: [
@@ -235,6 +239,11 @@ function validateEvidenceRoutes(
       }
     }
   }
+}
+
+function isFormalFollowupPath(value: string): boolean {
+  const match = /^\/followups\/([^/?#]+)$/.exec(value);
+  return match ? z.uuid().safeParse(match[1]).success : false;
 }
 
 export type ManagementQueryCapability = z.infer<

@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import type {
+  ConfirmedFollowupProgressNotificationStore,
   ExternalNotificationChannel,
   NotificationDeliveryClaim,
   NotificationStore,
@@ -19,7 +20,10 @@ interface InboxCursor {
 export interface InboxPage {
   items: Array<{
     notificationId: string;
-    eventType: "action_due" | "weekly_report_published";
+    eventType:
+      | "action_due"
+      | "weekly_report_published"
+      | "sales_progress_updated";
     title: string;
     body: string;
     deepLink: string;
@@ -56,7 +60,10 @@ export interface KyselyNotificationStoreOptions {
 }
 
 export class KyselyNotificationStore
-  implements NotificationStore, WeeklyReportPublicationNotificationStore
+  implements
+    NotificationStore,
+    WeeklyReportPublicationNotificationStore,
+    ConfirmedFollowupProgressNotificationStore
 {
   private readonly enabledExternalChannels: Set<ExternalNotificationChannel>;
 
@@ -137,6 +144,8 @@ export class KyselyNotificationStore
             recipient_user_id: input.recipientUserId,
             reminder_id: null,
             report_version_id: input.reportVersionId,
+            followup_id: null,
+            battle_state_version_id: null,
             event_type: "weekly_report_published",
             title: content.title,
             body: content.body,
@@ -222,6 +231,163 @@ export class KyselyNotificationStore
               last_error_message: null,
               created_at: input.publishedAt,
               updated_at: input.publishedAt,
+            })
+            .onConflict((conflict) =>
+              conflict.columns(["tenant_id", "dedupe_key"]).doNothing(),
+            )
+            .executeTakeFirst();
+        }
+        return true;
+      },
+    );
+  }
+
+  async materializeFollowupProgress(
+    input: Parameters<
+      ConfirmedFollowupProgressNotificationStore["materializeFollowupProgress"]
+    >[0],
+  ): Promise<boolean> {
+    return withTenantTransaction(
+      this.database,
+      { ...input.actor, requestId: input.eventId },
+      async (transaction) => {
+        const source = await transaction
+          .selectFrom("app.followups as followup")
+          .innerJoin("app.business_entities as entity", (join) =>
+            join
+              .onRef("entity.tenant_id", "=", "followup.tenant_id")
+              .onRef("entity.id", "=", "followup.entity_id"),
+          )
+          .innerJoin("app.users as sales", (join) =>
+            join
+              .onRef("sales.tenant_id", "=", "followup.tenant_id")
+              .onRef("sales.id", "=", "followup.submitted_by"),
+          )
+          .innerJoin("app.battle_state_versions as state", (join) =>
+            join
+              .onRef("state.tenant_id", "=", "followup.tenant_id")
+              .onRef("state.entity_id", "=", "followup.entity_id"),
+          )
+          .select([
+            "followup.summary",
+            "followup.submitted_by as sales_user_id",
+            "entity.name as entity_name",
+            "sales.display_name as sales_name",
+          ])
+          .where("followup.tenant_id", "=", input.actor.tenantId)
+          .where("followup.id", "=", input.followupId)
+          .where("followup.source_draft_id", "=", input.draftId)
+          .where("followup.entity_id", "=", input.entityId)
+          .where("state.id", "=", input.battleStateVersionId)
+          .executeTakeFirst();
+        if (!source) return false;
+
+        const salesMemberships = await transaction
+          .selectFrom("app.user_memberships")
+          .select("org_unit_id")
+          .where("tenant_id", "=", input.actor.tenantId)
+          .where("user_id", "=", source.sales_user_id)
+          .where("role_code", "=", "sales")
+          .where("valid_from", "<=", new Date(input.createdAt))
+          .where((expression) =>
+            expression.or([
+              expression("valid_to", "is", null),
+              expression("valid_to", ">", new Date(input.createdAt)),
+            ]),
+          )
+          .execute();
+        if (salesMemberships.length === 0) return false;
+
+        const leaders = await transaction
+          .selectFrom("app.user_memberships as membership")
+          .innerJoin("app.users as leader", (join) =>
+            join
+              .onRef("leader.tenant_id", "=", "membership.tenant_id")
+              .onRef("leader.id", "=", "membership.user_id"),
+          )
+          .select("leader.id as leader_id")
+          .distinct()
+          .where("membership.tenant_id", "=", input.actor.tenantId)
+          .where(
+            "membership.org_unit_id",
+            "in",
+            salesMemberships.map((membership) => membership.org_unit_id),
+          )
+          .where("membership.role_code", "=", "department_leader")
+          .where("membership.valid_from", "<=", new Date(input.createdAt))
+          .where((expression) =>
+            expression.or([
+              expression("membership.valid_to", "is", null),
+              expression("membership.valid_to", ">", new Date(input.createdAt)),
+            ]),
+          )
+          .where("leader.status", "=", "active")
+          .execute();
+        if (leaders.length === 0) return false;
+
+        const title = truncateText(
+          `${source.sales_name}更新了 ${source.entity_name}`,
+          200,
+        );
+        const body = truncateText(source.summary, 2_000);
+        for (const leader of leaders) {
+          const dedupeKey = `followup:${input.followupId}:leader:${leader.leader_id}:progress`;
+          const inserted = await transaction
+            .insertInto("app.notification_events")
+            .values({
+              tenant_id: input.actor.tenantId,
+              id: randomUUID(),
+              recipient_user_id: leader.leader_id,
+              reminder_id: null,
+              report_version_id: null,
+              followup_id: input.followupId,
+              battle_state_version_id: input.battleStateVersionId,
+              event_type: "sales_progress_updated",
+              title,
+              body,
+              deep_link: `/followups/${input.followupId}`,
+              priority: "medium",
+              read_at: null,
+              dedupe_key: dedupeKey,
+              created_at: input.createdAt,
+            })
+            .onConflict((conflict) =>
+              conflict.columns(["tenant_id", "dedupe_key"]).doNothing(),
+            )
+            .returning("id")
+            .executeTakeFirst();
+          const notificationEventId =
+            inserted?.id ??
+            (
+              await transaction
+                .selectFrom("app.notification_events")
+                .select("id")
+                .where("tenant_id", "=", input.actor.tenantId)
+                .where("dedupe_key", "=", dedupeKey)
+                .executeTakeFirstOrThrow()
+            ).id;
+          await transaction
+            .insertInto("app.notification_deliveries")
+            .values({
+              tenant_id: input.actor.tenantId,
+              id: randomUUID(),
+              notification_event_id: notificationEventId,
+              recipient_user_id: leader.leader_id,
+              channel: "in_app",
+              address_id: null,
+              status: "delivered",
+              dedupe_key: `notification:${notificationEventId}:channel:in_app`,
+              available_at: input.createdAt,
+              attempt_count: 0,
+              claim_token: null,
+              claimed_at: null,
+              delivered_at: input.createdAt,
+              provider_message_id: null,
+              provider_request_id: null,
+              last_error_code: null,
+              last_error_message: null,
+              created_at: input.createdAt,
+              updated_at: input.createdAt,
             })
             .onConflict((conflict) =>
               conflict.columns(["tenant_id", "dedupe_key"]).doNothing(),
@@ -579,6 +745,13 @@ function toIso(value: Date | string): string {
   return value instanceof Date
     ? value.toISOString()
     : new Date(value).toISOString();
+}
+
+function truncateText(value: string, maximumLength: number): string {
+  const normalized = value.trim();
+  return normalized.length <= maximumLength
+    ? normalized
+    : `${normalized.slice(0, maximumLength - 1)}…`;
 }
 
 function renderWeeklyReportTemplate(

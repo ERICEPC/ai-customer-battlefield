@@ -175,11 +175,11 @@ describe("Kysely management-query repository", () => {
       expect.arrayContaining([
         expect.objectContaining({
           kind: "followup",
-          deepLink: `/battle-map?entityId=${SYNTHETIC_ENTITY_ID}`,
+          deepLink: `/followups/${FOLLOWUP_ID}`,
         }),
         expect.objectContaining({
           kind: "fact",
-          deepLink: `/battle-map?entityId=${SYNTHETIC_ENTITY_ID}`,
+          deepLink: `/followups/${FOLLOWUP_ID}`,
         }),
         expect.objectContaining({
           kind: "stage_change",

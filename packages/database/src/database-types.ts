@@ -636,7 +636,12 @@ export interface NotificationEventTable {
   recipient_user_id: string;
   reminder_id: string | null;
   report_version_id: string | null;
-  event_type: "action_due" | "weekly_report_published";
+  followup_id: string | null;
+  battle_state_version_id: string | null;
+  event_type:
+    | "action_due"
+    | "weekly_report_published"
+    | "sales_progress_updated";
   title: string;
   body: string;
   deep_link: string;

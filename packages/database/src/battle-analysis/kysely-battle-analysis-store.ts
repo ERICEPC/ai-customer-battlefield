@@ -63,6 +63,71 @@ export class KyselyBattleAnalysisStore implements BattleAnalysisStore {
     this.idGenerator = options.idGenerator ?? randomUUID;
   }
 
+  async findByTriggerEvent(
+    input: Parameters<BattleAnalysisStore["findByTriggerEvent"]>[0],
+  ): Promise<BattleAnalysisResult | null> {
+    return withTenantTransaction(
+      this.database,
+      { ...input.actor, requestId: input.triggerEventId },
+      async (transaction) => {
+        const run = await transaction
+          .selectFrom("app.analysis_runs")
+          .select([
+            "id",
+            "entity_id",
+            "input_version",
+            "status",
+            "started_at",
+            "finished_at",
+          ])
+          .where("tenant_id", "=", input.actor.tenantId)
+          .where("trigger_event_id", "=", input.triggerEventId)
+          .where("entity_id", "=", input.entityId)
+          .where("status", "in", ["completed", "superseded"])
+          .orderBy("finished_at", "desc")
+          .executeTakeFirst();
+        if (!run?.finished_at) return null;
+        if (run.status === "superseded") {
+          return {
+            analysisRunId: run.id,
+            entityId: run.entity_id,
+            status: "superseded",
+            inputVersion: run.input_version,
+            battleStateVersionId: null,
+            battleStateVersionNo: null,
+            proposalIds: [],
+            startedAt: toIsoString(run.started_at),
+            finishedAt: toIsoString(run.finished_at),
+          };
+        }
+        const state = await transaction
+          .selectFrom("app.battle_state_versions")
+          .select(["id", "version_no"])
+          .where("tenant_id", "=", input.actor.tenantId)
+          .where("analysis_run_id", "=", run.id)
+          .executeTakeFirstOrThrow();
+        const proposals = await transaction
+          .selectFrom("app.action_proposals")
+          .select("id")
+          .where("tenant_id", "=", input.actor.tenantId)
+          .where("source_battle_state_version_id", "=", state.id)
+          .orderBy("id")
+          .execute();
+        return {
+          analysisRunId: run.id,
+          entityId: run.entity_id,
+          status: "completed",
+          inputVersion: run.input_version,
+          battleStateVersionId: state.id,
+          battleStateVersionNo: String(state.version_no),
+          proposalIds: proposals.map((proposal) => proposal.id),
+          startedAt: toIsoString(run.started_at),
+          finishedAt: toIsoString(run.finished_at),
+        };
+      },
+    );
+  }
+
   async start(
     input: Parameters<BattleAnalysisStore["start"]>[0],
   ): Promise<void> {
@@ -85,7 +150,7 @@ export class KyselyBattleAnalysisStore implements BattleAnalysisStore {
             tenant_id: input.actor.tenantId,
             id: input.analysisRunId,
             entity_id: input.entityId,
-            trigger_event_id: null,
+            trigger_event_id: input.triggerEventId ?? null,
             rule_version: input.ruleVersion,
             analyzer_config_version: input.analyzerConfigVersion,
             input_version: input.inputVersion,

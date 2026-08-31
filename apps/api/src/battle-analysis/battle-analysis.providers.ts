@@ -35,6 +35,7 @@ const unavailableSnapshotReader: ConfirmedFactSnapshotReader = {
   read: unavailable,
 };
 const unavailableAnalysisStore: BattleAnalysisStore = {
+  findByTriggerEvent: unavailable,
   start: unavailable,
   complete: unavailable,
   fail: unavailable,

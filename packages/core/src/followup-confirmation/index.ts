@@ -1,4 +1,6 @@
 export {
+  type FollowupAutomationStatus,
+  type FollowupAutomationStatusReader,
   type FollowupConfirmationResult,
   type FollowupConfirmationStore,
   FollowupDraftExpiredError,
@@ -19,6 +21,7 @@ export {
   CancelFollowupDraft,
   ConfirmFollowupDraft,
   CreatePersistentFollowupDraft,
+  GetFollowupAutomationStatus,
   GetFollowupDraft,
   GetFormalFollowup,
   InvalidFollowupDraftCandidateError,

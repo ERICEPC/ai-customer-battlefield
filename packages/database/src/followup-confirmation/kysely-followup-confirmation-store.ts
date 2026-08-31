@@ -1,6 +1,8 @@
 import { createHash, randomUUID } from "node:crypto";
 import {
   type FollowupAgentExecutionReceipt,
+  type FollowupAutomationStatus,
+  type FollowupAutomationStatusReader,
   type FollowupConfirmationResult,
   type FollowupConfirmationStore,
   FollowupDraftExpiredError,
@@ -16,6 +18,8 @@ import {
 } from "@battlefield/core";
 import { type Kysely, sql, type Transaction } from "kysely";
 
+import { appendAuditEntry } from "../audit/append-audit-entry.js";
+import { resolveEntityAccessScope } from "../authorization/entity-access.js";
 import type { BattlefieldDatabase } from "../database-types.js";
 import { withTenantTransaction } from "../tenant-session.js";
 
@@ -43,9 +47,21 @@ interface IdempotencyRow {
 }
 
 export class KyselyFollowupConfirmationStore
-  implements FollowupConfirmationStore
+  implements FollowupConfirmationStore, FollowupAutomationStatusReader
 {
-  constructor(private readonly database: Kysely<BattlefieldDatabase>) {}
+  private readonly requestIdFactory: () => string;
+  private readonly clock: () => Date;
+
+  constructor(
+    private readonly database: Kysely<BattlefieldDatabase>,
+    options: {
+      requestIdFactory?: () => string;
+      clock?: () => Date;
+    } = {},
+  ) {
+    this.requestIdFactory = options.requestIdFactory ?? randomUUID;
+    this.clock = options.clock ?? (() => new Date());
+  }
 
   async create(
     input: Parameters<FollowupConfirmationStore["create"]>[0],
@@ -124,9 +140,11 @@ export class KyselyFollowupConfirmationStore
   async getFollowup(
     input: Parameters<FollowupConfirmationStore["getFollowup"]>[0],
   ) {
-    return withTenantTransaction(
+    const requestId = this.requestIdFactory();
+    const accessedAt = this.clock().toISOString();
+    const result = await withTenantTransaction(
       this.database,
-      { ...input.actor, requestId: input.followupId },
+      { ...input.actor, requestId },
       async (transaction) => {
         const followup = await transaction
           .selectFrom("app.followups")
@@ -144,8 +162,27 @@ export class KyselyFollowupConfirmationStore
           .where("tenant_id", "=", input.actor.tenantId)
           .where("id", "=", input.followupId)
           .executeTakeFirst();
-        if (!followup) {
-          throw new FollowupNotFoundError();
+        const accessScope = followup
+          ? await resolveEntityAccessScope(transaction, {
+              tenantId: input.actor.tenantId,
+              userId: input.actor.userId,
+              entityId: followup.entity_id,
+              at: accessedAt,
+            })
+          : null;
+        if (!followup || !accessScope) {
+          await appendAuditEntry(transaction, {
+            tenantId: input.actor.tenantId,
+            actorUserId: input.actor.userId,
+            aggregateType: "followup",
+            aggregateId: input.followupId,
+            action: "followup.view_denied",
+            occurredAt: accessedAt,
+            requestId,
+            afterPayload: { outcome: "denied" },
+            reason: "outside_authorized_scope_or_missing",
+          });
+          return null;
         }
         const opportunities = await transaction
           .selectFrom("app.followup_opportunities")
@@ -164,7 +201,7 @@ export class KyselyFollowupConfirmationStore
           .orderBy("id")
           .execute();
 
-        return {
+        const record = {
           followupId: followup.id,
           sourceDraftId: followup.source_draft_id,
           entityId: followup.entity_id,
@@ -185,6 +222,140 @@ export class KyselyFollowupConfirmationStore
             factValue: fact.fact_value,
             opportunityId: fact.opportunity_id,
           })),
+        };
+        await appendAuditEntry(transaction, {
+          tenantId: input.actor.tenantId,
+          actorUserId: input.actor.userId,
+          aggregateType: "followup",
+          aggregateId: input.followupId,
+          action: "followup.viewed",
+          occurredAt: accessedAt,
+          requestId,
+          afterPayload: {
+            outcome: "allowed",
+            accessScope,
+            entityId: followup.entity_id,
+            relatedOpportunityCount: opportunities.length,
+            factCount: facts.length,
+          },
+        });
+        return record;
+      },
+    );
+    if (!result) throw new FollowupNotFoundError();
+    return result;
+  }
+
+  async getAutomationStatus(
+    input: Parameters<FollowupAutomationStatusReader["getAutomationStatus"]>[0],
+  ): Promise<FollowupAutomationStatus> {
+    return withTenantTransaction(
+      this.database,
+      { ...input.actor, requestId: input.eventId },
+      async (transaction) => {
+        const pipeline = await transaction
+          .selectFrom("app.domain_events as event")
+          .innerJoin("app.outbox_messages as outbox", (join) =>
+            join
+              .onRef("outbox.tenant_id", "=", "event.tenant_id")
+              .onRef("outbox.event_id", "=", "event.id"),
+          )
+          .leftJoin("app.analysis_runs as analysis", (join) =>
+            join
+              .onRef("analysis.tenant_id", "=", "event.tenant_id")
+              .onRef("analysis.trigger_event_id", "=", "event.id"),
+          )
+          .leftJoin("app.battle_state_versions as state", (join) =>
+            join
+              .onRef("state.tenant_id", "=", "analysis.tenant_id")
+              .onRef("state.analysis_run_id", "=", "analysis.id"),
+          )
+          .select([
+            "event.id as event_id",
+            "event.aggregate_id as followup_id",
+            "event.occurred_at",
+            "outbox.status as outbox_status",
+            "outbox.attempt_count",
+            "outbox.last_error",
+            "outbox.claimed_at",
+            "outbox.published_at",
+            "analysis.status as analysis_status",
+            "analysis.error_message as analysis_error_message",
+            "analysis.started_at",
+            "analysis.finished_at",
+            "state.id as battle_state_version_id",
+            "state.effective_at",
+          ])
+          .where("event.tenant_id", "=", input.actor.tenantId)
+          .where("event.id", "=", input.eventId)
+          .where("event.aggregate_id", "=", input.followupId)
+          .where("event.event_type", "=", "followup.confirmed.v1")
+          .orderBy("analysis.started_at", "desc")
+          .executeTakeFirst();
+        if (!pipeline) throw new FollowupNotFoundError();
+
+        const notification = await transaction
+          .selectFrom("app.notification_events")
+          .select((expression) => [
+            expression.fn.count<number>("id").as("count"),
+            expression.fn.max("created_at").as("latest_created_at"),
+          ])
+          .where("tenant_id", "=", input.actor.tenantId)
+          .where("followup_id", "=", input.followupId)
+          .where("event_type", "=", "sales_progress_updated")
+          .executeTakeFirstOrThrow();
+        const leaderNotificationCount = Number(notification.count);
+        const analysisFailed = pipeline.analysis_status === "failed";
+        const outboxFailed = ["cancelled", "dead_lettered"].includes(
+          pipeline.outbox_status,
+        );
+        const battleMapStatus: FollowupAutomationStatus["battleMapStatus"] =
+          analysisFailed
+            ? "failed"
+            : pipeline.battle_state_version_id
+              ? "completed"
+              : pipeline.analysis_status === "running"
+                ? "processing"
+                : "queued";
+        const leaderNotificationStatus: FollowupAutomationStatus["leaderNotificationStatus"] =
+          leaderNotificationCount > 0
+            ? "completed"
+            : analysisFailed || outboxFailed
+              ? "failed"
+              : "waiting";
+        const overallStatus: FollowupAutomationStatus["overallStatus"] =
+          battleMapStatus === "completed" &&
+          leaderNotificationStatus === "completed"
+            ? "completed"
+            : battleMapStatus === "failed" ||
+                leaderNotificationStatus === "failed"
+              ? "failed"
+              : "processing";
+        const timestamps = [
+          pipeline.occurred_at,
+          pipeline.claimed_at,
+          pipeline.published_at,
+          pipeline.started_at,
+          pipeline.finished_at,
+          pipeline.effective_at,
+          notification.latest_created_at,
+        ].filter((value): value is Date => value !== null);
+
+        return {
+          eventId: pipeline.event_id,
+          followupId: pipeline.followup_id,
+          overallStatus,
+          battleMapStatus,
+          leaderNotificationStatus,
+          outboxStatus: pipeline.outbox_status,
+          battleStateVersionId: pipeline.battle_state_version_id,
+          leaderNotificationCount,
+          attemptCount: pipeline.attempt_count,
+          errorMessage:
+            pipeline.analysis_error_message ?? pipeline.last_error ?? null,
+          updatedAt: timestamps
+            .map(toIsoString)
+            .sort((left, right) => right.localeCompare(left))[0]!,
         };
       },
     );
@@ -287,7 +458,7 @@ export class KyselyFollowupConfirmationStore
           input.actor.tenantId,
           input.draftId,
         );
-        await insertAuditEntry(transaction, {
+        await appendAuditEntry(transaction, {
           tenantId: input.actor.tenantId,
           actorUserId: input.actor.userId,
           aggregateType: "followup_draft",
@@ -474,7 +645,7 @@ export class KyselyFollowupConfirmationStore
           .where("tenant_id", "=", input.actor.tenantId)
           .where("id", "=", input.draftId)
           .executeTakeFirstOrThrow();
-        await insertAuditEntry(transaction, {
+        await appendAuditEntry(transaction, {
           tenantId: input.actor.tenantId,
           actorUserId: input.actor.userId,
           aggregateType: "followup",
@@ -489,6 +660,7 @@ export class KyselyFollowupConfirmationStore
           },
         });
         const eventPayload = {
+          eventId,
           followupId,
           draftId: input.draftId,
           entityId: candidate.entityId,
@@ -783,36 +955,6 @@ async function completeIdempotentOperation(
     .where("tenant_id", "=", input.tenantId)
     .where("operation", "=", input.operation)
     .where("idempotency_key", "=", input.idempotencyKey)
-    .executeTakeFirstOrThrow();
-}
-
-async function insertAuditEntry(
-  transaction: DatabaseTransaction,
-  input: {
-    tenantId: string;
-    actorUserId: string;
-    aggregateType: string;
-    aggregateId: string;
-    action: string;
-    occurredAt: string;
-    afterPayload: object;
-  },
-): Promise<void> {
-  await transaction
-    .insertInto("app.audit_entries")
-    .values({
-      tenant_id: input.tenantId,
-      id: randomUUID(),
-      aggregate_type: input.aggregateType,
-      aggregate_id: input.aggregateId,
-      action: input.action,
-      actor_user_id: input.actorUserId,
-      request_id: null,
-      before_payload: null,
-      after_payload: jsonObject(input.afterPayload),
-      reason: null,
-      occurred_at: input.occurredAt,
-    })
     .executeTakeFirstOrThrow();
 }
 

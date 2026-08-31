@@ -56,7 +56,7 @@ function result() {
             evidenceId,
             occurredAt: "2026-08-31T03:00:00.000Z",
             label: "客户确认安全评审时间",
-            deepLink: `/battle-map?entityId=${entityId}`,
+            deepLink: `/followups/${evidenceId}`,
           },
         ],
       },
@@ -161,12 +161,12 @@ describe("management-query contracts", () => {
       {
         kind: "followup",
         evidenceId,
-        deepLink: `/battle-map?entityId=${entityId}`,
+        deepLink: `/followups/${evidenceId}`,
       },
       {
         kind: "fact",
         evidenceId,
-        deepLink: `/battle-map?entityId=${entityId}`,
+        deepLink: `/followups/${evidenceId}`,
       },
       {
         kind: "stage_change",
