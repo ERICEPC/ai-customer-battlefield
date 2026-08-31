@@ -12,23 +12,34 @@ describe("SenseAudioFollowupDraftAgent", () => {
   it("requests strict structured output and returns a review-only candidate", async () => {
     const fetch = vi.fn().mockResolvedValue(
       Response.json({
-        id: "resp-demo",
-        object: "response",
+        id: "chatcmpl-demo",
+        object: "chat.completion",
         model: "senseaudio-s2-flash",
-        status: "completed",
-        output: {
-          type: "message",
-          role: "assistant",
-          content: JSON.stringify({
-            summary: "客户已确认预算，下周三前需要方案与排期。",
-            followupType: "call",
-            facts: [
-              { factType: "budget_status", factValue: "预算已确认" },
-              { factType: "next_step", factValue: "下周三前提交方案与排期" },
-            ],
-          }),
+        choices: [
+          {
+            index: 0,
+            message: {
+              role: "assistant",
+              content: JSON.stringify({
+                summary: "客户已确认预算，下周三前需要方案与排期。",
+                followupType: "call",
+                facts: [
+                  { factType: "budget_status", factValue: "预算已确认" },
+                  {
+                    factType: "next_step",
+                    factValue: "下周三前提交方案与排期",
+                  },
+                ],
+              }),
+            },
+            finish_reason: "stop",
+          },
+        ],
+        usage: {
+          prompt_tokens: 100,
+          completion_tokens: 50,
+          total_tokens: 150,
         },
-        usage: { input_tokens: 100, output_tokens: 50, total_tokens: 150 },
       }),
     );
     const agent = new SenseAudioFollowupDraftAgent({
@@ -60,7 +71,7 @@ describe("SenseAudioFollowupDraftAgent", () => {
         model: "senseaudio-s2-flash",
         promptVersion: "followup-extraction-v1",
         status: "succeeded",
-        providerRequestId: "resp-demo",
+        providerRequestId: "chatcmpl-demo",
         durationMs: 1234,
         usage: { inputTokens: 100, outputTokens: 50, totalTokens: 150 },
       },
@@ -68,7 +79,7 @@ describe("SenseAudioFollowupDraftAgent", () => {
 
     expect(fetch).toHaveBeenCalledTimes(1);
     const [url, init] = fetch.mock.calls[0] as [string, RequestInit];
-    expect(url).toBe("https://api.senseaudio.cn/v1/responses");
+    expect(url).toBe("https://api.senseaudio.cn/v1/chat/completions");
     expect(init.headers).toMatchObject({
       authorization: "Bearer test-api-key",
       "content-type": "application/json",
@@ -78,18 +89,17 @@ describe("SenseAudioFollowupDraftAgent", () => {
       model: "senseaudio-s2-flash",
       stream: false,
       response_format: {
-        type: "json_schema",
-        json_schema: {
-          name: "followup_draft_candidate",
-          strict: true,
-          schema: {
-            type: "object",
-            additionalProperties: false,
-            required: ["summary", "followupType", "facts"],
-          },
-        },
+        type: "json_object",
       },
     });
+    expect(JSON.parse(String(init.body)).messages).toEqual([
+      expect.objectContaining({ role: "system" }),
+      {
+        role: "user",
+        content:
+          "刚给客户打完电话，预算确认了，让我们下周三前发方案和实施排期。",
+      },
+    ]);
   });
 
   it("retries a rate-limited request once without losing the input", async () => {
@@ -103,16 +113,22 @@ describe("SenseAudioFollowupDraftAgent", () => {
       )
       .mockResolvedValueOnce(
         Response.json({
-          status: "completed",
-          output: {
-            type: "message",
-            role: "assistant",
-            content: JSON.stringify({
-              summary: "客户预算已确认。",
-              followupType: "call",
-              facts: [{ factType: "budget_status", factValue: "预算已确认" }],
-            }),
-          },
+          choices: [
+            {
+              index: 0,
+              message: {
+                role: "assistant",
+                content: JSON.stringify({
+                  summary: "客户预算已确认。",
+                  followupType: "call",
+                  facts: [
+                    { factType: "budget_status", factValue: "预算已确认" },
+                  ],
+                }),
+              },
+              finish_reason: "stop",
+            },
+          ],
         }),
       );
     const sleep = vi.fn().mockResolvedValue(undefined);
@@ -139,17 +155,21 @@ describe("SenseAudioFollowupDraftAgent", () => {
   it("rejects structured output with fields outside the review contract", async () => {
     const fetch = vi.fn().mockResolvedValue(
       Response.json({
-        status: "completed",
-        output: {
-          type: "message",
-          role: "assistant",
-          content: JSON.stringify({
-            summary: "客户预算已确认。",
-            followupType: "call",
-            facts: [],
-            autoCommit: true,
-          }),
-        },
+        choices: [
+          {
+            index: 0,
+            message: {
+              role: "assistant",
+              content: JSON.stringify({
+                summary: "客户预算已确认。",
+                followupType: "call",
+                facts: [],
+                autoCommit: true,
+              }),
+            },
+            finish_reason: "stop",
+          },
+        ],
       }),
     );
     const agent = new SenseAudioFollowupDraftAgent({

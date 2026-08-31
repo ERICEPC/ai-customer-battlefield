@@ -70,6 +70,7 @@ export type {
   SourceEvidenceTable,
   SourceInputTable,
   TenantTable,
+  UserAiSettingsTable,
   UserCredentialTable,
   UserMembershipTable,
   UserSessionTable,

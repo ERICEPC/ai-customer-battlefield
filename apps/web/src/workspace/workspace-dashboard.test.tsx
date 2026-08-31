@@ -93,6 +93,94 @@ afterEach(() => {
 });
 
 describe("WorkspaceDashboard", () => {
+  test("opens with a sales-focused conversation and actionable reminders", async () => {
+    const navigate = vi.fn();
+    render(
+      <SessionProvider
+        initialSession={{
+          user: {
+            id: "30000000-0000-4000-8000-000000000001",
+            displayName: "销售1",
+            email: "sales1@demo.local",
+          },
+          role: "sales",
+          department: {
+            id: "31000000-0000-4000-8000-000000000001",
+            name: "商业化一部",
+          },
+          directLeader: {
+            id: "30000000-0000-4000-8000-000000000072",
+            displayName: "领导A",
+          },
+          teamMembers: [],
+          expiresAt: "2026-09-01T08:00:00.000Z",
+        }}
+      >
+        <WorkspaceDashboard api={api()} navigate={navigate} />
+      </SessionProvider>,
+    );
+
+    expect(
+      await screen.findByRole("heading", { name: "你好，销售1" }),
+    ).toBeVisible();
+    const attention = screen.getByRole("region", {
+      name: "销售1今天需要关注的事",
+    });
+    expect(
+      within(attention).getByText(/确认下一轮方案范围.*已到计划时间/),
+    ).toBeVisible();
+    expect(within(attention).getByText(/关系从 65 提升到 72.5/)).toBeVisible();
+    fireEvent.click(screen.getByRole("button", { name: "我要录入线索" }));
+    expect(screen.getByLabelText("告诉 AI 你想做什么")).toHaveValue(
+      "我要录入线索",
+    );
+    fireEvent.submit(
+      screen
+        .getByRole("button", { name: "发送给 AI" })
+        .closest("form") as HTMLFormElement,
+    );
+    expect(navigate).toHaveBeenCalledWith(
+      "/?draft=%E6%88%91%E8%A6%81%E5%BD%95%E5%85%A5%E7%BA%BF%E7%B4%A2",
+    );
+  });
+
+  test("shows team activity and a seller-query suggestion to a leader", async () => {
+    render(
+      <SessionProvider
+        initialSession={{
+          user: {
+            id: "30000000-0000-4000-8000-000000000072",
+            displayName: "领导A",
+            email: "leader.a@demo.local",
+          },
+          role: "department_leader",
+          department: {
+            id: "31000000-0000-4000-8000-000000000001",
+            name: "商业化一部",
+          },
+          directLeader: null,
+          teamMembers: [
+            {
+              id: "30000000-0000-4000-8000-000000000001",
+              displayName: "销售1",
+            },
+          ],
+          expiresAt: "2026-09-01T08:00:00.000Z",
+        }}
+      >
+        <WorkspaceDashboard api={api()} />
+      </SessionProvider>,
+    );
+
+    expect(
+      await screen.findByRole("heading", { name: "你好，领导A" }),
+    ).toBeVisible();
+    expect(screen.getByText(/演示销售正在推进华东示范客户/)).toBeVisible();
+    expect(
+      screen.getByRole("button", { name: "我要看看某位销售怎么样" }),
+    ).toBeVisible();
+  });
+
   test("does not offer the leader-only progress query to a sales user", async () => {
     render(
       <SessionProvider

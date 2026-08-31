@@ -37,12 +37,13 @@ const navigation = [
 ] as const;
 
 type NavigationLabel = (typeof navigation)[number]["label"];
+type ActiveItem = NavigationLabel | "个人设置";
 type NavigationRole = (typeof navigation)[number]["roles"][number];
 
 const mobileNavigation: ReadonlyArray<{
   label: string;
   href: string;
-  activeItem: NavigationLabel;
+  activeItem: ActiveItem;
   mark: string;
   roles: readonly NavigationRole[];
 }> = [
@@ -103,7 +104,7 @@ export function AppShell({
   children,
   onLoggedOut,
 }: {
-  activeItem: NavigationLabel;
+  activeItem: ActiveItem;
   breadcrumb: string;
   children: ReactNode;
   onLoggedOut?: () => void;
@@ -238,6 +239,9 @@ export function AppShell({
                   </div>
                 )}
               </dl>
+              <Link className="account-settings-link" href="/settings">
+                个人设置
+              </Link>
               {logoutError ? <p role="alert">{logoutError}</p> : null}
               <button type="button" onClick={() => void handleLogout()}>
                 退出登录

@@ -13,7 +13,7 @@ const MIGRATION_DIRECTORY = fileURLToPath(
 const TENANT_ALPHA = "10000000-0000-4000-8000-000000000001";
 const USER_ALPHA = "30000000-0000-4000-8000-000000000001";
 
-describe("0008_two_level_identity migration", () => {
+describe("two-level identity migrations", () => {
   let database: DatabaseHandle<BattlefieldDatabase>;
 
   beforeEach(async () => {
@@ -71,6 +71,34 @@ describe("0008_two_level_identity migration", () => {
 
     expect(active.rows[0]?.tenant_id).toBe(TENANT_ALPHA);
     expect(missing.rows[0]?.tenant_id).toBeNull();
+  });
+
+  test("publishes active tenants to the isolated login directory", async () => {
+    await sql`
+      insert into app.tenants (id, slug, name)
+      values (${TENANT_ALPHA}::uuid, 'alpha', 'Alpha')
+    `.execute(database.db);
+
+    const directory = await sql<{ exists: boolean }>`
+      select to_regclass('app_auth.tenant_login_directory') is not null as exists
+    `.execute(database.db);
+
+    expect(directory.rows[0]?.exists).toBe(true);
+
+    const active = await sql<{ tenant_id: string | null }>`
+      select app.resolve_active_tenant_id('alpha') as tenant_id
+    `.execute(database.db);
+    expect(active.rows[0]?.tenant_id).toBe(TENANT_ALPHA);
+
+    await sql`
+      update app.tenants
+      set status = 'suspended'
+      where id = ${TENANT_ALPHA}::uuid
+    `.execute(database.db);
+    const suspended = await sql<{ tenant_id: string | null }>`
+      select app.resolve_active_tenant_id('alpha') as tenant_id
+    `.execute(database.db);
+    expect(suspended.rows[0]?.tenant_id).toBeNull();
   });
 
   test("enforces one credential and one unique session token hash per tenant", async () => {

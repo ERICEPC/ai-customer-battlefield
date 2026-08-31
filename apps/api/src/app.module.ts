@@ -8,6 +8,7 @@ import { FollowupDraftsModule } from "./followup-drafts/followup-drafts.module.j
 import { HealthController } from "./health/health.controller.js";
 import { ManagementQueriesModule } from "./management-queries/management-queries.module.js";
 import { NotificationsModule } from "./notifications/notifications.module.js";
+import { UserAiSettingsModule } from "./user-ai-settings/user-ai-settings.module.js";
 import { WeeklyReportsModule } from "./weekly-reports/weekly-reports.module.js";
 import { WorkspaceModule } from "./workspace/workspace.module.js";
 
@@ -19,6 +20,7 @@ import { WorkspaceModule } from "./workspace/workspace.module.js";
     BattleAnalysisModule,
     BusinessActionsModule,
     NotificationsModule,
+    UserAiSettingsModule,
     WorkspaceModule,
     ManagementQueriesModule,
     WeeklyReportsModule,

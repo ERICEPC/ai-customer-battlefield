@@ -108,6 +108,20 @@ export interface UserSessionTable {
   created_at: Timestamp;
 }
 
+export interface UserAiSettingsTable {
+  tenant_id: string;
+  user_id: string;
+  provider: "senseaudio";
+  model_id: string;
+  api_key_ciphertext: NullableText;
+  api_key_iv: NullableText;
+  api_key_auth_tag: NullableText;
+  api_key_last_four: NullableText;
+  version_no: VersionNumber;
+  created_at: Timestamp;
+  updated_at: Timestamp;
+}
+
 export interface ChannelAddressTable {
   tenant_id: string;
   id: Generated<string>;
@@ -765,6 +779,7 @@ export interface BattlefieldDatabase {
   "app.user_memberships": UserMembershipTable;
   "app.user_credentials": UserCredentialTable;
   "app.user_sessions": UserSessionTable;
+  "app.user_ai_settings": UserAiSettingsTable;
   "app.channel_addresses": ChannelAddressTable;
   "app.business_entity_types": BusinessEntityTypeTable;
   "app.business_entities": BusinessEntityTable;

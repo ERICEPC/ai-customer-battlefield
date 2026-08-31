@@ -8,7 +8,7 @@ import type {
   WorkspaceSnapshot,
 } from "@battlefield/contracts";
 import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
+import { type FormEvent, useEffect, useRef, useState } from "react";
 
 import { useOptionalSession } from "../auth/session-provider";
 import { getWorkspaceSnapshot } from "./api-client";
@@ -21,8 +21,10 @@ const defaultApi: WorkspaceDashboardApi = { get: getWorkspaceSnapshot };
 
 export function WorkspaceDashboard({
   api = defaultApi,
+  navigate = (path) => window.location.assign(path),
 }: {
   api?: WorkspaceDashboardApi;
+  navigate?: (path: string) => void;
 }) {
   const sessionContext = useOptionalSession();
   const [snapshot, setSnapshot] = useState<WorkspaceSnapshot | null>(null);
@@ -30,6 +32,7 @@ export function WorkspaceDashboard({
   const [isSlowLoading, setIsSlowLoading] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [reloadVersion, setReloadVersion] = useState(0);
+  const [assistantPrompt, setAssistantPrompt] = useState("");
   const requestVersion = useRef(0);
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: reloadVersion intentionally triggers recovery.
@@ -108,13 +111,121 @@ export function WorkspaceDashboard({
 
   const presentation = scopePresentation(snapshot.scopeMode);
   const noVisibleEntities = snapshot.kpis.assignedEntityCount === 0;
+  const session = sessionContext?.session ?? null;
+  const isSales = session?.role === "sales";
+  const displayName = session?.user.displayName ?? "作战伙伴";
+  const suggestions = isSales
+    ? ["我要录入线索", "我要查询商机进度", "我今天该推进什么"]
+    : ["我要看看某位销售怎么样", "查看团队最新进展", "哪些项目需要我介入"];
+  const attentionItems = buildAttentionItems(snapshot, isSales);
+
+  function submitAssistantPrompt(event: FormEvent<HTMLFormElement>): void {
+    event.preventDefault();
+    const question = assistantPrompt.trim();
+    if (!question) return;
+    navigate(assistantDestination(question, isSales));
+  }
 
   return (
     <div className="workspace-dashboard">
+      <section className="workspace-copilot-hero">
+        <div className="workspace-copilot-main">
+          <p className="eyebrow">AI BUSINESS COPILOT</p>
+          <h1>你好，{displayName}</h1>
+          <p className="workspace-copilot-intro">
+            {isSales
+              ? "先处理今天最值得关注的商机，再把新的客户信息交给我整理。"
+              : "先看团队今天发生的变化，也可以直接问某位销售或某个项目。"}
+          </p>
+
+          <section
+            className="workspace-attention"
+            aria-label={`${displayName}今天需要关注的事`}
+          >
+            <div className="workspace-attention-heading">
+              <strong>今天需要关注</strong>
+              <span>{attentionItems.length} 条</span>
+            </div>
+            {attentionItems.length > 0 ? (
+              <ol>
+                {attentionItems.map((item) => (
+                  <li key={item.key}>
+                    <Link href={item.href}>
+                      <span className={`attention-mark tone-${item.tone}`} />
+                      <span>{item.copy}</span>
+                      <span aria-hidden="true">→</span>
+                    </Link>
+                  </li>
+                ))}
+              </ol>
+            ) : (
+              <p>当前没有新的高优先事项，可以主动录入一次客户进展。</p>
+            )}
+          </section>
+
+          <form
+            className="workspace-copilot-form"
+            onSubmit={submitAssistantPrompt}
+          >
+            <label htmlFor="workspace-assistant-prompt">
+              现在想让我帮你做什么？
+            </label>
+            <div>
+              <textarea
+                id="workspace-assistant-prompt"
+                aria-label="告诉 AI 你想做什么"
+                value={assistantPrompt}
+                onChange={(event) =>
+                  setAssistantPrompt(event.currentTarget.value)
+                }
+                placeholder={
+                  isSales
+                    ? "例如：刚见完客户，预算已确认，下周三前要提交方案…"
+                    : "例如：帮我看看销售1这周有哪些进展…"
+                }
+                rows={3}
+              />
+              <button type="submit" disabled={!assistantPrompt.trim()}>
+                发送给 AI
+              </button>
+            </div>
+          </form>
+
+          <fieldset
+            className="workspace-copilot-suggestions"
+            aria-label="快捷建议"
+          >
+            {suggestions.map((suggestion) => (
+              <button
+                type="button"
+                key={suggestion}
+                onClick={() => setAssistantPrompt(suggestion)}
+              >
+                {suggestion}
+              </button>
+            ))}
+          </fieldset>
+        </div>
+
+        <aside className="workspace-copilot-mascot" aria-label="AI 作战助手">
+          <span className="mascot-spark mascot-spark-one">✦</span>
+          <span className="mascot-spark mascot-spark-two">✦</span>
+          <div className="mascot-bubble">
+            {isSales ? "有新线索就告诉我" : "想先看谁的进度？"}
+          </div>
+          <div className="mascot-head">
+            <span />
+            <span />
+            <strong>⌣</strong>
+          </div>
+          <div className="mascot-body">AI</div>
+        </aside>
+      </section>
+
       <section className="page-heading workspace-heading">
         <div>
           <p className="eyebrow">ROLE-SCOPED WORKSPACE</p>
-          <h1>{presentation.title}</h1>
+          <h2>{presentation.title}</h2>
           <p>{presentation.description}</p>
         </div>
         <div className="workspace-generated-at">
@@ -163,6 +274,67 @@ export function WorkspaceDashboard({
       )}
     </div>
   );
+}
+
+interface AttentionItem {
+  key: string;
+  copy: string;
+  href: string;
+  tone: "blue" | "orange" | "violet";
+}
+
+function buildAttentionItems(
+  snapshot: WorkspaceSnapshot,
+  isSales: boolean,
+): AttentionItem[] {
+  const items: AttentionItem[] = snapshot.priorityActions
+    .slice(0, 2)
+    .map((action) => ({
+      key: `action-${action.actionId}`,
+      copy: isSales
+        ? `${action.entityName}的「${action.title}」${action.isOverdue ? "已到计划时间" : "等待推进"}`
+        : `${action.ownerName}正在推进${action.entityName}：${action.title}${action.isOverdue ? "，已到计划时间" : ""}`,
+      href: action.deepLink,
+      tone: action.isOverdue ? "orange" : "blue",
+    }));
+
+  for (const change of snapshot.recentBattleChanges.slice(0, 2)) {
+    const relatedOwner = snapshot.priorityActions.find(
+      (action) => action.entityId === change.entityId,
+    )?.ownerName;
+    const relationshipChange =
+      change.previousState?.relationshipScore !== null &&
+      change.previousState?.relationshipScore !== undefined &&
+      change.relationshipScore !== null
+        ? `关系从 ${formatScore(change.previousState.relationshipScore)} ${Number(change.relationshipScore) >= Number(change.previousState.relationshipScore) ? "提升" : "变化"}到 ${formatScore(change.relationshipScore)}`
+        : "形成了新的作战判断";
+    items.push({
+      key: `battle-${change.battleStateVersionId}`,
+      copy: isSales
+        ? `${change.entityName}有了新进展：${relationshipChange}，作战地图移动到「${quadrantLabel(change.quadrantCode)}」`
+        : `${relatedOwner ?? "团队"}负责的${change.entityName}有了新进展：${relationshipChange}`,
+      href: change.deepLink,
+      tone: "violet",
+    });
+  }
+
+  return items.slice(0, 4);
+}
+
+function assistantDestination(question: string, isSales: boolean): string {
+  const encoded = encodeURIComponent(question);
+  if (isSales && /(录入|线索|跟进|客户|拜访|电话)/.test(question)) {
+    return `/?draft=${encoded}`;
+  }
+  if (!isSales && /(销售|谁|进展|怎么样|团队)/.test(question)) {
+    return `/ask?question=${encoded}`;
+  }
+  if (/(动作|推进|介入|提醒)/.test(question)) return "/actions";
+  return "/battle-map";
+}
+
+function formatScore(value: string): string {
+  return String(Number(value));
 }
 
 function KpiGrid({ kpis }: { kpis: WorkspaceKpis }) {

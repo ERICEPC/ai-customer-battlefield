@@ -7,10 +7,10 @@ const DEFAULT_TIMEOUT_MS = 20_000;
 const DEFAULT_PROMPT_VERSION = "followup-extraction-v1";
 
 export const DEFAULT_FOLLOWUP_EXTRACTION_PROMPT = `你是销售跟进记录拆解助手。只提取用户原文明确表达、可供人工核对的内容，不补写、不猜测。
-返回严格符合 JSON Schema 的对象：
+只返回一个 JSON 对象，不要使用 Markdown 代码块，也不要附加解释。对象只能包含以下字段：
 - summary：简洁保留进展、风险和下一步；
 - followupType：meeting、call、message、email、other 之一；
-- facts：原文支持的经营事实，factType 使用小写英文 snake_case，factValue 使用简洁中文。
+- facts：对象数组，存放原文支持的经营事实；每项只能包含 factType 和 factValue，factType 使用小写英文 snake_case，factValue 使用简洁中文。
 风险、主观判断和建议不能伪装成已确认事实；无法确定时宁可省略。`;
 
 type Fetch = typeof globalThis.fetch;
@@ -71,20 +71,15 @@ export class SenseAudioFollowupDraftAgent implements FollowupDraftAgent {
   async propose(input: Parameters<FollowupDraftAgent["propose"]>[0]) {
     const requestBody = JSON.stringify({
       model: this.#model,
-      input: [
-        { type: "message", role: "system", content: this.#prompt },
-        { type: "message", role: "user", content: input.rawInput },
+      messages: [
+        { role: "system", content: this.#prompt },
+        { role: "user", content: input.rawInput },
       ],
       stream: false,
       temperature: 0.1,
       max_tokens: 1_200,
       response_format: {
-        type: "json_schema",
-        json_schema: {
-          name: "followup_draft_candidate",
-          strict: true,
-          schema: extractionJsonSchema,
-        },
+        type: "json_object",
       },
     });
     const startedAt = this.#now();
@@ -140,7 +135,7 @@ export class SenseAudioFollowupDraftAgent implements FollowupDraftAgent {
     for (let attempt = 1; attempt <= this.#maxAttempts; attempt += 1) {
       let response: Response;
       try {
-        response = await this.#fetch(`${this.#baseUrl}/responses`, {
+        response = await this.#fetch(`${this.#baseUrl}/chat/completions`, {
           method: "POST",
           headers: {
             authorization: `Bearer ${this.#apiKey}`,
@@ -175,35 +170,6 @@ export class SenseAudioFollowupDraftAgent implements FollowupDraftAgent {
   }
 }
 
-const extractionJsonSchema = {
-  type: "object",
-  additionalProperties: false,
-  required: ["summary", "followupType", "facts"],
-  properties: {
-    summary: { type: "string", minLength: 1, maxLength: 5_000 },
-    followupType: {
-      type: "string",
-      enum: ["meeting", "call", "message", "email", "other"],
-    },
-    facts: {
-      type: "array",
-      maxItems: 100,
-      items: {
-        type: "object",
-        additionalProperties: false,
-        required: ["factType", "factValue"],
-        properties: {
-          factType: {
-            type: "string",
-            pattern: "^[a-z][a-z0-9_.-]{0,99}$",
-          },
-          factValue: { type: "string", minLength: 1, maxLength: 5_000 },
-        },
-      },
-    },
-  },
-} as const;
-
 function extractCompletedResponse(responseBody: unknown): {
   content: string;
   requestId: string | null;
@@ -220,22 +186,22 @@ function extractCompletedResponse(responseBody: unknown): {
   const body = responseBody as {
     id?: unknown;
     model?: unknown;
-    status?: unknown;
-    output?: unknown;
+    choices?: unknown;
     usage?: unknown;
   };
-  if (body.status !== "completed") {
-    throw invalidResponse();
-  }
   if (
-    body.output &&
-    typeof body.output === "object" &&
-    !Array.isArray(body.output) &&
-    "content" in body.output &&
-    typeof body.output.content === "string"
+    Array.isArray(body.choices) &&
+    body.choices.length > 0 &&
+    body.choices[0] &&
+    typeof body.choices[0] === "object" &&
+    "message" in body.choices[0] &&
+    body.choices[0].message &&
+    typeof body.choices[0].message === "object" &&
+    "content" in body.choices[0].message &&
+    typeof body.choices[0].message.content === "string"
   ) {
     return {
-      content: body.output.content,
+      content: body.choices[0].message.content,
       requestId: typeof body.id === "string" ? body.id : null,
       model: typeof body.model === "string" ? body.model : null,
       usage: decodeUsage(body.usage),
@@ -254,20 +220,20 @@ function decodeUsage(value: unknown): {
     throw invalidResponse();
   }
   const usage = value as {
-    input_tokens?: unknown;
-    output_tokens?: unknown;
+    prompt_tokens?: unknown;
+    completion_tokens?: unknown;
     total_tokens?: unknown;
   };
   if (
-    !isNonnegativeInteger(usage.input_tokens) ||
-    !isNonnegativeInteger(usage.output_tokens) ||
+    !isNonnegativeInteger(usage.prompt_tokens) ||
+    !isNonnegativeInteger(usage.completion_tokens) ||
     !isNonnegativeInteger(usage.total_tokens)
   ) {
     throw invalidResponse();
   }
   return {
-    inputTokens: usage.input_tokens,
-    outputTokens: usage.output_tokens,
+    inputTokens: usage.prompt_tokens,
+    outputTokens: usage.completion_tokens,
     totalTokens: usage.total_tokens,
   };
 }

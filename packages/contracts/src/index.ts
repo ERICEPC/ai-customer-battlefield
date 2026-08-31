@@ -161,6 +161,20 @@ export {
   reminderStatusSchema,
 } from "./reminders.js";
 export {
+  type SenseAudioTextModelId,
+  senseAudioTextModelIdSchema,
+  senseAudioTextModelIds,
+} from "./senseaudio-models.js";
+export {
+  type TestUserAiConnectionResponse,
+  testUserAiConnectionResponseSchema,
+  type UpdateUserAiSettingsRequest,
+  type UserAiSettingsResponse,
+  updateUserAiSettingsRequestSchema,
+  userAiSettingsApiErrorSchema,
+  userAiSettingsResponseSchema,
+} from "./user-ai-settings.js";
+export {
   type GenerateWeeklyReportRequest,
   generateWeeklyReportRequestSchema,
   type ReviewWeeklyReportRequest,
