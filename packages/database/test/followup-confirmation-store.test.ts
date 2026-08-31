@@ -326,6 +326,66 @@ describe("KyselyFollowupConfirmationStore", () => {
     ]);
   });
 
+  test("keeps pending drafts private to their creator and limits writes to sales responsibility", async () => {
+    await createDraft(store, candidate());
+    await seedFollowupAccessActors(database);
+    const observerActor = {
+      tenantId: actor.tenantId,
+      userId: OBSERVER_USER_ID,
+    };
+
+    await expect(
+      store.get({ actor: observerActor, draftId: DRAFT_ID }),
+    ).rejects.toBeInstanceOf(FollowupDraftNotFoundError);
+    await expect(
+      store.revise({
+        actor: observerActor,
+        draftId: DRAFT_ID,
+        versionNo: "1",
+        candidate: candidate(),
+        changedAt: "2026-08-31T02:32:00.000Z",
+      }),
+    ).rejects.toBeInstanceOf(FollowupDraftNotFoundError);
+    await expect(
+      store.cancel({
+        actor: observerActor,
+        draftId: DRAFT_ID,
+        versionNo: "1",
+        idempotencyKey: "observer-cancel-draft",
+        cancelledAt: "2026-08-31T02:34:00.000Z",
+      }),
+    ).rejects.toBeInstanceOf(FollowupDraftNotFoundError);
+    await expect(
+      store.confirm({
+        actor: observerActor,
+        draftId: DRAFT_ID,
+        versionNo: "1",
+        idempotencyKey: "observer-confirm-draft",
+        confirmedAt: "2026-08-31T02:35:00.000Z",
+      }),
+    ).rejects.toBeInstanceOf(FollowupDraftNotFoundError);
+    await expect(
+      store.create({
+        actor: observerActor,
+        draftId: OTHER_DRAFT_ID,
+        rawInput: "领导尝试代替销售录入",
+        candidate: candidate(),
+        createdAt: CREATED_AT,
+        expiresAt: EXPIRES_AT,
+      }),
+    ).rejects.toMatchObject<Partial<FollowupRelatedRecordNotFoundError>>({
+      recordType: "entity",
+    });
+
+    expect(await store.get({ actor, draftId: DRAFT_ID })).toMatchObject({
+      status: "pending_confirmation",
+      versionNo: "1",
+    });
+    expect(
+      await tableCounts(database, ["followups", "idempotency_records"]),
+    ).toEqual({ followups: 0, idempotency_records: 0 });
+  });
+
   test("rejects reuse of an idempotency key for a different confirmation", async () => {
     await createDraft(store, candidate());
     await store.confirm({

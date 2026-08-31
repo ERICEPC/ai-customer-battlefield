@@ -9,6 +9,7 @@ import {
 } from "@battlefield/core";
 import { type Kysely, sql } from "kysely";
 
+import { entityAccessExistsSql } from "../authorization/entity-access.js";
 import type { BattlefieldDatabase } from "../database-types.js";
 import { withTenantTransaction } from "../tenant-session.js";
 
@@ -121,7 +122,11 @@ export class KyselyBusinessEntityReader implements BusinessEntityReader {
                 and assignment.entity_id = entity.id
                 and assignment.assignment_role = 'owner'
                 and assignment.is_primary
-                and assignment.valid_to is null
+                and assignment.valid_from <= current_timestamp
+                and (
+                  assignment.valid_to is null
+                  or assignment.valid_to > current_timestamp
+                )
               order by assignment.valid_from desc, assignment.id desc
               limit 1
             ) as primary_owner on true
@@ -151,6 +156,11 @@ export class KyselyBusinessEntityReader implements BusinessEntityReader {
               on current_state.tenant_id = entity.tenant_id
               and current_state.entity_id = entity.id
             where entity.tenant_id = ${input.actor.tenantId}::uuid
+              and ${entityAccessExistsSql({
+                tenantId: input.actor.tenantId,
+                userId: input.actor.userId,
+                entityId: sql`entity.id`,
+              })}
             ${statusFilter}
             ${searchFilter}
           )

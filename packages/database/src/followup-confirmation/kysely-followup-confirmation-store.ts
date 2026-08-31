@@ -19,7 +19,10 @@ import {
 import { type Kysely, sql, type Transaction } from "kysely";
 
 import { appendAuditEntry } from "../audit/append-audit-entry.js";
-import { resolveEntityAccessScope } from "../authorization/entity-access.js";
+import {
+  entityAccessExistsSql,
+  resolveEntityAccessScope,
+} from "../authorization/entity-access.js";
 import type { BattlefieldDatabase } from "../database-types.js";
 import { withTenantTransaction } from "../tenant-session.js";
 
@@ -73,6 +76,7 @@ export class KyselyFollowupConfirmationStore
         await validateCandidateReferences(
           transaction,
           input.actor.tenantId,
+          input.actor.userId,
           input.candidate,
         );
         const sourceInputId = randomUUID();
@@ -121,7 +125,12 @@ export class KyselyFollowupConfirmationStore
           })
           .executeTakeFirstOrThrow();
 
-        return loadDraft(transaction, input.actor.tenantId, input.draftId);
+        return loadDraft(
+          transaction,
+          input.actor.tenantId,
+          input.actor.userId,
+          input.draftId,
+        );
       },
     );
   }
@@ -133,7 +142,12 @@ export class KyselyFollowupConfirmationStore
       this.database,
       { ...input.actor, requestId: input.draftId },
       (transaction) =>
-        loadDraft(transaction, input.actor.tenantId, input.draftId),
+        loadDraft(
+          transaction,
+          input.actor.tenantId,
+          input.actor.userId,
+          input.draftId,
+        ),
     );
   }
 
@@ -255,6 +269,11 @@ export class KyselyFollowupConfirmationStore
       async (transaction) => {
         const pipeline = await transaction
           .selectFrom("app.domain_events as event")
+          .innerJoin("app.followups as followup", (join) =>
+            join
+              .onRef("followup.tenant_id", "=", "event.tenant_id")
+              .onRef("followup.id", "=", "event.aggregate_id"),
+          )
           .innerJoin("app.outbox_messages as outbox", (join) =>
             join
               .onRef("outbox.tenant_id", "=", "event.tenant_id")
@@ -273,6 +292,7 @@ export class KyselyFollowupConfirmationStore
           .select([
             "event.id as event_id",
             "event.aggregate_id as followup_id",
+            "followup.entity_id",
             "event.occurred_at",
             "outbox.status as outbox_status",
             "outbox.attempt_count",
@@ -293,6 +313,13 @@ export class KyselyFollowupConfirmationStore
           .orderBy("analysis.started_at", "desc")
           .executeTakeFirst();
         if (!pipeline) throw new FollowupNotFoundError();
+        const accessScope = await resolveEntityAccessScope(transaction, {
+          tenantId: input.actor.tenantId,
+          userId: input.actor.userId,
+          entityId: pipeline.entity_id,
+          at: this.clock().toISOString(),
+        });
+        if (!accessScope) throw new FollowupNotFoundError();
 
         const notification = await transaction
           .selectFrom("app.notification_events")
@@ -371,12 +398,14 @@ export class KyselyFollowupConfirmationStore
         const draft = await lockDraft(
           transaction,
           input.actor.tenantId,
+          input.actor.userId,
           input.draftId,
         );
         assertPendingDraft(draft, input.versionNo, input.changedAt);
         await validateCandidateReferences(
           transaction,
           input.actor.tenantId,
+          input.actor.userId,
           input.candidate,
         );
         const nextVersion = Number(draft.version_no) + 1;
@@ -392,6 +421,7 @@ export class KyselyFollowupConfirmationStore
           })
           .where("tenant_id", "=", input.actor.tenantId)
           .where("id", "=", input.draftId)
+          .where("created_by", "=", input.actor.userId)
           .executeTakeFirstOrThrow();
         await transaction
           .insertInto("app.draft_revisions")
@@ -406,7 +436,12 @@ export class KyselyFollowupConfirmationStore
           })
           .executeTakeFirstOrThrow();
 
-        return loadDraft(transaction, input.actor.tenantId, input.draftId);
+        return loadDraft(
+          transaction,
+          input.actor.tenantId,
+          input.actor.userId,
+          input.draftId,
+        );
       },
     );
   }
@@ -421,6 +456,7 @@ export class KyselyFollowupConfirmationStore
         const draft = await lockDraft(
           transaction,
           input.actor.tenantId,
+          input.actor.userId,
           input.draftId,
         );
         const requestHash = sha256(
@@ -452,10 +488,12 @@ export class KyselyFollowupConfirmationStore
           })
           .where("tenant_id", "=", input.actor.tenantId)
           .where("id", "=", input.draftId)
+          .where("created_by", "=", input.actor.userId)
           .executeTakeFirstOrThrow();
         const cancelled = await loadDraft(
           transaction,
           input.actor.tenantId,
+          input.actor.userId,
           input.draftId,
         );
         await appendAuditEntry(transaction, {
@@ -495,6 +533,7 @@ export class KyselyFollowupConfirmationStore
         const draft = await lockDraft(
           transaction,
           input.actor.tenantId,
+          input.actor.userId,
           input.draftId,
         );
         const requestHash = sha256(
@@ -519,6 +558,7 @@ export class KyselyFollowupConfirmationStore
         await lockAndValidateCandidateReferences(
           transaction,
           input.actor.tenantId,
+          input.actor.userId,
           candidate,
         );
 
@@ -644,6 +684,7 @@ export class KyselyFollowupConfirmationStore
           })
           .where("tenant_id", "=", input.actor.tenantId)
           .where("id", "=", input.draftId)
+          .where("created_by", "=", input.actor.userId)
           .executeTakeFirstOrThrow();
         await appendAuditEntry(transaction, {
           tenantId: input.actor.tenantId,
@@ -719,6 +760,7 @@ export class KyselyFollowupConfirmationStore
 async function loadDraft(
   transaction: DatabaseTransaction,
   tenantId: string,
+  userId: string,
   draftId: string,
 ): Promise<PersistentFollowupDraft> {
   const row = await transaction
@@ -749,6 +791,7 @@ async function loadDraft(
     ])
     .where("draft.tenant_id", "=", tenantId)
     .where("draft.id", "=", draftId)
+    .where("draft.created_by", "=", userId)
     .executeTakeFirst();
   if (!row) {
     throw new FollowupDraftNotFoundError();
@@ -759,6 +802,7 @@ async function loadDraft(
 async function lockDraft(
   transaction: DatabaseTransaction,
   tenantId: string,
+  userId: string,
   draftId: string,
 ) {
   const row = await transaction
@@ -766,6 +810,7 @@ async function lockDraft(
     .select(["id", "status", "candidate_payload", "version_no", "expires_at"])
     .where("tenant_id", "=", tenantId)
     .where("id", "=", draftId)
+    .where("created_by", "=", userId)
     .forUpdate()
     .executeTakeFirst();
   if (!row) {
@@ -794,6 +839,7 @@ function assertPendingDraft(
 async function validateCandidateReferences(
   transaction: DatabaseTransaction,
   tenantId: string,
+  userId: string,
   candidate: PersistentFollowupDraftCandidate,
 ): Promise<void> {
   assertCandidateShape(candidate);
@@ -802,6 +848,14 @@ async function validateCandidateReferences(
     .select("id")
     .where("tenant_id", "=", tenantId)
     .where("id", "=", candidate.entityId)
+    .where(
+      entityAccessExistsSql({
+        tenantId,
+        userId,
+        entityId: sql`app.business_entities.id`,
+        allowedScopes: ["owner", "collaborator"],
+      }),
+    )
     .executeTakeFirst();
   if (!entity) {
     throw new FollowupRelatedRecordNotFoundError("entity");
@@ -824,6 +878,7 @@ async function validateCandidateReferences(
 async function lockAndValidateCandidateReferences(
   transaction: DatabaseTransaction,
   tenantId: string,
+  userId: string,
   candidate: PersistentFollowupDraftCandidate,
 ): Promise<void> {
   assertCandidateShape(candidate);
@@ -832,6 +887,14 @@ async function lockAndValidateCandidateReferences(
     .select("id")
     .where("tenant_id", "=", tenantId)
     .where("id", "=", candidate.entityId)
+    .where(
+      entityAccessExistsSql({
+        tenantId,
+        userId,
+        entityId: sql`app.business_entities.id`,
+        allowedScopes: ["owner", "collaborator"],
+      }),
+    )
     .forUpdate()
     .executeTakeFirst();
   if (!entity) {

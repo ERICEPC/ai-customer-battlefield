@@ -1,4 +1,5 @@
 import { fileURLToPath } from "node:url";
+import { FollowupNotFoundError } from "@battlefield/core";
 import {
   type BattlefieldDatabase,
   type DatabaseHandle,
@@ -26,6 +27,7 @@ const MIGRATION_DIRECTORY = fileURLToPath(
 );
 const DRAFT_ID = "70000000-0000-4000-8000-000000000091";
 const CONFIRMED_AT = "2026-09-01T02:00:00.000Z";
+const UNASSIGNED_USER_ID = "30000000-0000-4000-8000-000000000073";
 const actor = {
   tenantId: SYNTHETIC_TENANT_ID,
   userId: SYNTHETIC_USER_ID,
@@ -142,5 +144,28 @@ describe("confirmed follow-up automation", () => {
       leaderNotificationCount: 1,
       battleStateVersionId: state?.stateId,
     });
+    await withTenantTransaction(
+      database.db,
+      { ...actor, requestId: "90000000-0000-4000-8000-000000000094" },
+      (transaction) =>
+        transaction
+          .insertInto("app.users")
+          .values({
+            tenant_id: SYNTHETIC_TENANT_ID,
+            id: UNASSIGNED_USER_ID,
+            display_name: "同租户无责任关系用户",
+          })
+          .executeTakeFirstOrThrow(),
+    );
+    await expect(
+      followups.getAutomationStatus({
+        actor: {
+          tenantId: SYNTHETIC_TENANT_ID,
+          userId: UNASSIGNED_USER_ID,
+        },
+        followupId: confirmed.followupId,
+        eventId: confirmed.eventId,
+      }),
+    ).rejects.toBeInstanceOf(FollowupNotFoundError);
   });
 });

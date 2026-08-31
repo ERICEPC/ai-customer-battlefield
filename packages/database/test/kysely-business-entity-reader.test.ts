@@ -24,6 +24,7 @@ const ENTITY_AURORA = "50000000-0000-4000-8000-000000000001";
 const ENTITY_BEACON = "50000000-0000-4000-8000-000000000002";
 const ENTITY_CEDAR = "50000000-0000-4000-8000-000000000003";
 const ENTITY_HIDDEN = "50000000-0000-4000-8000-000000000004";
+const ENTITY_UNASSIGNED = "50000000-0000-4000-8000-000000000005";
 const REQUEST_ID = "90000000-0000-4000-8000-000000000001";
 const CEDAR_DRAFT_ID = "70000000-0000-4000-8000-000000000081";
 
@@ -94,6 +95,9 @@ describe("KyselyBusinessEntityReader", () => {
     });
     expect(page.items[0]?.updatedAt).toBe("2026-08-31T04:01:00.000Z");
     expect(page.items.some((item) => item.id === ENTITY_HIDDEN)).toBe(false);
+    expect(page.items.some((item) => item.id === ENTITY_UNASSIGNED)).toBe(
+      false,
+    );
     expect(searchPage.items).toEqual([
       {
         id: ENTITY_AURORA,
@@ -161,6 +165,17 @@ async function seedDirectory(
     { ...actorAlpha, requestId: REQUEST_ID },
     async (transaction) => {
       await insertEntity(transaction, {
+        entityId: ENTITY_UNASSIGNED,
+        tenantId: TENANT_ALPHA,
+        typeId: TYPE_ALPHA,
+        name: "Unassigned Internal Account",
+        shortName: null,
+        status: "active",
+        isT0: true,
+        versionNo: 1,
+        updatedAt: "2026-08-31T04:30:00.000Z",
+      });
+      await insertEntity(transaction, {
         entityId: ENTITY_AURORA,
         tenantId: TENANT_ALPHA,
         typeId: TYPE_ALPHA,
@@ -208,6 +223,23 @@ async function seedDirectory(
           ${USER_ALPHA}::uuid,
           'owner',
           true
+        )
+      `.execute(transaction);
+      await sql`
+        insert into app.entity_assignments (
+          tenant_id,
+          id,
+          entity_id,
+          user_id,
+          assignment_role,
+          is_primary
+        ) values (
+          ${TENANT_ALPHA}::uuid,
+          '60000000-0000-4000-8000-000000000003'::uuid,
+          ${ENTITY_BEACON}::uuid,
+          ${USER_ALPHA}::uuid,
+          'collaborator',
+          false
         )
       `.execute(transaction);
       await sql`
