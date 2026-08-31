@@ -96,6 +96,7 @@ export function WeeklyReportWorkspace({
   const [needsReload, setNeedsReload] = useState(false);
   const historyRequestVersion = useRef(0);
   const detailRequestVersion = useRef(0);
+  const hydratedSelection = useRef("");
   const operationInFlight = useRef(false);
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: historyReload intentionally triggers recovery.
@@ -138,6 +139,11 @@ export function WeeklyReportWorkspace({
   useEffect(() => {
     if (!selectedVersionId) {
       setDetail(null);
+      setDetailLoading(false);
+      return;
+    }
+    if (hydratedSelection.current === selectedVersionId) {
+      hydratedSelection.current = "";
       setDetailLoading(false);
       return;
     }
@@ -265,7 +271,10 @@ export function WeeklyReportWorkspace({
     updateHistory: boolean,
   ): void {
     applyDetail(report, setDetail, setNote, setIncluded);
-    setSelectedVersionId(report.versionId);
+    if (report.versionId !== selectedVersionId) {
+      hydratedSelection.current = report.versionId;
+      setSelectedVersionId(report.versionId);
+    }
     if (updateHistory) {
       setHistory((current) => mergeHistory([toHistoryItem(report)], current));
     }

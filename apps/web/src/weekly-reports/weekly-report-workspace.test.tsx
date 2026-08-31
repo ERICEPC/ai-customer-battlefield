@@ -337,11 +337,19 @@ describe("WeeklyReportWorkspace", () => {
       "weekly-transition-key",
     );
     fireEvent.click(screen.getByRole("button", { name: "创建修订版" }));
-    await act(async () => Promise.resolve());
+    expect(
+      await screen.findByText("修订版已创建，原发布版本保持不变。"),
+    ).toBeVisible();
+    expect(
+      screen.getByRole("region", { name: "个人周报 第2版" }),
+    ).toBeVisible();
     expect(reportApi.revise).toHaveBeenCalledWith(
       versionId,
       { lockVersion: 2 },
       "weekly-transition-key",
+    );
+    expect(reportApi.get).not.toHaveBeenCalledWith(
+      "92000000-0000-4000-8000-000000000002",
     );
   });
 
