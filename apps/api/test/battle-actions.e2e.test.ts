@@ -40,6 +40,7 @@ import { configureApp } from "../src/main.js";
 const MIGRATION_DIRECTORY = fileURLToPath(
   new URL("../../../packages/database/migrations", import.meta.url),
 );
+const UNASSIGNED_API_USER_ID = "30000000-0000-4000-8000-000000000099";
 
 describe("battle analysis and confirmed action API", () => {
   let app: INestApplication;
@@ -223,6 +224,51 @@ describe("battle analysis and confirmed action API", () => {
       status: "planned",
       versionNo: "1",
     });
+
+    await withTenantTransaction(
+      database.db,
+      {
+        tenantId: SYNTHETIC_TENANT_ID,
+        userId: SYNTHETIC_USER_ID,
+        requestId: "90000000-0000-4000-8000-000000000099",
+      },
+      async (transaction) => {
+        await transaction
+          .insertInto("app.users")
+          .values({
+            tenant_id: SYNTHETIC_TENANT_ID,
+            id: UNASSIGNED_API_USER_ID,
+            display_name: "无责任 API 用户",
+            email: null,
+            mobile: null,
+            status: "active",
+          })
+          .executeTakeFirstOrThrow();
+      },
+    );
+    const sameTenantDenied = await request(app.getHttpServer())
+      .get(`/api/v1/actions/${accepted.actionId}`)
+      .set("x-tenant-id", SYNTHETIC_TENANT_ID)
+      .set("x-user-id", UNASSIGNED_API_USER_ID)
+      .expect(404);
+    expect(sameTenantDenied.body).toMatchObject({ code: "ACTION_NOT_FOUND" });
+    expect(
+      businessActionPageSchema.parse(
+        (
+          await request(app.getHttpServer())
+            .get("/api/v1/actions")
+            .set("x-tenant-id", SYNTHETIC_TENANT_ID)
+            .set("x-user-id", UNASSIGNED_API_USER_ID)
+            .expect(200)
+        ).body,
+      ),
+    ).toEqual({ items: [], nextCursor: null });
+    const crossTenantDenied = await request(app.getHttpServer())
+      .get(`/api/v1/actions/${accepted.actionId}`)
+      .set("x-tenant-id", SYNTHETIC_OTHER_TENANT_ID)
+      .set("x-user-id", SYNTHETIC_OTHER_USER_ID)
+      .expect(404);
+    expect(crossTenantDenied.body).toMatchObject({ code: "ACTION_NOT_FOUND" });
 
     const transitioned = actionTransitionResponseSchema.parse(
       (

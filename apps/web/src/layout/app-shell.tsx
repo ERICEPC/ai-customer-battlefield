@@ -4,7 +4,7 @@ import type { ReactNode } from "react";
 import { developmentActorConfiguration } from "../config/development-actor";
 
 const navigation = [
-  { label: "经营总览", href: "#" },
+  { label: "经营总览", href: "/workspace" },
   { label: "经营对象", href: "/entities" },
   { label: "客户作战地图", href: "/battle-map" },
   { label: "跟进工作台", href: "/" },
@@ -21,8 +21,8 @@ const mobileNavigation: ReadonlyArray<{
   activeItem: NavigationLabel;
   mark: string;
 }> = [
-  { label: "今日", href: "/", activeItem: "跟进工作台", mark: "今" },
-  { label: "对象", href: "/entities", activeItem: "经营对象", mark: "客" },
+  { label: "今日", href: "/workspace", activeItem: "经营总览", mark: "今" },
+  { label: "跟进", href: "/", activeItem: "跟进工作台", mark: "跟" },
   {
     label: "地图",
     href: "/battle-map",
@@ -46,7 +46,11 @@ export function AppShell({
   return (
     <div className="app-shell">
       <aside className="sidebar">
-        <Link className="brand" href="/" aria-label="AI 客户作战系统首页">
+        <Link
+          className="brand"
+          href="/workspace"
+          aria-label="AI 客户作战系统首页"
+        >
           <span className="brand-mark" aria-hidden="true">
             A
           </span>

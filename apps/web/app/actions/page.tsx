@@ -1,7 +1,12 @@
 import { ActionWorkspace } from "../../src/battle-operations/action-workspace";
 import { AppShell } from "../../src/layout/app-shell";
 
-export default function ActionsPage() {
+export default async function ActionsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ actionId?: string }>;
+}) {
+  const { actionId } = await searchParams;
   return (
     <AppShell activeItem="经营动作" breadcrumb="销售工作台 / 经营动作">
       <div className="page-content battle-page">
@@ -19,7 +24,7 @@ export default function ActionsPage() {
             未确认建议不触发提醒
           </div>
         </section>
-        <ActionWorkspace />
+        <ActionWorkspace {...(actionId ? { initialActionId: actionId } : {})} />
       </div>
     </AppShell>
   );

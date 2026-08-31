@@ -161,7 +161,7 @@ Each E2E file remains a fresh process; the suite stays fail-fast and determinist
 
 Commit: `feat: expose role-scoped workspace API`
 
-**Local evidence:** the new real Nest + PGlite suite first returned 404 for all five workspace scenarios. After the module was wired, 5/5 passed; the official fresh-process API runner passed 30/30 twice consecutively. API typecheck, production build, Biome and diff checks passed. Remote CI remains the commit close condition.
+**Evidence:** the new real Nest + PGlite suite first returned 404 for all five workspace scenarios. After the module was wired, 5/5 passed; the official fresh-process API runner passed 30/30 twice consecutively. API typecheck, production build, Biome and diff checks passed. Commit `2edb59e` passed all repository gates in Actions run `33350647948` (4 minutes 13 seconds).
 
 ---
 
@@ -176,26 +176,31 @@ Commit: `feat: expose role-scoped workspace API`
 - Modify: `apps/web/src/layout/app-shell.tsx`
 - Modify: `apps/web/src/layout/app-shell.test.tsx`
 - Modify: `apps/web/app/globals.css`
+- Modify: `packages/database/src/action-decisions/kysely-action-query-reader.ts`
+- Modify: `packages/database/test/workspace-reader.test.ts`
+- Modify: `apps/api/test/battle-actions.e2e.test.ts`
 
 **Interfaces:**
 - `/workspace` renders the same projection as “今日工作台” for personal scope and “经营总览” for observed-portfolio scope.
 - Existing `/` remains the follow-up capture workbench; desktop/mobile navigation points “今日/经营总览” to `/workspace` and “跟进” to `/`.
 
-- [ ] **Step 1: Write client/component/navigation tests and verify RED**
+- [x] **Step 1: Write client/component/navigation tests and verify RED**
 
 Cover exact API parsing, loading skeleton, retryable error, empty assigned scope, partial/no-analysis state, personal and management copy, KPI cards, action ordering, change delta/new-baseline labels, safe deep links, and mobile navigation semantics.
 
-- [ ] **Step 2: Implement the workspace dashboard**
+- [x] **Step 2: Implement the workspace dashboard**
 
 Desktop layout: judgement header, KPI row, priority-action primary column, recent-change/evidence summary, quadrant distribution and explicit scope explanation. Mobile layout: single-column cards, no miniature scatter plot, primary links at comfortable touch size.
 
-- [ ] **Step 3: Preserve state/accessibility rules**
+- [x] **Step 3: Preserve state/accessibility rules**
 
 Use semantic headings/lists, text in addition to color, `aria-live` for loading/error, visible focus, no nested interactive controls, and no horizontal overflow at 390px.
 
-- [ ] **Step 4: Run Web tests/typecheck/build/Biome and commit**
+- [x] **Step 4: Run Web tests/typecheck/build/Biome and commit**
 
 Commit: `feat: add sales and management workspace`
+
+**Local evidence:** the Web client/component/navigation suites first failed because the workspace client and page did not exist and the overview route still pointed to `#`. Review then exposed that the action deep link was not consumed and that the existing exact-action query accepted same-tenant out-of-scope IDs. Red tests drove exact deep-link loading plus one shared active-assignment visibility predicate for exact and paged action reads; owners see their own actions, observers see open actions on observed entities, and ended, unassigned, cross-tenant or otherwise unauthorized IDs return the same 404 as missing records. The final local suites passed Web 77/77, database 88/88 and isolated API 30/30; Web/database/API type and build gates, Biome, public-boundary and diff checks passed. Browser acceptance used the real Nest + PGlite demo at 1280×900 and true 390×844: the personal scope, seven KPI links, formal-action and battle-state deep links rendered from the strict API, both viewports had `scrollWidth === innerWidth`, the mobile “今日” item was current, and console errors/warnings were zero. Browser testing also found that the synthetic state history lacked its `battle_state_current` pointer; a failing database test captured the issue before the demo seed and startup build lifecycle were corrected.
 
 ---
 

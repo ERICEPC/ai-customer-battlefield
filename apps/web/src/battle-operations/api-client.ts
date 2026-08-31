@@ -22,12 +22,14 @@ import {
   type BattleStateDetail,
   type BusinessActionListQuery,
   type BusinessActionPage,
+  type BusinessActionRecord,
   battleAnalysisResultSchema,
   battleMapPageSchema,
   battleMapQuerySchema,
   battleStateDetailSchema,
   businessActionListQuerySchema,
   businessActionPageSchema,
+  businessActionRecordSchema,
   type RejectActionProposalRequest,
   rejectActionProposalRequestSchema,
   type TransitionBusinessActionRequest,
@@ -213,6 +215,15 @@ export async function listBusinessActions(
 ): Promise<BusinessActionPage> {
   const query = businessActionListQuerySchema.parse(input);
   return request(`/actions${queryString(query)}`, businessActionPageSchema);
+}
+
+export async function getBusinessAction(
+  actionId: string,
+): Promise<BusinessActionRecord> {
+  return request(
+    `/actions/${encodeURIComponent(actionId)}`,
+    businessActionRecordSchema,
+  );
 }
 
 export async function transitionBusinessAction(

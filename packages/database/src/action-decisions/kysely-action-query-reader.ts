@@ -226,6 +226,7 @@ export class KyselyActionQueryReader implements ActionQueryReader {
           ${actionSelect()}
           where action.tenant_id = ${input.actor.tenantId}::uuid
             and action.id = ${input.actionId}::uuid
+          ${actionVisibilityFilter(input.actor)}
         `.execute(transaction);
         const row = result.rows[0];
         if (!row) throw new BusinessActionNotFoundError();
@@ -269,6 +270,7 @@ export class KyselyActionQueryReader implements ActionQueryReader {
           ${entityFilter}
           ${ownerFilter}
           ${cursorFilter}
+          ${actionVisibilityFilter(input.actor)}
           order by action.planned_at, action.id
           limit ${input.limit + 1}
         `.execute(transaction);
@@ -356,6 +358,30 @@ function actionSelect() {
     join app.users as action_owner
       on action_owner.tenant_id = action.tenant_id
       and action_owner.id = action.owner_user_id
+  `;
+}
+
+function actionVisibilityFilter(actor: { tenantId: string; userId: string }) {
+  return sql`
+    and exists (
+      select 1
+      from app.entity_assignments as visible_assignment
+      where visible_assignment.tenant_id = ${actor.tenantId}::uuid
+        and visible_assignment.entity_id = action.entity_id
+        and visible_assignment.user_id = ${actor.userId}::uuid
+        and visible_assignment.valid_from <= current_timestamp
+        and (
+          visible_assignment.valid_to is null
+          or visible_assignment.valid_to > current_timestamp
+        )
+        and (
+          action.owner_user_id = ${actor.userId}::uuid
+          or (
+            visible_assignment.assignment_role = 'management_observer'
+            and action.status in ('planned', 'in_progress')
+          )
+        )
+    )
   `;
 }
 

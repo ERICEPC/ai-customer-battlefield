@@ -25,6 +25,7 @@ import {
 import {
   acceptActionProposal,
   getActionProposal,
+  getBusinessAction,
   listActionOwners,
   listActionProposals,
   listBusinessActions,
@@ -51,6 +52,7 @@ export interface ActionWorkspaceApi {
     idempotencyKey: string,
   ): Promise<ActionDecisionResponse>;
   listActions(input: BusinessActionListQuery): Promise<BusinessActionPage>;
+  getAction(actionId: string): Promise<BusinessActionRecord>;
   transitionAction(
     actionId: string,
     input: TransitionBusinessActionRequest,
@@ -64,6 +66,7 @@ const defaultApi: ActionWorkspaceApi = {
   acceptProposal: acceptActionProposal,
   rejectProposal: rejectActionProposal,
   listActions: listBusinessActions,
+  getAction: getBusinessAction,
   transitionAction: transitionBusinessAction,
 };
 
@@ -80,9 +83,11 @@ type RejectAttempt = {
 export function ActionWorkspace({
   api = defaultApi,
   actor = developmentActorConfiguration(),
+  initialActionId,
 }: {
   api?: ActionWorkspaceApi;
   actor?: DevelopmentActor;
+  initialActionId?: string;
 }) {
   const [proposals, setProposals] = useState<ActionProposalRecord[]>([]);
   const [actions, setActions] = useState<BusinessActionRecord[]>([]);
@@ -131,8 +136,9 @@ export function ActionWorkspace({
       api.listOwners({ limit: 50 }),
       api.listProposals({ status: "pending_confirmation", limit: 50 }),
       api.listActions({ limit: 50 }),
+      initialActionId ? api.getAction(initialActionId) : Promise.resolve(null),
     ])
-      .then(([ownerPage, proposalPage, actionPage]) => {
+      .then(([ownerPage, proposalPage, actionPage, targetAction]) => {
         if (
           !current ||
           ownerVersion !== ownerRequestVersion.current ||
@@ -141,7 +147,7 @@ export function ActionWorkspace({
         )
           return;
         setProposals(proposalPage.items);
-        setActions(actionPage.items);
+        setActions(actionsWithTargetFirst(actionPage.items, targetAction));
         setOwners(ownerPage.items);
         setOwnerCursor(ownerPage.nextCursor);
         setProposalCursor(proposalPage.nextCursor);
@@ -174,7 +180,7 @@ export function ActionWorkspace({
     return () => {
       current = false;
     };
-  }, [api, reloadVersion]);
+  }, [api, initialActionId, reloadVersion]);
 
   const selected =
     proposals.find((proposal) => proposal.proposalId === selectedProposalId) ??
@@ -201,9 +207,14 @@ export function ActionWorkspace({
     setActionCursor(null);
     setIsLoadingMoreActions(false);
     try {
-      const page = await api.listActions({ limit: 50 });
+      const [page, targetAction] = await Promise.all([
+        api.listActions({ limit: 50 }),
+        initialActionId
+          ? api.getAction(initialActionId)
+          : Promise.resolve(null),
+      ]);
       if (requestVersion !== actionRequestVersion.current) return;
-      setActions(page.items);
+      setActions(actionsWithTargetFirst(page.items, targetAction));
       setActionCursor(page.nextCursor);
     } catch (error) {
       if (requestVersion !== actionRequestVersion.current) return;
@@ -434,6 +445,7 @@ export function ActionWorkspace({
           <FormalActionList
             actions={actions}
             api={api}
+            highlightedActionId={initialActionId ?? null}
             nextCursor={actionCursor}
             isLoadingMore={isLoadingMoreActions}
             onLoadMore={loadMoreActions}
@@ -837,6 +849,7 @@ function ProposalDecisionCard({
 function FormalActionList({
   actions,
   api,
+  highlightedActionId,
   onChange,
   nextCursor,
   isLoadingMore,
@@ -844,6 +857,7 @@ function FormalActionList({
 }: {
   actions: BusinessActionRecord[];
   api: ActionWorkspaceApi;
+  highlightedActionId: string | null;
   onChange(value: ActionTransitionResponse): void;
   nextCursor: string | null;
   isLoadingMore: boolean;
@@ -876,6 +890,7 @@ function FormalActionList({
             <FormalActionCard
               action={action}
               api={api}
+              isTarget={action.actionId === highlightedActionId}
               key={action.actionId}
               onChange={onChange}
             />
@@ -896,14 +911,22 @@ function FormalActionList({
 function FormalActionCard({
   action,
   api,
+  isTarget,
   onChange,
 }: {
   action: BusinessActionRecord;
   api: ActionWorkspaceApi;
+  isTarget: boolean;
   onChange(value: ActionTransitionResponse): void;
 }) {
   const [isChanging, setIsChanging] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const cardRef = useRef<HTMLElement>(null);
+  useEffect(() => {
+    if (!isTarget) return;
+    cardRef.current?.focus({ preventScroll: true });
+    cardRef.current?.scrollIntoView?.({ block: "center" });
+  }, [isTarget]);
   async function transition(
     toStatus: "in_progress" | "completed" | "cancelled",
   ) {
@@ -923,7 +946,12 @@ function FormalActionCard({
     }
   }
   return (
-    <article className="formal-action-card">
+    <article
+      ref={cardRef}
+      className={`formal-action-card${isTarget ? " is-deep-link-target" : ""}`}
+      aria-label={`${action.title}${isTarget ? "（工作台定位）" : ""}`}
+      tabIndex={isTarget ? -1 : undefined}
+    >
       <div className="formal-action-title">
         <span className={`action-status ${action.status}`}>
           {statusLabel(action.status)}
@@ -931,6 +959,11 @@ function FormalActionCard({
         <span className={`priority ${action.priority}`}>
           {priorityLabel(action.priority)}
         </span>
+        {isTarget ? (
+          <span className="action-deep-link-target">
+            已从工作台定位到此动作
+          </span>
+        ) : null}
       </div>
       <p className="formal-action-entity">{action.entityName}</p>
       <h3>{action.title}</h3>
@@ -1047,6 +1080,17 @@ function mergeById<T, K extends keyof T>(
   const merged = new Map(current.map((item) => [item[key], item]));
   for (const item of additions) merged.set(item[key], item);
   return [...merged.values()];
+}
+
+function actionsWithTargetFirst(
+  actions: BusinessActionRecord[],
+  target: BusinessActionRecord | null,
+): BusinessActionRecord[] {
+  if (!target) return actions;
+  return [
+    target,
+    ...actions.filter((item) => item.actionId !== target.actionId),
+  ];
 }
 
 function initialActiveOwnerId(

@@ -62,6 +62,12 @@ const formalAction: BusinessActionRecord = {
   versionNo: "1",
 };
 
+const deepLinkedAction: BusinessActionRecord = {
+  ...formalAction,
+  actionId: "d0000000-0000-4000-8000-000000000099",
+  title: "工作台指定的后续动作",
+};
+
 const secondProposal: ActionProposalRecord = {
   ...proposal,
   proposalId: "c0000000-0000-4000-8000-000000000003",
@@ -79,6 +85,7 @@ function api(overrides: Partial<ActionWorkspaceApi> = {}) {
       nextCursor: null,
     }),
     getProposal: vi.fn().mockResolvedValue(proposal),
+    getAction: vi.fn().mockResolvedValue(formalAction),
     acceptProposal: vi.fn().mockResolvedValue({
       proposalId,
       status: "accepted",
@@ -137,6 +144,26 @@ describe("ActionWorkspace", () => {
       "href",
       `/battle-map?entityId=${entityId}&stateVersion=${proposal.sourceBattleStateVersionId}`,
     );
+  });
+
+  it("loads, places first and labels an exact action from a workspace deep link", async () => {
+    const getAction = vi.fn().mockResolvedValue(deepLinkedAction);
+    render(
+      <ActionWorkspace
+        initialActionId={deepLinkedAction.actionId}
+        api={api({ getAction })}
+      />,
+    );
+
+    const target = await screen.findByRole("article", {
+      name: "工作台指定的后续动作（工作台定位）",
+    });
+    expect(within(target).getByText("已从工作台定位到此动作")).toBeVisible();
+    expect(getAction).toHaveBeenCalledWith(deepLinkedAction.actionId);
+    const formalSection = screen.getByRole("region", { name: "正式经营动作" });
+    expect(
+      within(formalSection).getAllByRole("article")[0],
+    ).toHaveAccessibleName("工作台指定的后续动作（工作台定位）");
   });
 
   it("requires owner, time and priority before explicitly creating an action", async () => {

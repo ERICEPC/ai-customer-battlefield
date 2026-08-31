@@ -147,6 +147,17 @@ export async function seedSyntheticAcceptedAction(
         })
         .executeTakeFirstOrThrow();
       await transaction
+        .insertInto("app.battle_state_current")
+        .values({
+          tenant_id: SYNTHETIC_TENANT_ID,
+          entity_id: "50000000-0000-4000-8000-000000000001",
+          battle_state_version_id: stateVersionId,
+          version_no: 1,
+          input_version: "a".repeat(64),
+          updated_at: "2026-08-31T00:00:30.000Z",
+        })
+        .executeTakeFirstOrThrow();
+      await transaction
         .insertInto("app.action_proposals")
         .values({
           tenant_id: SYNTHETIC_TENANT_ID,

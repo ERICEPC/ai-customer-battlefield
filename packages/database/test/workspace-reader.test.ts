@@ -1,6 +1,8 @@
 import { fileURLToPath } from "node:url";
+import { BusinessActionNotFoundError } from "@battlefield/core";
 import { afterEach, beforeEach, describe, expect, test } from "vitest";
 
+import { KyselyActionQueryReader } from "../src/action-decisions/kysely-action-query-reader.js";
 import type { DatabaseHandle } from "../src/database-handle.js";
 import type { BattlefieldDatabase } from "../src/database-types.js";
 import { migrateDatabase } from "../src/migrate.js";
@@ -39,6 +41,9 @@ const ENDED_STATE_ID = "b1000000-0000-4000-8000-000000000005";
 const OWN_ACTION_ID = "d1000000-0000-4000-8000-000000000001";
 const COLLEAGUE_OWN_ENTITY_ACTION_ID = "d1000000-0000-4000-8000-000000000002";
 const OBSERVED_ACTION_ID = "d1000000-0000-4000-8000-000000000003";
+const COMPLETED_OBSERVED_ACTION_ID = "d1000000-0000-4000-8000-000000000004";
+const UNASSIGNED_ACTION_ID = "d1000000-0000-4000-8000-000000000005";
+const ENDED_ACTION_ID = "d1000000-0000-4000-8000-000000000006";
 const actor = { tenantId: SYNTHETIC_TENANT_ID, userId: SYNTHETIC_USER_ID };
 const manager = { tenantId: SYNTHETIC_TENANT_ID, userId: MANAGER_ID };
 const colleague = { tenantId: SYNTHETIC_TENANT_ID, userId: COLLEAGUE_ID };
@@ -196,6 +201,55 @@ describe("Kysely role-scoped workspace reader", () => {
           action.entityId !== UNASSIGNED_ENTITY_ID,
       ),
     ).toBe(true);
+  });
+
+  test("authorizes exact action reads with the same active assignment rules as the workspace", async () => {
+    const actionReader = new KyselyActionQueryReader(database.db);
+
+    await expect(
+      actionReader.getAction({ actor, actionId: OWN_ACTION_ID }),
+    ).resolves.toMatchObject({ actionId: OWN_ACTION_ID });
+    await expect(
+      actionReader.getAction({ actor: manager, actionId: OBSERVED_ACTION_ID }),
+    ).resolves.toMatchObject({ actionId: OBSERVED_ACTION_ID });
+    await expect(
+      actionReader.getAction({
+        actor: colleague,
+        actionId: COMPLETED_OBSERVED_ACTION_ID,
+      }),
+    ).resolves.toMatchObject({ actionId: COMPLETED_OBSERVED_ACTION_ID });
+
+    for (const [deniedActor, actionId] of [
+      [actor, COLLEAGUE_OWN_ENTITY_ACTION_ID],
+      [manager, COMPLETED_OBSERVED_ACTION_ID],
+      [actor, UNASSIGNED_ACTION_ID],
+      [actor, ENDED_ACTION_ID],
+      [unassignedUser, OWN_ACTION_ID],
+      [otherActor, OWN_ACTION_ID],
+    ] as const) {
+      await expect(
+        actionReader.getAction({ actor: deniedActor, actionId }),
+      ).rejects.toBeInstanceOf(BusinessActionNotFoundError);
+    }
+
+    await expect(
+      actionReader.listActions({ actor, limit: 20 }),
+    ).resolves.toMatchObject({
+      items: [
+        expect.objectContaining({ actionId: OWN_ACTION_ID }),
+        expect.objectContaining({ actionId: OBSERVED_ACTION_ID }),
+      ],
+      nextCursor: null,
+    });
+    await expect(
+      actionReader.listActions({ actor: manager, limit: 20 }),
+    ).resolves.toMatchObject({
+      items: [expect.objectContaining({ actionId: OBSERVED_ACTION_ID })],
+      nextCursor: null,
+    });
+    await expect(
+      actionReader.listActions({ actor: unassignedUser, limit: 20 }),
+    ).resolves.toEqual({ items: [], nextCursor: null });
   });
 
   test("rejects an invalid projection instant before opening a query snapshot", async () => {

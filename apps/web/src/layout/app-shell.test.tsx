@@ -17,6 +17,9 @@ describe("AppShell", () => {
 
     const desktop = screen.getByRole("navigation", { name: "主导航" });
     expect(
+      within(desktop).getByRole("link", { name: "经营总览" }),
+    ).toHaveAttribute("href", "/workspace");
+    expect(
       within(desktop).getByRole("link", { name: "客户作战地图" }),
     ).toHaveAttribute("href", "/battle-map");
     expect(
@@ -27,6 +30,14 @@ describe("AppShell", () => {
     ).toHaveAttribute("href", "/inbox");
 
     const mobile = screen.getByRole("navigation", { name: "移动端主导航" });
+    expect(within(mobile).getByRole("link", { name: "今日" })).toHaveAttribute(
+      "href",
+      "/workspace",
+    );
+    expect(within(mobile).getByRole("link", { name: "跟进" })).toHaveAttribute(
+      "href",
+      "/",
+    );
     expect(within(mobile).getByRole("link", { name: "地图" })).toHaveAttribute(
       "href",
       "/battle-map",
@@ -38,6 +49,27 @@ describe("AppShell", () => {
     expect(within(mobile).getByRole("link", { name: "通知" })).toHaveAttribute(
       "href",
       "/inbox",
+    );
+  });
+
+  it("marks the workspace as the system home on desktop and mobile", () => {
+    render(
+      <AppShell activeItem="经营总览" breadcrumb="销售工作台 / 经营总览">
+        <p>工作台内容</p>
+      </AppShell>,
+    );
+
+    expect(
+      screen.getByRole("link", { name: "AI 客户作战系统首页" }),
+    ).toHaveAttribute("href", "/workspace");
+    const desktop = screen.getByRole("navigation", { name: "主导航" });
+    expect(
+      within(desktop).getByRole("link", { name: "经营总览" }),
+    ).toHaveAttribute("aria-current", "page");
+    const mobile = screen.getByRole("navigation", { name: "移动端主导航" });
+    expect(within(mobile).getByRole("link", { name: "今日" })).toHaveAttribute(
+      "aria-current",
+      "page",
     );
   });
 });

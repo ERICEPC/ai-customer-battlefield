@@ -1,17 +1,20 @@
 import type {
   ActionDecisionResponse,
   BattleMapPage,
+  BusinessActionRecord,
 } from "@battlefield/contracts";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
   acceptActionProposal,
   BattleOperationsApiError,
+  getBusinessAction,
   listBattleMap,
 } from "./api-client";
 
 const entityId = "50000000-0000-4000-8000-000000000001";
 const proposalId = "c0000000-0000-4000-8000-000000000001";
+const actionId = "d0000000-0000-4000-8000-000000000001";
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -74,6 +77,40 @@ describe("battle operations API client", () => {
           "idempotency-key": "accept-stable-001",
         }),
       }),
+    );
+  });
+
+  it("loads one exact formal action for a workspace deep link", async () => {
+    const action: BusinessActionRecord = {
+      actionId,
+      entityId,
+      entityName: "Aurora Systems",
+      opportunityId: null,
+      title: "完成安全评审",
+      description: "与客户安全负责人完成评审。",
+      ownerUserId: "30000000-0000-4000-8000-000000000001",
+      ownerName: "销售甲",
+      priority: "urgent",
+      status: "planned",
+      plannedAt: "2026-09-02T09:00:00.000Z",
+      completedAt: null,
+      sourceProposalId: proposalId,
+      confirmedBy: "30000000-0000-4000-8000-000000000001",
+      confirmedAt: "2026-08-31T04:00:00.000Z",
+      versionNo: "1",
+    };
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify(action), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(getBusinessAction(actionId)).resolves.toEqual(action);
+    expect(fetchMock).toHaveBeenCalledWith(
+      `http://localhost:3001/api/v1/actions/${actionId}`,
+      expect.objectContaining({ headers: expect.any(Object) }),
     );
   });
 

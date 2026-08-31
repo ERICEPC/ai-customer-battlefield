@@ -6,6 +6,7 @@
   "scripts": {
     "predev": "pnpm --filter @battlefield/contracts build && pnpm --filter @battlefield/core build && pnpm --filter @battlefield/database build && pnpm --filter @battlefield/worker build",
     "dev": "tsx watch src/main.ts",
+    "predev:demo": "pnpm --filter @battlefield/contracts build && pnpm --filter @battlefield/core build && pnpm --filter @battlefield/database build && pnpm --filter @battlefield/worker build",
     "dev:demo": "tsx dev/demo-server.ts",
     "prebuild": "pnpm --filter @battlefield/contracts build && pnpm --filter @battlefield/core build && pnpm --filter @battlefield/database build && pnpm --filter @battlefield/worker build",
     "build": "tsc -p tsconfig.build.json",
