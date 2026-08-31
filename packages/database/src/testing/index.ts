@@ -9,6 +9,13 @@ export {
   seedSyntheticBusinessEntityDirectory,
 } from "./synthetic-directory.js";
 export {
+  SYNTHETIC_DEMO_PASSWORD,
+  SYNTHETIC_DEPARTMENT_ID,
+  SYNTHETIC_LEADER_EMAIL,
+  SYNTHETIC_SALES_EMAIL,
+  seedSyntheticTwoLevelIdentity,
+} from "./synthetic-identity.js";
+export {
   SYNTHETIC_MANAGER_USER_ID,
   seedSyntheticAcceptedAction,
   seedSyntheticInboxNotification,

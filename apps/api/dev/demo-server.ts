@@ -10,6 +10,7 @@ import {
   seedSyntheticInboxNotification,
   seedSyntheticManagementObserver,
   seedSyntheticReminderConfiguration,
+  seedSyntheticTwoLevelIdentity,
 } from "@battlefield/database/testing";
 import { createReminderWorker, runWorkerLoop } from "@battlefield/worker";
 import { Test } from "@nestjs/testing";
@@ -31,6 +32,7 @@ await migrateDatabase(database.migrations, migrationDirectory);
 console.info("Synthetic demo migrations applied.");
 await seedSyntheticBusinessEntityDirectory(database);
 await seedSyntheticManagementObserver(database);
+await seedSyntheticTwoLevelIdentity(database);
 await seedSyntheticReminderConfiguration(database);
 await seedSyntheticAcceptedAction(database);
 await seedSyntheticInboxNotification(database, {
