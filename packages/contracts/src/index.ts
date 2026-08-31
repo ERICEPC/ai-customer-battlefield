@@ -117,3 +117,18 @@ export {
   reminderKindSchema,
   reminderStatusSchema,
 } from "./reminders.js";
+export {
+  type WorkspaceBattleChange,
+  type WorkspaceKpis,
+  type WorkspacePriorityAction,
+  type WorkspaceQuadrantBucket,
+  type WorkspaceScopeMode,
+  type WorkspaceSnapshot,
+  workspaceBattleChangeSchema,
+  workspaceKpisSchema,
+  workspacePreviousBattleStateSchema,
+  workspacePriorityActionSchema,
+  workspaceQuadrantBucketSchema,
+  workspaceScopeModeSchema,
+  workspaceSnapshotSchema,
+} from "./workspace.js";

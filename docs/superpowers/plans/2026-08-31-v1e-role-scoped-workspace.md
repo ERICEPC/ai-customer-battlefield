@@ -41,11 +41,11 @@
 - Produces `workspaceSnapshotSchema`, `WorkspaceSnapshot`, `WorkspaceReader`, and `GetWorkspaceSnapshot`.
 - Public shape contains `generatedAt`, `scopeMode`, bounded KPI counts, priority actions, recent battle changes, and quadrant distribution.
 
-- [ ] **Step 1: Write contract tests and verify RED**
+- [x] **Step 1: Write contract tests and verify RED**
 
 Cover strict unknown-key rejection, non-negative counts, UUID/ISO timestamp validation, nullable previous state, exact action/status/priority unions, bounded data gaps and exactly one bucket per quadrant code.
 
-- [ ] **Step 2: Implement the strict Zod contract**
+- [x] **Step 2: Implement the strict Zod contract**
 
 Use this stable top-level shape:
 
@@ -70,15 +70,17 @@ Use this stable top-level shape:
 
 Deep links are application-relative fixed-format links assembled from validated IDs; arbitrary URLs are not part of the contract.
 
-- [ ] **Step 3: Write core use-case tests and verify RED**
+- [x] **Step 3: Write core use-case tests and verify RED**
 
-Prove actor and injected clock pass unchanged to the reader, response parsing rejects an invalid adapter result, and the use case performs no authorization or SQL itself.
+Prove actor and one injected clock instant pass unchanged to the reader, an invalid clock is rejected before the reader runs, and the use case performs no authorization, transport parsing or SQL itself. As in the existing modules, the NestJS controller performs runtime response parsing with the shared contract.
 
-- [ ] **Step 4: Implement the minimal port/use case and run focused GREEN**
+- [x] **Step 4: Implement the minimal port/use case and run focused GREEN**
 
 Run contracts/core tests, type checks and Biome before committing.
 
 Commit: `feat: define role-scoped workspace contract`
+
+**Evidence:** the contract suite first failed because `workspace.ts` did not exist; the core suite then failed because the workspace use-case modules did not exist. After implementation, contracts passed 51/51, core passed 38/38, both type checks passed, and the repository Biome/diff checks were clean.
 
 ---
 
