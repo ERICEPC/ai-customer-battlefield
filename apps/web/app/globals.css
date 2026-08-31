@@ -6363,6 +6363,50 @@ section.workspace-attention a:hover {
   text-align: right;
 }
 
+.admin-section-state {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 13px;
+  align-items: center;
+  min-height: 104px;
+  padding: 18px;
+  color: #344054;
+  border: 1px dashed #cfd7e5;
+  border-radius: 14px;
+  background: #f8fafc;
+}
+
+.admin-section-state > div {
+  min-width: 0;
+}
+
+.admin-section-state strong,
+.admin-section-state p {
+  margin: 0;
+}
+
+.admin-section-state strong {
+  font-size: 14px;
+}
+
+.admin-section-state p {
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.admin-section-state-error {
+  grid-template-columns: minmax(0, 1fr) auto;
+  color: var(--danger);
+  border-color: #f2c4bf;
+  background: var(--danger-soft);
+}
+
+.admin-section-state-error button {
+  white-space: nowrap;
+}
+
 .access-scope-note {
   display: flex;
   gap: 20px;
@@ -6949,7 +6993,8 @@ section.workspace-attention a:hover {
   .failure-list dl,
   .failure-replay,
   .admin-audit-list > article,
-  .role-capability-save {
+  .role-capability-save,
+  .admin-section-state-error {
     grid-template-columns: 1fr;
   }
 

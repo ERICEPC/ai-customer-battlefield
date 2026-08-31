@@ -137,6 +137,41 @@ describe("SystemManagementWorkspace", () => {
     ).toHaveLength(19);
   });
 
+  test("reveals fast sections while a slower remote section is still loading", async () => {
+    const managementApi = api();
+    const pendingVersions = deferred<AiRuntimeConfigVersionPage>();
+    managementApi.listVersions = vi.fn(() => pendingVersions.promise);
+
+    render(<SystemManagementWorkspace api={managementApi} />);
+
+    expect(await screen.findByText("角色与功能权限")).toBeVisible();
+    expect(screen.getByText("正在读取 Agent 运行配置…")).toBeVisible();
+    expect(screen.getByText("Worker 运行正常")).toBeVisible();
+
+    pendingVersions.resolve(versions);
+    expect(await screen.findByText("严格契约 V2")).toBeVisible();
+  });
+
+  test("isolates a failed section and retries only that section", async () => {
+    const managementApi = api();
+    managementApi.getHealth = vi
+      .fn()
+      .mockRejectedValueOnce(new Error("远端 Worker 查询超时"))
+      .mockResolvedValue(health);
+
+    render(<SystemManagementWorkspace api={managementApi} />);
+
+    expect(await screen.findByText("严格契约 V2")).toBeVisible();
+    expect(await screen.findByText("Worker 运行状态读取失败")).toBeVisible();
+    expect(screen.getByText("远端 Worker 查询超时")).toBeVisible();
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "重试 Worker 运行状态" }),
+    );
+    expect(await screen.findByText("Worker 运行正常")).toBeVisible();
+    expect(managementApi.getHealth).toHaveBeenCalledTimes(2);
+  });
+
   test("saves a complete role capability set with a mandatory reason", async () => {
     const managementApi = api();
     render(<SystemManagementWorkspace api={managementApi} />);
@@ -324,4 +359,15 @@ function queue(
     deadLetteredCount,
     oldestReadyAt: null,
   };
+}
+
+function deferred<T>(): {
+  promise: Promise<T>;
+  resolve(value: T): void;
+} {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((complete) => {
+    resolve = complete;
+  });
+  return { promise, resolve };
 }
