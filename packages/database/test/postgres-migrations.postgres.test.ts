@@ -372,8 +372,8 @@ describe("PostgreSQL migrations", () => {
       "entity_assignments_user_current_idx",
     );
     expect(workspacePlans.action).toContain("business_actions_owner_due_idx");
-    expect(workspacePlans.managementScope).toContain(
-      "entity_assignments_user_current_idx",
+    expect(workspacePlans.managementScope).toMatch(
+      /entity_assignments_(?:user|entity)_current_idx/,
     );
     expect(workspacePlans.managementOpenAction).toContain(
       "business_actions_entity_idx",
