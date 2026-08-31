@@ -1,4 +1,14 @@
 export {
+  type AuditEntry,
+  type AuditEntryListQuery,
+  type AuditEntryPage,
+  type AuditLogApiError,
+  auditEntryListQuerySchema,
+  auditEntryPageSchema,
+  auditEntrySchema,
+  auditLogApiErrorSchema,
+} from "./audit-log.js";
+export {
   type AuthApiError,
   authApiErrorSchema,
   type IdentityPerson,

@@ -8,6 +8,10 @@ export {
   OutboxClaimLostError,
 } from "./async-work/kysely-outbox-store.js";
 export {
+  KyselyAuditLogReader,
+  type KyselyAuditLogReaderOptions,
+} from "./audit/kysely-audit-log-reader.js";
+export {
   KyselyBattleAnalysisStore,
   type KyselyBattleAnalysisStoreOptions,
   KyselyConfirmedFactSnapshotReader,

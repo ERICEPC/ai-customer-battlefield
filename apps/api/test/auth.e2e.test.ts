@@ -95,7 +95,7 @@ describe("authentication API", () => {
     });
   });
 
-  it("reserves management-query endpoints for the department leader", async () => {
+  it("reserves management and audit endpoints for the department leader", async () => {
     const sales = request.agent(app.getHttpServer());
     await sales.post("/api/v1/auth/login").send({
       tenantSlug: "alpha",
@@ -108,6 +108,7 @@ describe("authentication API", () => {
       .expect(({ body }) => {
         expect(body.code).toBe("ROLE_FORBIDDEN");
       });
+    await sales.get("/api/v1/audit-entries").expect(403);
 
     const leader = request.agent(app.getHttpServer());
     await leader.post("/api/v1/auth/login").send({
@@ -116,6 +117,7 @@ describe("authentication API", () => {
       password: "Demo@2026",
     });
     await leader.get("/api/v1/management-query-subjects").expect(200);
+    await leader.get("/api/v1/audit-entries").expect(200);
   });
 
   it("does not let caller-supplied actor headers override the session", async () => {

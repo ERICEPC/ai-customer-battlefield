@@ -1,4 +1,5 @@
 import { Module } from "@nestjs/common";
+import { AuditLogModule } from "./audit-log/audit-log.module.js";
 
 import { AuthModule } from "./auth/auth.module.js";
 import { BattleAnalysisModule } from "./battle-analysis/battle-analysis.module.js";
@@ -15,6 +16,7 @@ import { WorkspaceModule } from "./workspace/workspace.module.js";
 @Module({
   imports: [
     AuthModule,
+    AuditLogModule,
     BusinessEntitiesModule,
     FollowupDraftsModule,
     BattleAnalysisModule,
