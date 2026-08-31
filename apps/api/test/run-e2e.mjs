@@ -1,6 +1,7 @@
 import { spawn } from "node:child_process";
 
 const testFiles = [
+  "test/auth.e2e.test.ts",
   "test/app.e2e.test.ts",
   "test/business-entities.e2e.test.ts",
   "test/followup-confirmation.e2e.test.ts",

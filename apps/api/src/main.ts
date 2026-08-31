@@ -18,6 +18,7 @@ export function configureApp(app: INestApplication): void {
   if (webOrigin) {
     app.enableCors({
       origin: webOrigin,
+      credentials: true,
       methods: ["GET", "POST", "PATCH"],
       allowedHeaders: [
         "content-type",
