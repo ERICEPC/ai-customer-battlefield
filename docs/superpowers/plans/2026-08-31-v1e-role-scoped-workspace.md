@@ -226,7 +226,7 @@ pnpm build
 git diff --check
 ```
 
-- [ ] **Step 2: Run assignment-boundary acceptance**
+- [x] **Step 2: Run assignment-boundary acceptance**
 
 On real PostgreSQL 18 or the CI integration path, prove an owner cannot see another user's action, a management observer can see an observed entity's open action, an ended assignment removes scope, and no foreign-tenant row changes any count.
 
@@ -238,11 +238,11 @@ At desktop and true 390×844 CSS viewport, prove personal workspace → action d
 
 Mark the sales/management homepage delivered. Keep management queries, weekly reports, reminder escalation, production OIDC/RBAC, configuration UI, import and deployment recovery explicit.
 
-- [ ] **Step 5: Review, push directly to `main`, and watch matching CI**
+- [x] **Step 5: Review, push directly to `main`, and watch matching CI**
 
 Record SHA, exact test counts, PostgreSQL evidence, browser evidence, CI URL/duration and deferred boundaries. Close only V1-E, then continue to management queries/reports.
 
-**Pre-delivery evidence:** the fresh complete local gate passed with contracts 52/52, core 38/38, database 94/94, API E2E 30/30, worker 13/13 and Web 78/78 (305/305 total), plus frozen install, public-boundary, Biome, typecheck, production build and diff checks. The boundary suite proves personal, observer, ended, unassigned and cross-tenant behavior for workspace projections plus action/map landing reads; proposal reads, accept/reject writes, action transitions and idempotency replay all repeat the same assignment boundary. Proposal/action responses expose `canDecide`/`canTransition`, while owner candidates require an entity-scoped current owner/collaborator relationship. Real Nest + PGlite browser acceptance passed at 1280×900 and 390×844 for both `alpha-owner` and the synthetic `demo-manager`: notification, follow-up workbench, exact action and exact battle-state links all reached the expected target; the observer saw one explicitly observed object and its open action owned by `alpha-owner`; both mobile views had `scrollWidth === innerWidth === 390` and a 44px minimum main-link height. A final 1280px observer regression additionally proved that the exact action remains visible but all transition controls are absent and the read-only boundary is explicit. Matching PostgreSQL 18 CI, commit SHA and run URL remain required before Steps 2 and 5 close.
+**Delivery evidence:** the fresh complete local gate passed with contracts 52/52, core 38/38, database 94/94, API E2E 30/30, worker 13/13 and Web 78/78 (305/305 total), plus frozen install, public-boundary, Biome, typecheck, production build and diff checks. The boundary suite proves personal, observer, ended, unassigned and cross-tenant behavior for workspace projections plus action/map landing reads; proposal reads, accept/reject writes, action transitions and idempotency replay all repeat the same assignment boundary. Proposal/action responses expose `canDecide`/`canTransition`, while owner candidates require an entity-scoped current owner/collaborator relationship. Real Nest + PGlite browser acceptance passed at 1280×900 and 390×844 for both `alpha-owner` and the synthetic `demo-manager`: notification, follow-up workbench, exact action and exact battle-state links all reached the expected target; the observer saw one explicitly observed object and its open action owned by `alpha-owner`; both mobile views had `scrollWidth === innerWidth === 390` and a 44px minimum main-link height. A final 1280px observer regression additionally proved that the exact action remains visible but all transition controls are absent and the read-only boundary is explicit. Commit `a7353b9` was pushed directly to `main`; matching [CI run 33356531410](https://github.com/ERICEPC/ai-customer-battlefield/actions/runs/33356531410) completed successfully in 4m09s, including PostgreSQL 18 migrations/tenant queries, the reminder/inbox flow, all tests and production builds. V1-E is closed; the overall V1 remains active.
 
 ## Acceptance Gate
 
