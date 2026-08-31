@@ -1,5 +1,8 @@
 import { fileURLToPath } from "node:url";
-import type { BusinessEntityReader } from "@battlefield/core";
+import {
+  type BusinessEntityReader,
+  ManagementQuerySubjectNotFoundError,
+} from "@battlefield/core";
 import { sql } from "kysely";
 import { afterAll, beforeAll, describe, expect, test } from "vitest";
 
@@ -15,10 +18,13 @@ import { createPostgresDatabase } from "../src/database-factory.js";
 import type { DatabaseHandle } from "../src/database-handle.js";
 import type { BattlefieldDatabase } from "../src/database-types.js";
 import { KyselyFollowupConfirmationStore } from "../src/followup-confirmation/kysely-followup-confirmation-store.js";
+import { KyselyManagementQueryRepository } from "../src/management-queries/kysely-management-query-repository.js";
 import { migrateDatabase } from "../src/migrate.js";
 import { withTenantTransaction } from "../src/tenant-session.js";
 import {
   SYNTHETIC_ENTITY_ID,
+  SYNTHETIC_OTHER_TENANT_ID,
+  SYNTHETIC_OTHER_USER_ID,
   SYNTHETIC_TENANT_ID,
   SYNTHETIC_USER_ID,
   seedSyntheticBusinessEntityDirectory,
@@ -29,6 +35,13 @@ const MIGRATION_DIRECTORY = fileURLToPath(
   new URL("../migrations", import.meta.url),
 );
 const DATABASE_URL = process.env.DATABASE_URL;
+const MANAGER_ID = "30000000-0000-4000-8000-000000000013";
+const UNASSIGNED_USER_ID = "30000000-0000-4000-8000-000000000014";
+const MANAGER_QUERY_ID = "90000000-0000-4000-8000-000000000013";
+const SELLER_QUERY_ID = "90000000-0000-4000-8000-000000000014";
+const MANAGEMENT_QUERY_NOW = "2026-09-04T00:00:00.000Z";
+const MANAGEMENT_PERIOD_START = "2026-08-31T00:00:00.000Z";
+const MANAGEMENT_PERIOD_END = "2026-09-05T00:00:00.000Z";
 
 describe("PostgreSQL migrations", () => {
   let database: DatabaseHandle<BattlefieldDatabase>;
@@ -75,6 +88,7 @@ describe("PostgreSQL migrations", () => {
       MIGRATION_DIRECTORY,
     );
     await seedSyntheticBusinessEntityDirectory(database);
+    await seedSyntheticManagementScope(database);
     const page = await reader.list({
       actor: { tenantId: SYNTHETIC_TENANT_ID, userId: SYNTHETIC_USER_ID },
       limit: 20,
@@ -243,6 +257,59 @@ describe("PostgreSQL migrations", () => {
       actor,
       now: "2026-09-04T00:00:00.000Z",
     });
+    const queryIds = [MANAGER_QUERY_ID, SELLER_QUERY_ID];
+    const managementRepository = new KyselyManagementQueryRepository(
+      database.db,
+      {
+        queryIdFactory: () =>
+          queryIds.shift() ?? "90000000-0000-4000-8000-000000000099",
+      },
+    );
+    const manager = { tenantId: SYNTHETIC_TENANT_ID, userId: MANAGER_ID };
+    const [managerSubjects, sellerSubjects] = await Promise.all([
+      managementRepository.listSubjects({ actor: manager, limit: 20 }),
+      managementRepository.listSubjects({ actor, limit: 20 }),
+    ]);
+    const managerProgress = await managementRepository.runSalesWeeklyProgress({
+      actor: manager,
+      subjectUserId: SYNTHETIC_USER_ID,
+      periodStart: MANAGEMENT_PERIOD_START,
+      periodEnd: MANAGEMENT_PERIOD_END,
+      queryNow: MANAGEMENT_QUERY_NOW,
+      dataCutoffAt: MANAGEMENT_QUERY_NOW,
+    });
+    const sellerProgress = await managementRepository.runSalesWeeklyProgress({
+      actor,
+      subjectUserId: SYNTHETIC_USER_ID,
+      periodStart: MANAGEMENT_PERIOD_START,
+      periodEnd: MANAGEMENT_PERIOD_END,
+      queryNow: MANAGEMENT_QUERY_NOW,
+      dataCutoffAt: MANAGEMENT_QUERY_NOW,
+    });
+    await expect(
+      managementRepository.runSalesWeeklyProgress({
+        actor: manager,
+        subjectUserId: UNASSIGNED_USER_ID,
+        periodStart: MANAGEMENT_PERIOD_START,
+        periodEnd: MANAGEMENT_PERIOD_END,
+        queryNow: MANAGEMENT_QUERY_NOW,
+        dataCutoffAt: MANAGEMENT_QUERY_NOW,
+      }),
+    ).rejects.toBeInstanceOf(ManagementQuerySubjectNotFoundError);
+    await expect(
+      managementRepository.runSalesWeeklyProgress({
+        actor: {
+          tenantId: SYNTHETIC_OTHER_TENANT_ID,
+          userId: SYNTHETIC_OTHER_USER_ID,
+        },
+        subjectUserId: SYNTHETIC_USER_ID,
+        periodStart: MANAGEMENT_PERIOD_START,
+        periodEnd: MANAGEMENT_PERIOD_END,
+        queryNow: MANAGEMENT_QUERY_NOW,
+        dataCutoffAt: MANAGEMENT_QUERY_NOW,
+      }),
+    ).rejects.toBeInstanceOf(ManagementQuerySubjectNotFoundError);
+    const managementAudits = await readManagementQueryAudits(database);
     const workspacePlans = await readWorkspacePlanEvidence(database);
 
     expect(firstRun.map((migration) => migration.name)).toEqual([
@@ -305,6 +372,82 @@ describe("PostgreSQL migrations", () => {
       "entity_assignments_user_current_idx",
     );
     expect(workspacePlans.action).toContain("business_actions_owner_due_idx");
+    expect(workspacePlans.managementScope).toContain(
+      "entity_assignments_user_current_idx",
+    );
+    expect(workspacePlans.managementOpenAction).toContain(
+      "business_actions_entity_idx",
+    );
+    expect(workspacePlans.managementOpenAction).toContain(
+      "action_status_history_action_idx",
+    );
+    expect(managerSubjects).toEqual({
+      items: [
+        {
+          userId: SYNTHETIC_USER_ID,
+          displayName: "alpha-owner",
+          scopeKind: "observed_portfolio",
+        },
+      ],
+      nextCursor: null,
+    });
+    expect(sellerSubjects).toEqual({
+      items: [
+        {
+          userId: SYNTHETIC_USER_ID,
+          displayName: "alpha-owner",
+          scopeKind: "self",
+        },
+      ],
+      nextCursor: null,
+    });
+    expect(managerProgress).toMatchObject({
+      queryId: MANAGER_QUERY_ID,
+      subject: {
+        userId: SYNTHETIC_USER_ID,
+        displayName: "alpha-owner",
+      },
+      scope: { kind: "observed_portfolio", entityCount: 1 },
+      metrics: {
+        confirmedFollowupCount: 1,
+        validFactCount: 1,
+        stageChangeCount: 0,
+        completedActionCount: 0,
+        openActionCount: 1,
+        overdueActionCount: 1,
+      },
+      dataGaps: [],
+    });
+    expect(
+      new Set(managerProgress.highlights[0]?.evidence.map((item) => item.kind)),
+    ).toEqual(new Set(["followup", "fact", "action", "battle_state"]));
+    expect(sellerProgress).toMatchObject({
+      queryId: SELLER_QUERY_ID,
+      scope: { kind: "self", entityCount: 1 },
+      metrics: managerProgress.metrics,
+    });
+    expect(managementAudits).toHaveLength(2);
+    expect(
+      managementAudits.map((audit) => ({
+        aggregate_id: audit.aggregate_id,
+        actor_user_id: audit.actor_user_id,
+        action: audit.action,
+      })),
+    ).toEqual([
+      {
+        aggregate_id: MANAGER_QUERY_ID,
+        actor_user_id: MANAGER_ID,
+        action: "management_query.executed",
+      },
+      {
+        aggregate_id: SELLER_QUERY_ID,
+        actor_user_id: SYNTHETIC_USER_ID,
+        action: "management_query.executed",
+      },
+    ]);
+    expect(JSON.stringify(managementAudits)).not.toContain(
+      "Synthetic customer confirmed the budget.",
+    );
     expect(confirmationCounts).toEqual({
       action_count: 1,
       followup_count: 1,
@@ -317,7 +460,12 @@ describe("PostgreSQL migrations", () => {
 
 async function readWorkspacePlanEvidence(
   database: DatabaseHandle<BattlefieldDatabase>,
-): Promise<{ assignment: string; action: string }> {
+): Promise<{
+  assignment: string;
+  action: string;
+  managementScope: string;
+  managementOpenAction: string;
+}> {
   return withTenantTransaction(
     database.db,
     {
@@ -349,13 +497,137 @@ async function readWorkspacePlanEvidence(
         order by action.planned_at, action.id
         limit 5
       `.execute(transaction);
+      const managementScopePlan = await sql<{ "QUERY PLAN": unknown }>`
+        explain (format json)
+        select subject_assignment.entity_id
+        from app.entity_assignments as subject_assignment
+        inner join app.entity_assignments as observer_assignment
+          on observer_assignment.tenant_id = subject_assignment.tenant_id
+          and observer_assignment.entity_id = subject_assignment.entity_id
+        where subject_assignment.tenant_id = ${SYNTHETIC_TENANT_ID}::uuid
+          and subject_assignment.user_id = ${SYNTHETIC_USER_ID}::uuid
+          and subject_assignment.assignment_role in ('owner', 'collaborator')
+          and subject_assignment.valid_from <= ${MANAGEMENT_QUERY_NOW}::timestamptz
+          and (
+            subject_assignment.valid_to is null
+            or subject_assignment.valid_to > ${MANAGEMENT_QUERY_NOW}::timestamptz
+          )
+          and observer_assignment.user_id = ${MANAGER_ID}::uuid
+          and observer_assignment.assignment_role = 'management_observer'
+          and observer_assignment.valid_from <= ${MANAGEMENT_QUERY_NOW}::timestamptz
+          and (
+            observer_assignment.valid_to is null
+            or observer_assignment.valid_to > ${MANAGEMENT_QUERY_NOW}::timestamptz
+          )
+      `.execute(transaction);
+      const managementOpenActionPlan = await sql<{ "QUERY PLAN": unknown }>`
+        explain (format json)
+        select action.id
+        from app.business_actions as action
+        inner join lateral (
+          select history.to_status
+          from app.action_status_history as history
+          where history.tenant_id = action.tenant_id
+            and history.action_id = action.id
+            and history.changed_at <= ${MANAGEMENT_QUERY_NOW}::timestamptz
+          order by history.version_no desc
+          limit 1
+        ) as cutoff_status on true
+        where action.tenant_id = ${SYNTHETIC_TENANT_ID}::uuid
+          and action.entity_id = ${SYNTHETIC_ENTITY_ID}::uuid
+          and action.owner_user_id = ${SYNTHETIC_USER_ID}::uuid
+          and action.confirmed_at <= ${MANAGEMENT_QUERY_NOW}::timestamptz
+          and cutoff_status.to_status in ('planned', 'in_progress')
+      `.execute(transaction);
       return {
         assignment: JSON.stringify(
           assignmentPlan.rows[0]?.["QUERY PLAN"] ?? null,
         ),
         action: JSON.stringify(actionPlan.rows[0]?.["QUERY PLAN"] ?? null),
+        managementScope: JSON.stringify(
+          managementScopePlan.rows[0]?.["QUERY PLAN"] ?? null,
+        ),
+        managementOpenAction: JSON.stringify(
+          managementOpenActionPlan.rows[0]?.["QUERY PLAN"] ?? null,
+        ),
       };
     },
+  );
+}
+
+async function seedSyntheticManagementScope(
+  database: DatabaseHandle<BattlefieldDatabase>,
+): Promise<void> {
+  await withTenantTransaction(
+    database.db,
+    {
+      tenantId: SYNTHETIC_TENANT_ID,
+      userId: SYNTHETIC_USER_ID,
+      requestId: "90000000-0000-4000-8000-000000000015",
+    },
+    async (transaction) => {
+      await transaction
+        .updateTable("app.entity_assignments")
+        .set({ valid_from: "2026-08-01T00:00:00.000Z" })
+        .where("tenant_id", "=", SYNTHETIC_TENANT_ID)
+        .where("entity_id", "=", SYNTHETIC_ENTITY_ID)
+        .where("user_id", "=", SYNTHETIC_USER_ID)
+        .executeTakeFirstOrThrow();
+      await transaction
+        .insertInto("app.users")
+        .values([
+          {
+            tenant_id: SYNTHETIC_TENANT_ID,
+            id: MANAGER_ID,
+            display_name: "synthetic-manager",
+            email: null,
+            mobile: null,
+            status: "active",
+          },
+          {
+            tenant_id: SYNTHETIC_TENANT_ID,
+            id: UNASSIGNED_USER_ID,
+            display_name: "synthetic-unassigned",
+            email: null,
+            mobile: null,
+            status: "active",
+          },
+        ])
+        .execute();
+      await transaction
+        .insertInto("app.entity_assignments")
+        .values({
+          tenant_id: SYNTHETIC_TENANT_ID,
+          id: "60000000-0000-4000-8000-000000000013",
+          entity_id: SYNTHETIC_ENTITY_ID,
+          user_id: MANAGER_ID,
+          assignment_role: "management_observer",
+          is_primary: false,
+          valid_from: "2026-08-01T00:00:00.000Z",
+          valid_to: null,
+        })
+        .executeTakeFirstOrThrow();
+    },
+  );
+}
+
+async function readManagementQueryAudits(
+  database: DatabaseHandle<BattlefieldDatabase>,
+) {
+  return withTenantTransaction(
+    database.db,
+    {
+      tenantId: SYNTHETIC_TENANT_ID,
+      userId: SYNTHETIC_USER_ID,
+      requestId: "90000000-0000-4000-8000-000000000016",
+    },
+    (transaction) =>
+      transaction
+        .selectFrom("app.audit_entries")
+        .select(["aggregate_id", "actor_user_id", "action", "after_payload"])
+        .where("aggregate_type", "=", "management_query")
+        .orderBy("aggregate_id")
+        .execute(),
   );
 }
 
