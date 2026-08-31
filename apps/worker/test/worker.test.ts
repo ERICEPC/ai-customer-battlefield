@@ -1,5 +1,5 @@
 import type { OutboxMessage } from "@battlefield/core";
-import { describe, expect, test } from "vitest";
+import { describe, expect, test, vi } from "vitest";
 
 import { loadWorkerConfig } from "../src/config.js";
 import {
@@ -13,6 +13,8 @@ const actor = {
   userId: "30000000-0000-4000-8000-000000000001",
 };
 const actionId = "d0000000-0000-4000-8000-000000000001";
+const reportId = "91000000-0000-4000-8000-000000000001";
+const reportVersionId = "92000000-0000-4000-8000-000000000001";
 
 function message(
   topic: string,
@@ -107,6 +109,11 @@ describe("reminder worker", () => {
           return { cancelled: 1 };
         },
       },
+      reportNotifier: {
+        async execute() {
+          return { status: "materialized" };
+        },
+      },
     });
 
     await handlers["action_proposal.accepted.v1"]?.handle(
@@ -144,6 +151,38 @@ describe("reminder worker", () => {
         changedAt: "2026-09-01T00:40:00.000Z",
       },
     ]);
+  });
+
+  test("materializes a validated weekly-report publication event", async () => {
+    const execute = vi.fn().mockResolvedValue({ status: "materialized" });
+    const handlers = createOutboxHandlers({
+      scheduler: { onActionAccepted: vi.fn() },
+      canceller: { execute: vi.fn() },
+      reportNotifier: { execute },
+    });
+
+    await handlers["weekly_report.published.v1"]?.handle(
+      {
+        ...message("weekly_report.published.v1", {
+          reportId,
+          reportVersionId,
+          recipientUserId: actor.userId,
+          reportType: "personal",
+        }),
+        aggregateType: "weekly_report",
+        aggregateId: reportId,
+      },
+      actor,
+    );
+
+    expect(execute).toHaveBeenCalledWith({
+      actor,
+      reportId,
+      reportVersionId,
+      recipientUserId: actor.userId,
+      reportType: "personal",
+      publishedAt: "2026-09-01T00:00:00.000Z",
+    });
   });
 
   test("runs recovery, Outbox, due reminders, and external deliveries in one bounded tick", async () => {

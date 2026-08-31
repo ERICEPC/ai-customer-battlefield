@@ -1,12 +1,14 @@
 import {
   CancelActionReminders,
   DispatchDueReminders,
+  MaterializePublishedWeeklyReportNotification,
   type NotificationChannel,
   NotificationDelivery,
   type OutboxMessage,
   type OutboxTopicHandler,
   PermanentOutboxError,
   ProcessOutboxBatch,
+  PublishedWeeklyReportNotFoundError,
   ScheduleActionReminders,
 } from "@battlefield/core";
 import {
@@ -171,6 +173,7 @@ export class ReminderWorker {
 export function createOutboxHandlers(input: {
   scheduler: Pick<ScheduleActionReminders, "onActionAccepted">;
   canceller: Pick<CancelActionReminders, "execute">;
+  reportNotifier: Pick<MaterializePublishedWeeklyReportNotification, "execute">;
 }): Readonly<Record<string, OutboxTopicHandler>> {
   return {
     "action_proposal.accepted.v1": {
@@ -206,6 +209,40 @@ export function createOutboxHandlers(input: {
     },
     "action_proposal.rejected.v1": noOperationHandler(),
     "followup.confirmed.v1": noOperationHandler(),
+    "weekly_report.published.v1": {
+      async handle(message, actor) {
+        const payload = objectPayload(message);
+        const reportId = uuidField(payload, "reportId");
+        const reportVersionId = uuidField(payload, "reportVersionId");
+        const recipientUserId = uuidField(payload, "recipientUserId");
+        const reportType = payload.reportType;
+        if (
+          message.aggregateType !== "weekly_report" ||
+          message.aggregateId !== reportId ||
+          (reportType !== "personal" && reportType !== "managed_portfolio")
+        ) {
+          throw invalidPayload();
+        }
+        try {
+          await input.reportNotifier.execute({
+            actor,
+            reportId,
+            reportVersionId,
+            recipientUserId,
+            reportType,
+            publishedAt: message.occurredAt,
+          });
+        } catch (error) {
+          if (error instanceof PublishedWeeklyReportNotFoundError) {
+            throw new PermanentOutboxError(
+              "WEEKLY_REPORT_PUBLICATION_NOT_FOUND",
+              error.message,
+            );
+          }
+          throw error;
+        }
+      },
+    },
   };
 }
 
@@ -223,9 +260,14 @@ export function createReminderWorker(input: {
   const reminderStore = new KyselyReminderStore(input.database, {
     enabledExternalChannels: channels.map((channel) => channel.channel),
   });
-  const notificationStore = new KyselyNotificationStore(input.database);
+  const notificationStore = new KyselyNotificationStore(input.database, {
+    enabledExternalChannels: channels.map((channel) => channel.channel),
+  });
   const scheduler = new ScheduleActionReminders({ store: reminderStore });
   const canceller = new CancelActionReminders({ store: reminderStore });
+  const reportNotifier = new MaterializePublishedWeeklyReportNotification({
+    store: notificationStore,
+  });
   return new ReminderWorker({
     actor: input.actor,
     batchSize: input.batchSize,
@@ -236,7 +278,7 @@ export function createReminderWorker(input: {
     deliveryRecovery: notificationStore,
     outboxProcessor: new ProcessOutboxBatch({
       store: outboxStore,
-      handlers: createOutboxHandlers({ scheduler, canceller }),
+      handlers: createOutboxHandlers({ scheduler, canceller, reportNotifier }),
       clock,
     }),
     reminderDispatcher: new DispatchDueReminders({

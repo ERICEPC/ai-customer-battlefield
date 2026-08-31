@@ -88,6 +88,7 @@ export {
 export {
   InvalidInboxCursorError,
   KyselyNotificationStore,
+  type KyselyNotificationStoreOptions,
   NotificationClaimLostError,
   NotificationNotFoundError,
 } from "./notifications/kysely-notification-store.js";

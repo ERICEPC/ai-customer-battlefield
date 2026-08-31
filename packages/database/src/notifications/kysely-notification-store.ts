@@ -1,7 +1,10 @@
 import { randomUUID } from "node:crypto";
 import type {
+  ExternalNotificationChannel,
   NotificationDeliveryClaim,
   NotificationStore,
+  WeeklyReportPublicationNotificationInput,
+  WeeklyReportPublicationNotificationStore,
 } from "@battlefield/core";
 import { type Kysely, sql, type UpdateObject } from "kysely";
 
@@ -48,8 +51,187 @@ export class InvalidInboxCursorError extends Error {
   }
 }
 
-export class KyselyNotificationStore implements NotificationStore {
-  constructor(private readonly database: Kysely<BattlefieldDatabase>) {}
+export interface KyselyNotificationStoreOptions {
+  enabledExternalChannels?: ExternalNotificationChannel[];
+}
+
+export class KyselyNotificationStore
+  implements NotificationStore, WeeklyReportPublicationNotificationStore
+{
+  private readonly enabledExternalChannels: Set<ExternalNotificationChannel>;
+
+  constructor(
+    private readonly database: Kysely<BattlefieldDatabase>,
+    options: KyselyNotificationStoreOptions = {},
+  ) {
+    this.enabledExternalChannels = new Set(
+      options.enabledExternalChannels ?? [],
+    );
+  }
+
+  async materialize(
+    input: WeeklyReportPublicationNotificationInput,
+  ): Promise<boolean> {
+    return withTenantTransaction(
+      this.database,
+      { ...input.actor, requestId: randomUUID() },
+      async (transaction) => {
+        const report = await transaction
+          .selectFrom("app.weekly_report_versions as version")
+          .innerJoin("app.weekly_reports as report", (join) =>
+            join
+              .onRef("report.tenant_id", "=", "version.tenant_id")
+              .onRef("report.id", "=", "version.report_id"),
+          )
+          .innerJoin("app.weekly_report_audiences as audience", (join) =>
+            join
+              .onRef("audience.tenant_id", "=", "version.tenant_id")
+              .onRef("audience.report_version_id", "=", "version.id"),
+          )
+          .select(["version.title"])
+          .where("version.tenant_id", "=", input.actor.tenantId)
+          .where("version.id", "=", input.reportVersionId)
+          .where("version.report_id", "=", input.reportId)
+          .where("version.status", "=", "published")
+          .where("report.report_type", "=", input.reportType)
+          .where("audience.user_id", "=", input.recipientUserId)
+          .where("audience.audience_role", "=", "recipient")
+          .executeTakeFirst();
+        if (!report) return false;
+
+        const template = await transaction
+          .selectFrom("app.notification_template_versions")
+          .select([
+            "title_template",
+            "body_template",
+            "deep_link_template",
+            "priority",
+          ])
+          .where("tenant_id", "=", input.actor.tenantId)
+          .where("template_key", "=", "weekly_report_published")
+          .where("channel", "=", "in_app")
+          .where("status", "=", "published")
+          .where("effective_at", "<=", new Date(input.publishedAt))
+          .orderBy("version_no", "desc")
+          .executeTakeFirst();
+        const content = renderWeeklyReportTemplate(
+          template ?? {
+            title_template: "周报已发布",
+            body_template: "《{{report_title}}》已发布，可查看正式版本。",
+            deep_link_template:
+              "/reports?reportId={{report_id}}&versionId={{report_version_id}}",
+            priority: "medium" as const,
+          },
+          {
+            reportId: input.reportId,
+            reportVersionId: input.reportVersionId,
+            reportTitle: report.title,
+          },
+        );
+        const dedupeKey = `weekly-report:${input.reportVersionId}:published`;
+        const inserted = await transaction
+          .insertInto("app.notification_events")
+          .values({
+            tenant_id: input.actor.tenantId,
+            id: randomUUID(),
+            recipient_user_id: input.recipientUserId,
+            reminder_id: null,
+            report_version_id: input.reportVersionId,
+            event_type: "weekly_report_published",
+            title: content.title,
+            body: content.body,
+            deep_link: content.deepLink,
+            priority: template?.priority ?? "medium",
+            read_at: null,
+            dedupe_key: dedupeKey,
+            created_at: input.publishedAt,
+          })
+          .onConflict((conflict) =>
+            conflict.columns(["tenant_id", "dedupe_key"]).doNothing(),
+          )
+          .returning("id")
+          .executeTakeFirst();
+        const eventId =
+          inserted?.id ??
+          (
+            await transaction
+              .selectFrom("app.notification_events")
+              .select("id")
+              .where("tenant_id", "=", input.actor.tenantId)
+              .where("report_version_id", "=", input.reportVersionId)
+              .where("recipient_user_id", "=", input.recipientUserId)
+              .executeTakeFirstOrThrow()
+          ).id;
+        await transaction
+          .insertInto("app.notification_deliveries")
+          .values({
+            tenant_id: input.actor.tenantId,
+            id: randomUUID(),
+            notification_event_id: eventId,
+            recipient_user_id: input.recipientUserId,
+            channel: "in_app",
+            address_id: null,
+            status: "delivered",
+            dedupe_key: `notification:${eventId}:channel:in_app`,
+            available_at: input.publishedAt,
+            attempt_count: 0,
+            claim_token: null,
+            claimed_at: null,
+            delivered_at: input.publishedAt,
+            provider_message_id: null,
+            provider_request_id: null,
+            last_error_code: null,
+            last_error_message: null,
+            created_at: input.publishedAt,
+            updated_at: input.publishedAt,
+          })
+          .onConflict((conflict) =>
+            conflict.columns(["tenant_id", "dedupe_key"]).doNothing(),
+          )
+          .executeTakeFirst();
+
+        for (const channel of this.enabledExternalChannels) {
+          const address = await transaction
+            .selectFrom("app.channel_addresses")
+            .select("id")
+            .where("tenant_id", "=", input.actor.tenantId)
+            .where("user_id", "=", input.recipientUserId)
+            .where("channel", "=", channel)
+            .where("status", "=", "active")
+            .executeTakeFirst();
+          if (!address) continue;
+          await transaction
+            .insertInto("app.notification_deliveries")
+            .values({
+              tenant_id: input.actor.tenantId,
+              id: randomUUID(),
+              notification_event_id: eventId,
+              recipient_user_id: input.recipientUserId,
+              channel,
+              address_id: address.id,
+              status: "pending",
+              dedupe_key: `${channel}:${eventId}`,
+              available_at: input.publishedAt,
+              attempt_count: 0,
+              claim_token: null,
+              claimed_at: null,
+              delivered_at: null,
+              provider_message_id: null,
+              provider_request_id: null,
+              last_error_code: null,
+              last_error_message: null,
+              created_at: input.publishedAt,
+              updated_at: input.publishedAt,
+            })
+            .onConflict((conflict) =>
+              conflict.columns(["tenant_id", "dedupe_key"]).doNothing(),
+            )
+            .executeTakeFirst();
+        }
+        return true;
+      },
+    );
+  }
 
   async claimDelivery(
     input: Parameters<NotificationStore["claimDelivery"]>[0],
@@ -397,4 +579,41 @@ function toIso(value: Date | string): string {
   return value instanceof Date
     ? value.toISOString()
     : new Date(value).toISOString();
+}
+
+function renderWeeklyReportTemplate(
+  template: {
+    title_template: string;
+    body_template: string;
+    deep_link_template: string;
+  },
+  values: {
+    reportId: string;
+    reportVersionId: string;
+    reportTitle: string;
+  },
+): { title: string; body: string; deepLink: string } {
+  const replace = (value: string) =>
+    value
+      .replaceAll("{{report_id}}", values.reportId)
+      .replaceAll("{{report_version_id}}", values.reportVersionId)
+      .replaceAll("{{report_title}}", values.reportTitle);
+  const rendered = {
+    title: replace(template.title_template),
+    body: replace(template.body_template),
+    deepLink: replace(template.deep_link_template),
+  };
+  if (
+    rendered.title.trim().length === 0 ||
+    rendered.title.length > 200 ||
+    rendered.body.trim().length === 0 ||
+    rendered.body.length > 2_000 ||
+    !/^\/(?!\/)[^\r\n]*$/.test(rendered.deepLink) ||
+    rendered.deepLink.length > 2_000
+  ) {
+    throw new Error(
+      "The published weekly-report notification template is invalid.",
+    );
+  }
+  return rendered;
 }
