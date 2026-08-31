@@ -327,4 +327,59 @@ describe("reminder worker", () => {
     });
     expect({ ticks, maximumActive }).toEqual({ ticks: 2, maximumActive: 1 });
   });
+
+  test("records heartbeat transitions and continues after one failed tick", async () => {
+    const controller = new AbortController();
+    const heartbeatEvents: string[] = [];
+    let ticks = 0;
+    const heartbeat = {
+      async register() {
+        heartbeatEvents.push("registered");
+      },
+      async markTickStarted() {
+        heartbeatEvents.push("started");
+      },
+      async markTickSucceeded(input: { summary: { completed: number } }) {
+        heartbeatEvents.push(`succeeded:${input.summary.completed}`);
+      },
+      async markTickFailed(input: { errorCode: string }) {
+        heartbeatEvents.push(`failed:${input.errorCode}`);
+      },
+    };
+    const worker = {
+      async tick() {
+        ticks += 1;
+        if (ticks === 1) throw new Error("synthetic database outage");
+        controller.abort();
+        return { recovered: 0, claimed: 1, completed: 1, failed: 0 };
+      },
+    };
+
+    await runWorkerLoop(worker, {
+      signal: controller.signal,
+      idlePollMs: 1,
+      busyPollMs: 1,
+      heartbeat: {
+        reporter: heartbeat,
+        actor,
+        workerKey: "reminder_worker",
+        instanceId: "d3000000-0000-4000-8000-000000000001",
+        leaseMs: 60_000,
+        clock: {
+          now: () => new Date(`2026-09-01T06:00:0${ticks}.000Z`),
+        },
+      },
+    });
+
+    expect({ ticks, heartbeatEvents }).toEqual({
+      ticks: 2,
+      heartbeatEvents: [
+        "registered",
+        "started",
+        "failed:WORKER_TICK_FAILED",
+        "started",
+        "succeeded:1",
+      ],
+    });
+  });
 });

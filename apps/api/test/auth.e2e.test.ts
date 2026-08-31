@@ -112,6 +112,7 @@ describe("authentication API", () => {
     await sales
       .get("/api/v1/ai-runtime-configs/followup_extraction/versions")
       .expect(403);
+    await sales.get("/api/v1/worker-operations/health").expect(403);
 
     const leader = request.agent(app.getHttpServer());
     await leader.post("/api/v1/auth/login").send({
@@ -124,6 +125,7 @@ describe("authentication API", () => {
     await leader
       .get("/api/v1/ai-runtime-configs/followup_extraction/versions")
       .expect(200);
+    await leader.get("/api/v1/worker-operations/health").expect(200);
   });
 
   it("does not let caller-supplied actor headers override the session", async () => {

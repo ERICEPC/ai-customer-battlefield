@@ -11,6 +11,7 @@ import { ManagementQueriesModule } from "./management-queries/management-queries
 import { NotificationsModule } from "./notifications/notifications.module.js";
 import { UserAiSettingsModule } from "./user-ai-settings/user-ai-settings.module.js";
 import { WeeklyReportsModule } from "./weekly-reports/weekly-reports.module.js";
+import { WorkerOperationsModule } from "./worker-operations/worker-operations.module.js";
 import { WorkspaceModule } from "./workspace/workspace.module.js";
 
 @Module({
@@ -27,6 +28,7 @@ import { WorkspaceModule } from "./workspace/workspace.module.js";
     WorkspaceModule,
     ManagementQueriesModule,
     WeeklyReportsModule,
+    WorkerOperationsModule,
   ],
   controllers: [HealthController],
 })

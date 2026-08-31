@@ -48,6 +48,7 @@ export type {
   AiRuntimeConfigReleaseTable,
   AiRuntimeConfigVersionTable,
   AnalysisRunTable,
+  AsyncWorkReplayHistoryTable,
   AuditEntryTable,
   BattlefieldDatabase,
   BattleStateCurrentTable,
@@ -90,6 +91,7 @@ export type {
   UserMembershipTable,
   UserSessionTable,
   UserTable,
+  WorkerHeartbeatTable,
 } from "./database-types.js";
 export { KyselyFollowupConfirmationStore } from "./followup-confirmation/kysely-followup-confirmation-store.js";
 export {
@@ -125,6 +127,14 @@ export {
   withTenantTransaction,
 } from "./tenant-session.js";
 export * from "./weekly-reports/index.js";
+export {
+  KyselyWorkerHeartbeatStore,
+  WorkerHeartbeatInstanceLostError,
+} from "./worker-operations/kysely-worker-heartbeat-store.js";
+export {
+  KyselyWorkerOperationsRepository,
+  type KyselyWorkerOperationsRepositoryOptions,
+} from "./worker-operations/kysely-worker-operations-repository.js";
 export {
   InvalidWorkspaceNowError,
   KyselyWorkspaceReader,

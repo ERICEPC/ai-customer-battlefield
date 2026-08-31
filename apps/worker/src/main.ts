@@ -1,6 +1,8 @@
+import { randomUUID } from "node:crypto";
 import {
   type BattlefieldDatabase,
   createPostgresDatabase,
+  KyselyWorkerHeartbeatStore,
 } from "@battlefield/database";
 import { createNotificationChannels } from "./channels/channel-registry.js";
 import { loadWorkerConfig } from "./config.js";
@@ -26,6 +28,7 @@ const worker = createReminderWorker({
   leaseMs: config.leaseMs,
   channels,
 });
+const heartbeat = new KyselyWorkerHeartbeatStore(database.db);
 
 process.once("SIGINT", () => controller.abort());
 process.once("SIGTERM", () => controller.abort());
@@ -35,6 +38,13 @@ try {
     signal: controller.signal,
     idlePollMs: config.idlePollMs,
     busyPollMs: config.busyPollMs,
+    heartbeat: {
+      reporter: heartbeat,
+      actor: config.actor,
+      workerKey: "reminder_worker",
+      instanceId: randomUUID(),
+      leaseMs: config.leaseMs,
+    },
   });
 } finally {
   await database.close();

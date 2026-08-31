@@ -157,6 +157,39 @@ export interface AiRuntimeConfigReleaseHistoryTable {
   reason: NullableText;
 }
 
+export interface WorkerHeartbeatTable {
+  tenant_id: string;
+  worker_key: string;
+  instance_id: string;
+  started_at: Timestamp;
+  expected_interval_ms: number;
+  lease_ms: number;
+  last_tick_started_at: NullableTimestamp;
+  last_tick_completed_at: NullableTimestamp;
+  last_success_at: NullableTimestamp;
+  last_failure_at: NullableTimestamp;
+  last_error_code: NullableText;
+  last_error_message: NullableText;
+  last_tick_summary: JsonObject;
+  updated_at: Timestamp;
+}
+
+export interface AsyncWorkReplayHistoryTable {
+  tenant_id: string;
+  id: Generated<string>;
+  work_kind: "outbox" | "reminder" | "notification_delivery";
+  work_item_id: string;
+  prior_status: "failed" | "dead_lettered";
+  prior_attempt_count: number;
+  prior_error_code: string;
+  prior_error_message: string;
+  reason: string;
+  idempotency_key: string;
+  request_hash: string;
+  replayed_by: string;
+  replayed_at: Timestamp;
+}
+
 export interface ChannelAddressTable {
   tenant_id: string;
   id: Generated<string>;
@@ -823,6 +856,8 @@ export interface BattlefieldDatabase {
   "app.ai_runtime_config_versions": AiRuntimeConfigVersionTable;
   "app.ai_runtime_config_releases": AiRuntimeConfigReleaseTable;
   "app.ai_runtime_config_release_history": AiRuntimeConfigReleaseHistoryTable;
+  "app.worker_heartbeats": WorkerHeartbeatTable;
+  "app.async_work_replay_history": AsyncWorkReplayHistoryTable;
   "app.channel_addresses": ChannelAddressTable;
   "app.business_entity_types": BusinessEntityTypeTable;
   "app.business_entities": BusinessEntityTable;

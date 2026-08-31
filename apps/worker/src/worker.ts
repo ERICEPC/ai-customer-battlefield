@@ -14,6 +14,7 @@ import {
   PublishedWeeklyReportNotFoundError,
   RequestBattleAnalysis,
   ScheduleActionReminders,
+  type WorkerHeartbeatReporter,
 } from "@battlefield/core";
 import {
   type BattlefieldDatabase,
@@ -351,10 +352,67 @@ export function createReminderWorker(input: {
 
 export async function runWorkerLoop(
   worker: Pick<ReminderWorker, "tick">,
-  input: { signal: AbortSignal; idlePollMs: number; busyPollMs: number },
+  input: {
+    signal: AbortSignal;
+    idlePollMs: number;
+    busyPollMs: number;
+    heartbeat?: {
+      reporter: WorkerHeartbeatReporter;
+      actor: { tenantId: string; userId: string };
+      workerKey: string;
+      instanceId: string;
+      leaseMs: number;
+      clock?: { now(): Date };
+    };
+  },
 ): Promise<void> {
+  const heartbeatClock = input.heartbeat?.clock ?? { now: () => new Date() };
+  if (input.heartbeat) {
+    await input.heartbeat.reporter.register({
+      actor: input.heartbeat.actor,
+      workerKey: input.heartbeat.workerKey,
+      instanceId: input.heartbeat.instanceId,
+      startedAt: heartbeatClock.now().toISOString(),
+      expectedIntervalMs: Math.max(input.idlePollMs, input.busyPollMs),
+      leaseMs: input.heartbeat.leaseMs,
+    });
+  }
   while (!input.signal.aborted) {
-    const result = await worker.tick();
+    let result: WorkerTickResult;
+    try {
+      if (input.heartbeat) {
+        await input.heartbeat.reporter.markTickStarted({
+          actor: input.heartbeat.actor,
+          workerKey: input.heartbeat.workerKey,
+          instanceId: input.heartbeat.instanceId,
+          startedAt: heartbeatClock.now().toISOString(),
+        });
+      }
+      result = await worker.tick();
+      if (input.heartbeat) {
+        await input.heartbeat.reporter.markTickSucceeded({
+          actor: input.heartbeat.actor,
+          workerKey: input.heartbeat.workerKey,
+          instanceId: input.heartbeat.instanceId,
+          completedAt: heartbeatClock.now().toISOString(),
+          summary: result,
+        });
+      }
+    } catch {
+      if (input.heartbeat) {
+        await input.heartbeat.reporter.markTickFailed({
+          actor: input.heartbeat.actor,
+          workerKey: input.heartbeat.workerKey,
+          instanceId: input.heartbeat.instanceId,
+          failedAt: heartbeatClock.now().toISOString(),
+          errorCode: "WORKER_TICK_FAILED",
+          errorMessage: "Worker tick failed.",
+        });
+      }
+      if (input.signal.aborted) break;
+      await wait(input.idlePollMs, input.signal);
+      continue;
+    }
     if (input.signal.aborted) {
       break;
     }

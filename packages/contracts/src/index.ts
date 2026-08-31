@@ -241,6 +241,27 @@ export {
   weeklyReportTypeSchema,
 } from "./weekly-reports.js";
 export {
+  type AsyncWorkFailureListQuery,
+  type AsyncWorkFailurePage,
+  type AsyncWorkFailureRecord,
+  type AsyncWorkFailureStatus,
+  type AsyncWorkKind,
+  type AsyncWorkReplayResponse,
+  asyncWorkFailureListQuerySchema,
+  asyncWorkFailurePageSchema,
+  asyncWorkFailureRecordSchema,
+  asyncWorkFailureStatusSchema,
+  asyncWorkKindSchema,
+  asyncWorkReplayResponseSchema,
+  type ReplayAsyncWorkItemRequest,
+  replayAsyncWorkItemRequestSchema,
+  type WorkerOperationsApiError,
+  type WorkerOperationsHealth,
+  workerOperationsApiErrorSchema,
+  workerOperationsHealthSchema,
+  workerOperationsIdempotencyKeySchema,
+} from "./worker-operations.js";
+export {
   type WorkspaceApiError,
   type WorkspaceBattleChange,
   type WorkspaceKpis,
