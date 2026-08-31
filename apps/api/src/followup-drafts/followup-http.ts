@@ -13,11 +13,14 @@ import {
   InvalidRawInputError,
 } from "@battlefield/core";
 import {
+  BadGatewayException,
   BadRequestException,
   ConflictException,
   NotFoundException,
+  ServiceUnavailableException,
   UnauthorizedException,
 } from "@nestjs/common";
+import { SenseAudioFollowupDraftAgentError } from "./senseaudio-followup-draft-agent.js";
 
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -118,6 +121,22 @@ export function mapFollowupError(
     error instanceof InvalidRawInputError
   ) {
     throw invalidRequest(error.message);
+  }
+  if (error instanceof SenseAudioFollowupDraftAgentError) {
+    if (error.code === "invalid_response") {
+      throw new BadGatewayException(
+        payload(
+          "AGENT_INVALID_RESPONSE",
+          "AI 返回内容未通过业务校验，请重试。你的输入尚未入库。",
+        ),
+      );
+    }
+    throw new ServiceUnavailableException(
+      payload(
+        "AGENT_UNAVAILABLE",
+        "AI 拆解服务暂时不可用，请稍后重试。你的输入尚未入库。",
+      ),
+    );
   }
   throw error;
 }

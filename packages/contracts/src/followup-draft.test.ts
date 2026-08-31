@@ -3,6 +3,8 @@ import { describe, expect, it } from "vitest";
 import {
   confirmFollowupDraftRequestSchema,
   createFollowupDraftRequestSchema,
+  followupAgentExecutionSchema,
+  followupApiErrorSchema,
   followupConfirmationResponseSchema,
   followupDraftCandidateSchema,
   followupDraftResponseSchema,
@@ -172,5 +174,37 @@ describe("follow-up draft responses", () => {
         followupId: null,
       }).success,
     ).toBe(false);
+  });
+});
+
+describe("followupApiErrorSchema", () => {
+  it("accepts a safe Agent-unavailable error for visible retry guidance", () => {
+    expect(
+      followupApiErrorSchema.parse({
+        code: "AGENT_UNAVAILABLE",
+        message: "AI 拆解服务暂时不可用，请稍后重试。你的输入尚未入库。",
+        requestId: "request-agent-001",
+      }),
+    ).toMatchObject({ code: "AGENT_UNAVAILABLE" });
+  });
+});
+
+describe("followupAgentExecutionSchema", () => {
+  it("accepts a bounded successful model receipt", () => {
+    expect(
+      followupAgentExecutionSchema.parse({
+        provider: "senseaudio",
+        model: "senseaudio-s2-flash",
+        promptVersion: "followup-extraction-v1",
+        status: "succeeded",
+        providerRequestId: "resp-demo",
+        durationMs: 1234,
+        usage: { inputTokens: 100, outputTokens: 50, totalTokens: 150 },
+      }),
+    ).toMatchObject({
+      model: "senseaudio-s2-flash",
+      promptVersion: "followup-extraction-v1",
+      status: "succeeded",
+    });
   });
 });

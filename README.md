@@ -31,12 +31,15 @@ corepack prepare pnpm@11.19.0 --activate
 pnpm install
 ```
 
-For a local synthetic demo, start the in-memory PGlite API and Web application in separate terminals:
+For a local synthetic demo, inject the SenseAudio key through the process environment, then start the in-memory PGlite API and Web application in separate terminals:
 
 ```bash
+export SENSEAUDIO_API_KEY=your_senseaudio_key
 pnpm --filter @battlefield/api dev:demo
 pnpm --filter @battlefield/web dev
 ```
+
+The normal demo does not silently fall back to fake AI: an absent or rejected key leaves the original text on screen and returns safe retry guidance without creating a draft. Model, Prompt version, timeout and retry count are configurable through [`.env.example`](.env.example). `FOLLOWUP_AGENT_PROVIDER=deterministic` is reserved for explicit local/test replay and is rejected in production.
 
 Open `http://localhost:3000/workspace` for the role-scoped sales/management homepage, `/` for the follow-up confirmation workbench, `/entities` for the entity directory, `/battle-map` for evidence-backed positioning, `/actions` for the suggestion decision gate and formal actions, `/ask` for the controlled sales-progress query, or `/inbox` for durable in-app notifications. The demo API runs the same reminder Worker in-process with external channels disabled. Its database is recreated on every API restart and must never be used as production storage.
 
@@ -101,7 +104,7 @@ Implemented today:
 - business entities, contacts and affiliation history, opportunities, assignment history, and stage history;
 - the `0003` physical foundation for sources, draft revisions, formal follow-ups, facts/evidence, idempotency, audit events, domain events, and Outbox messages;
 - tenant-safe entity directory API with keyset pagination and responsive Web UI;
-- deterministic follow-up proposal plus persistent create/read/revise/cancel/confirm REST APIs and immutable formal-record retrieval;
+- SenseAudio Responses + JSON Schema follow-up extraction behind the replaceable core Agent port, with strict output validation, bounded retry/timeout behavior, a persisted model/Prompt/usage execution receipt, and deterministic replay only when explicitly selected outside production;
 - responsive Web confirmation workbench with explicit human acknowledgement, optimistic-conflict recovery, stable retry idempotency, and confirmed source/actor receipt;
 - tenant-safe battle analysis, evidence/signal versioning, separately persisted action proposals, explicit accept/reject decisions, and formal action state transitions;
 - responsive battle-map and action workspaces with truthful partial-page counts, exact immutable source-version deep links, cursor-paged active-owner selection, timezone-safe planning, server-authoritative expired suggestions, and ambiguity-safe idempotent retries;

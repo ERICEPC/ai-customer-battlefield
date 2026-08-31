@@ -78,6 +78,9 @@ export function FollowupDraftForm({
     useState<FollowupConfirmationResponse | null>(null);
   const [formalFollowup, setFormalFollowup] =
     useState<FormalFollowupRecord | null>(null);
+  const [formalLoadState, setFormalLoadState] = useState<
+    "idle" | "loading" | "ready" | "error"
+  >("idle");
   const [operation, setOperation] = useState<Operation | null>(null);
   const [acknowledged, setAcknowledged] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -154,6 +157,7 @@ export function FollowupDraftForm({
     clearOperationError();
     setConfirmation(null);
     setFormalFollowup(null);
+    setFormalLoadState("idle");
     try {
       const nextDraft = await api.createDraft({
         entityId,
@@ -164,8 +168,8 @@ export function FollowupDraftForm({
       setAcknowledged(false);
       confirmKey.current = null;
       cancelKey.current = null;
-    } catch {
-      setErrorMessage("生成失败，请稍后重试。你的输入已保留。");
+    } catch (error) {
+      handleOperationError(error);
     } finally {
       setOperation(null);
     }
@@ -192,18 +196,22 @@ export function FollowupDraftForm({
         stableClientId(confirmKey, "confirm"),
       );
       setConfirmation(nextConfirmation);
-      try {
-        setFormalFollowup(
-          await api.getFormalFollowup(nextConfirmation.followupId),
-        );
-      } catch {
-        // The formal write already succeeded. Keep the receipt recoverable even
-        // if its optional details cannot be hydrated on the first attempt.
-      }
+      await loadFormalFollowup(nextConfirmation.followupId);
     } catch (error) {
       handleOperationError(error);
     } finally {
       setOperation(null);
+    }
+  }
+
+  async function loadFormalFollowup(followupId: string): Promise<void> {
+    setFormalLoadState("loading");
+    try {
+      setFormalFollowup(await api.getFormalFollowup(followupId));
+      setFormalLoadState("ready");
+    } catch {
+      setFormalFollowup(null);
+      setFormalLoadState("error");
     }
   }
 
@@ -344,6 +352,8 @@ export function FollowupDraftForm({
           <ConfirmationReceipt
             confirmation={confirmation}
             formalFollowup={formalFollowup}
+            formalLoadState={formalLoadState}
+            onReload={() => void loadFormalFollowup(confirmation.followupId)}
           />
         ) : draft?.status === "cancelled" ? (
           <TerminalDraft />
@@ -358,6 +368,33 @@ export function FollowupDraftForm({
                 </div>
                 <span className="pending-badge">版本 {draft.versionNo}</span>
               </div>
+
+              <div className="ai-result-status">
+                <span className="ai-result-mark" aria-hidden="true">
+                  ✦
+                </span>
+                <div>
+                  <strong>AI 已完成结构化拆解</strong>
+                  <span>待人工确认，尚未写入正式记录</span>
+                </div>
+              </div>
+
+              {draft.agentExecution ? (
+                <dl className="agent-execution-grid">
+                  <div>
+                    <dt>模型</dt>
+                    <dd>{draft.agentExecution.model}</dd>
+                  </div>
+                  <div>
+                    <dt>Prompt 版本</dt>
+                    <dd>{draft.agentExecution.promptVersion}</dd>
+                  </div>
+                  <div>
+                    <dt>运行状态</dt>
+                    <dd>{executionSummary(draft.agentExecution)}</dd>
+                  </div>
+                </dl>
+              ) : null}
 
               <label className="field-label" htmlFor="confirmed-summary">
                 确认摘要
@@ -545,9 +582,13 @@ export function FollowupDraftForm({
 function ConfirmationReceipt({
   confirmation,
   formalFollowup,
+  formalLoadState,
+  onReload,
 }: {
   confirmation: FollowupConfirmationResponse;
   formalFollowup: FormalFollowupRecord | null;
+  formalLoadState: "idle" | "loading" | "ready" | "error";
+  onReload: () => void;
 }) {
   return (
     <article className="result-card confirmation-receipt">
@@ -567,6 +608,40 @@ function ConfirmationReceipt({
             <dd>{formalFollowup?.sourceDraftId ?? confirmation.draftId}</dd>
           </div>
         </dl>
+        {formalLoadState === "loading" ? (
+          <div className="formal-read-status" role="status">
+            正在读取正式入库明细…
+          </div>
+        ) : null}
+        {formalLoadState === "error" ? (
+          <div className="error-message formal-read-error" role="alert">
+            <span>正式记录已写入，但详情读取失败。</span>
+            <button className="inline-button" type="button" onClick={onReload}>
+              重新读取正式记录
+            </button>
+          </div>
+        ) : null}
+        {formalFollowup ? (
+          <section className="formal-write-receipt" aria-label="正式入库内容">
+            <div className="formal-write-heading">
+              <h3>本次正式入库</h3>
+              <span>{followupTypeLabel(formalFollowup.followupType)}</span>
+            </div>
+            <p>{formalFollowup.summary}</p>
+            {formalFollowup.facts.length > 0 ? (
+              <ul>
+                {formalFollowup.facts.map((fact) => (
+                  <li key={`${fact.factType}-${fact.factValue}`}>
+                    <code>{fact.factType}</code>
+                    <span>{fact.factValue}</span>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="empty-formal-facts">本次未新增独立经营事实。</p>
+            )}
+          </section>
+        ) : null}
         <p className="boundary-note">
           经营事实已留痕；风险、提醒和建议动作仍需单独确认。
         </p>
@@ -615,6 +690,28 @@ function sameCandidate(
   right: FollowupDraftCandidate,
 ): boolean {
   return JSON.stringify(normalizedCandidate(left)) === JSON.stringify(right);
+}
+
+function executionSummary(
+  execution: NonNullable<FollowupDraftResponse["agentExecution"]>,
+): string {
+  const duration = (execution.durationMs / 1_000).toFixed(1);
+  const tokens = execution.usage
+    ? ` · ${execution.usage.totalTokens} tokens`
+    : "";
+  return `运行成功 · ${duration} 秒${tokens}`;
+}
+
+function followupTypeLabel(
+  followupType: FormalFollowupRecord["followupType"],
+): string {
+  return {
+    meeting: "会议",
+    call: "电话",
+    message: "即时消息",
+    email: "邮件",
+    other: "其他",
+  }[followupType];
 }
 
 function stableClientId(

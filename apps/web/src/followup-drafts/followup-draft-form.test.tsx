@@ -60,6 +60,15 @@ function pendingDraft(
     confirmedBy: null,
     cancelledAt: null,
     followupId: null,
+    agentExecution: {
+      provider: "senseaudio",
+      model: "senseaudio-s2-flash",
+      promptVersion: "followup-extraction-v1",
+      status: "succeeded",
+      providerRequestId: "resp-demo",
+      durationMs: 1234,
+      usage: { inputTokens: 100, outputTokens: 50, totalTokens: 150 },
+    },
     ...overrides,
   };
 }
@@ -85,7 +94,13 @@ const formalFollowup: FormalFollowupRecord = {
   confirmedAt: "2026-08-31T02:35:00.000Z",
   relatedOpportunityIds: [],
   primaryOpportunityId: null,
-  facts: [],
+  facts: [
+    {
+      factType: "budget_status",
+      factValue: "预算已确认",
+      opportunityId: null,
+    },
+  ],
 };
 
 function api(overrides: Partial<FollowupWorkbenchApi> = {}) {
@@ -149,10 +164,42 @@ describe("FollowupDraftForm", () => {
     fireEvent.click(screen.getByRole("button", { name: "生成跟进草稿" }));
 
     expect(await screen.findByText("人工确认区")).toBeVisible();
+    expect(screen.getByText("AI 已完成结构化拆解")).toBeVisible();
+    expect(screen.getByText("待人工确认，尚未写入正式记录")).toBeVisible();
+    expect(screen.getByText("senseaudio-s2-flash")).toBeVisible();
+    expect(screen.getByText("followup-extraction-v1")).toBeVisible();
+    expect(screen.getByText("运行成功 · 1.2 秒 · 150 tokens")).toBeVisible();
     expect(workbenchApi.createDraft).toHaveBeenCalledWith({
       entityId,
       rawInput: "客户确认预算，下一步提交方案",
     });
+  });
+
+  it("shows safe Agent retry guidance and preserves the original input", async () => {
+    const createDraft = vi.fn().mockRejectedValue(
+      new FollowupApiError(503, {
+        code: "AGENT_UNAVAILABLE",
+        message: "AI 拆解服务暂时不可用，请稍后重试。你的输入尚未入库。",
+        requestId: "request-agent-001",
+      }),
+    );
+    render(<FollowupDraftForm api={api({ createDraft })} />);
+    await screen.findByRole("option", { name: "Aurora Systems" });
+    fireEvent.change(screen.getByLabelText("经营对象"), {
+      target: { value: entityId },
+    });
+    fireEvent.change(screen.getByLabelText("本次客户跟进"), {
+      target: { value: "客户确认预算，下周提交方案。" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "生成跟进草稿" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "AI 拆解服务暂时不可用，请稍后重试。你的输入尚未入库。",
+    );
+    expect(screen.getByLabelText("本次客户跟进")).toHaveValue(
+      "客户确认预算，下周提交方案。",
+    );
+    expect(screen.queryByText("人工确认区")).not.toBeInTheDocument();
   });
 
   it("saves dirty edits before confirming the new version", async () => {
@@ -192,6 +239,12 @@ describe("FollowupDraftForm", () => {
     );
     expect(screen.getByText(followupId)).toBeVisible();
     expect(
+      screen.getByText("客户确认预算；销售需在下周提交方案"),
+    ).toBeVisible();
+    expect(screen.getByText("会议")).toBeVisible();
+    expect(screen.getByText("budget_status")).toBeVisible();
+    expect(screen.getByText("预算已确认")).toBeVisible();
+    expect(
       await screen.findByText("30000000-0000-4000-8000-000000000001"),
     ).toBeVisible();
     expect(workbenchApi.getFormalFollowup).toHaveBeenCalledWith(followupId);
@@ -213,6 +266,26 @@ describe("FollowupDraftForm", () => {
       { versionNo: "1" },
       expect.stringMatching(/^confirm-/),
     );
+  });
+
+  it("makes a failed formal-record read visible and retryable after the write succeeds", async () => {
+    const getFormalFollowup = vi
+      .fn()
+      .mockRejectedValueOnce(new Error("temporary read failure"))
+      .mockResolvedValueOnce(formalFollowup);
+    const workbenchApi = api({ getFormalFollowup });
+    render(<FollowupDraftForm api={workbenchApi} />);
+    await generateDraft();
+
+    fireEvent.click(screen.getByLabelText("我已核对以上内容"));
+    fireEvent.click(screen.getByRole("button", { name: "确认并写入正式跟进" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "正式记录已写入，但详情读取失败",
+    );
+    fireEvent.click(screen.getByRole("button", { name: "重新读取正式记录" }));
+    expect(await screen.findByText("本次正式入库")).toBeVisible();
+    expect(getFormalFollowup).toHaveBeenCalledTimes(2);
   });
 
   it("reuses the confirmation idempotency key after a recoverable request failure", async () => {

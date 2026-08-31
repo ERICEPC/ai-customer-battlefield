@@ -27,6 +27,7 @@ describe("CreateFollowupDraft", () => {
   it("returns a deterministic pending-confirmation draft proposed in actor scope", async () => {
     const propose = vi.fn().mockResolvedValue({
       summary: "客户已确认预算，下一步提交方案",
+      followupType: "meeting",
       relatedOpportunityIds: ["opportunity-001"],
     });
     const useCase = new CreateFollowupDraft({
@@ -56,7 +57,7 @@ describe("CreateFollowupDraft", () => {
         entityId,
         summary: "客户已确认预算，下一步提交方案",
         occurredAt: "2026-08-31T02:30:00.000Z",
-        followupType: "other",
+        followupType: "meeting",
         relatedOpportunityIds: ["opportunity-001"],
         primaryOpportunityId: null,
         facts: [],

@@ -85,9 +85,19 @@ describe("CreatePersistentFollowupDraft", () => {
     const persistence = store();
     const propose = vi.fn().mockResolvedValue({
       summary: "  客户确认预算  ",
+      followupType: "call",
       relatedOpportunityIds: [],
       primaryOpportunityId: null,
       facts: [],
+      agentExecution: {
+        provider: "senseaudio",
+        model: "senseaudio-s2-flash",
+        promptVersion: "followup-extraction-v1",
+        status: "succeeded",
+        providerRequestId: "resp-demo",
+        durationMs: 1234,
+        usage: { inputTokens: 100, outputTokens: 50, totalTokens: 150 },
+      },
     });
     const useCase = new CreatePersistentFollowupDraft({
       agent: { propose },
@@ -112,7 +122,16 @@ describe("CreatePersistentFollowupDraft", () => {
       actor,
       draftId,
       rawInput: "客户确认预算",
-      candidate: pendingDraft().candidate,
+      candidate: { ...pendingDraft().candidate, followupType: "call" },
+      agentExecution: {
+        provider: "senseaudio",
+        model: "senseaudio-s2-flash",
+        promptVersion: "followup-extraction-v1",
+        status: "succeeded",
+        providerRequestId: "resp-demo",
+        durationMs: 1234,
+        usage: { inputTokens: 100, outputTokens: 50, totalTokens: 150 },
+      },
       createdAt: now.toISOString(),
       expiresAt: "2026-09-07T02:30:00.000Z",
     });

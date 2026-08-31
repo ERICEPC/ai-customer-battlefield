@@ -1,5 +1,6 @@
 import { fileURLToPath } from "node:url";
 import {
+  type FollowupAgentExecutionReceipt,
   FollowupDraftExpiredError,
   FollowupDraftNotFoundError,
   type FollowupDraftNotPendingError,
@@ -34,6 +35,15 @@ const REQUEST_ID = "90000000-0000-4000-8000-000000000001";
 const CREATED_AT = "2026-08-31T02:30:00.000Z";
 const EXPIRES_AT = "2026-09-07T02:30:00.000Z";
 const actor = { tenantId: SYNTHETIC_TENANT_ID, userId: SYNTHETIC_USER_ID };
+const agentExecution: FollowupAgentExecutionReceipt = {
+  provider: "senseaudio",
+  model: "senseaudio-s2-flash",
+  promptVersion: "followup-extraction-v1",
+  status: "succeeded",
+  providerRequestId: "resp-demo",
+  durationMs: 1234,
+  usage: { inputTokens: 100, outputTokens: 50, totalTokens: 150 },
+};
 const otherActor = {
   tenantId: SYNTHETIC_OTHER_TENANT_ID,
   userId: SYNTHETIC_OTHER_USER_ID,
@@ -69,7 +79,7 @@ describe("KyselyFollowupConfirmationStore", () => {
   });
 
   test("creates and reads a tenant-scoped source, draft, and initial revision", async () => {
-    const created = await createDraft(store, candidate());
+    const created = await createDraft(store, candidate(), { agentExecution });
 
     expect(created).toMatchObject({
       draftId: DRAFT_ID,
@@ -77,6 +87,7 @@ describe("KyselyFollowupConfirmationStore", () => {
       versionNo: "1",
       rawInput: "客户确认预算",
       candidate: candidate(),
+      agentExecution,
     });
     expect(await store.get({ actor, draftId: DRAFT_ID })).toEqual(created);
     await expect(
@@ -117,7 +128,7 @@ describe("KyselyFollowupConfirmationStore", () => {
   });
 
   test("revises with optimistic locking and preserves every revision", async () => {
-    await createDraft(store, candidate());
+    await createDraft(store, candidate(), { agentExecution });
     const revisedCandidate = {
       ...candidate(),
       summary: "客户确认预算并要求下周提交方案",
@@ -133,6 +144,7 @@ describe("KyselyFollowupConfirmationStore", () => {
     });
     expect(revised).toMatchObject({
       candidate: revisedCandidate,
+      agentExecution,
       versionNo: "2",
     });
     await expect(
@@ -350,13 +362,19 @@ function candidate(
 async function createDraft(
   targetStore: KyselyFollowupConfirmationStore,
   draftCandidate: PersistentFollowupDraftCandidate,
-  overrides: { expiresAt?: string } = {},
+  overrides: {
+    expiresAt?: string;
+    agentExecution?: FollowupAgentExecutionReceipt;
+  } = {},
 ) {
   return targetStore.create({
     actor,
     draftId: DRAFT_ID,
     rawInput: "客户确认预算",
     candidate: draftCandidate,
+    ...(overrides.agentExecution
+      ? { agentExecution: overrides.agentExecution }
+      : {}),
     createdAt: CREATED_AT,
     expiresAt: overrides.expiresAt ?? EXPIRES_AT,
   });

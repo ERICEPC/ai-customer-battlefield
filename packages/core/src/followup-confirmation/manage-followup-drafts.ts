@@ -68,6 +68,7 @@ export class CreatePersistentFollowupDraft {
       entityId: input.entityId,
       occurredAt,
       summary: proposal.summary,
+      ...(proposal.followupType ? { followupType: proposal.followupType } : {}),
       relatedOpportunityIds: proposal.relatedOpportunityIds,
       primaryOpportunityId: proposal.primaryOpportunityId ?? null,
       facts: proposal.facts ?? [],
@@ -79,6 +80,9 @@ export class CreatePersistentFollowupDraft {
       draftId: this.dependencies.idGenerator.next(),
       rawInput,
       candidate,
+      ...(proposal.agentExecution
+        ? { agentExecution: proposal.agentExecution }
+        : {}),
       createdAt,
       expiresAt: new Date(now.getTime() + DRAFT_LIFETIME_MS).toISOString(),
     });

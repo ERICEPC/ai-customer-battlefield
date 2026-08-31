@@ -93,6 +93,25 @@ export const followupDraftStatusSchema = z.enum([
   "expired",
 ]);
 
+export const followupAgentExecutionSchema = z.strictObject({
+  provider: z
+    .string()
+    .trim()
+    .regex(/^[a-z][a-z0-9_-]{0,99}$/),
+  model: z.string().trim().min(1).max(200),
+  promptVersion: z.string().trim().min(1).max(200),
+  status: z.literal("succeeded"),
+  providerRequestId: z.string().trim().min(1).max(500).nullable(),
+  durationMs: z.number().int().nonnegative().max(600_000),
+  usage: z
+    .strictObject({
+      inputTokens: z.number().int().nonnegative(),
+      outputTokens: z.number().int().nonnegative(),
+      totalTokens: z.number().int().nonnegative(),
+    })
+    .nullable(),
+});
+
 export const followupDraftResponseSchema = z
   .strictObject({
     draftId: z.uuid(),
@@ -107,6 +126,7 @@ export const followupDraftResponseSchema = z
     confirmedBy: z.uuid().nullable(),
     cancelledAt: z.iso.datetime().nullable(),
     followupId: z.uuid().nullable(),
+    agentExecution: followupAgentExecutionSchema.optional(),
   })
   .superRefine((draft, context) => {
     if (
@@ -171,6 +191,8 @@ export const followupApiErrorSchema = z.strictObject({
     "RELATED_ENTITY_NOT_FOUND",
     "RELATED_OPPORTUNITY_NOT_FOUND",
     "INVALID_FOLLOWUP_DRAFT",
+    "AGENT_UNAVAILABLE",
+    "AGENT_INVALID_RESPONSE",
   ]),
   message: z.string().trim().min(1).max(1_000),
   requestId: z.string().trim().min(1).max(200),
@@ -186,6 +208,9 @@ export const followupApiErrorSchema = z.strictObject({
 });
 
 export type FollowupType = z.infer<typeof followupTypeSchema>;
+export type FollowupAgentExecution = z.infer<
+  typeof followupAgentExecutionSchema
+>;
 export type FollowupFactCandidate = z.infer<typeof followupFactCandidateSchema>;
 export type FollowupDraftCandidate = z.infer<
   typeof followupDraftCandidateSchema

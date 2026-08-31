@@ -12,6 +12,7 @@ export {
 export { InvalidRawInputError } from "./followup-drafts/errors.js";
 export type {
   ActorScope,
+  FollowupAgentExecutionReceipt,
   FollowupDraftAgent,
   FollowupDraftCandidate,
 } from "./followup-drafts/followup-draft-agent.js";

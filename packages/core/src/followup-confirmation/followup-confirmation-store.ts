@@ -1,4 +1,7 @@
-import type { ActorScope } from "../followup-drafts/followup-draft-agent.js";
+import type {
+  ActorScope,
+  FollowupAgentExecutionReceipt,
+} from "../followup-drafts/followup-draft-agent.js";
 
 export type FollowupDraftStatus =
   | "pending_confirmation"
@@ -36,6 +39,7 @@ export interface PersistentFollowupDraft {
   confirmedBy: string | null;
   cancelledAt: string | null;
   followupId: string | null;
+  agentExecution?: FollowupAgentExecutionReceipt;
 }
 
 export interface FollowupConfirmationResult {
@@ -72,6 +76,7 @@ export interface FollowupConfirmationStore {
     draftId: string;
     rawInput: string;
     candidate: PersistentFollowupDraftCandidate;
+    agentExecution?: FollowupAgentExecutionReceipt;
     createdAt: string;
     expiresAt: string;
   }): Promise<PersistentFollowupDraft>;

@@ -1,5 +1,6 @@
 import { createHash, randomUUID } from "node:crypto";
 import {
+  type FollowupAgentExecutionReceipt,
   type FollowupConfirmationResult,
   type FollowupConfirmationStore,
   FollowupDraftExpiredError,
@@ -80,7 +81,9 @@ export class KyselyFollowupConfirmationStore
             source_input_id: sourceInputId,
             entity_id: input.candidate.entityId,
             status: "pending_confirmation",
-            candidate_payload: jsonObject(input.candidate),
+            candidate_payload: jsonObject(
+              encodeDraftPayload(input.candidate, input.agentExecution),
+            ),
             created_by: input.actor.userId,
             expires_at: input.expiresAt,
             created_at: input.createdAt,
@@ -94,7 +97,9 @@ export class KyselyFollowupConfirmationStore
             id: randomUUID(),
             draft_id: input.draftId,
             revision_no: 1,
-            candidate_payload: jsonObject(input.candidate),
+            candidate_payload: jsonObject(
+              encodeDraftPayload(input.candidate, input.agentExecution),
+            ),
             changed_by: input.actor.userId,
             changed_at: input.createdAt,
           })
@@ -204,11 +209,13 @@ export class KyselyFollowupConfirmationStore
           input.candidate,
         );
         const nextVersion = Number(draft.version_no) + 1;
+        const agentExecution = decodeAgentExecution(draft.candidate_payload);
+        const nextPayload = encodeDraftPayload(input.candidate, agentExecution);
         await transaction
           .updateTable("app.followup_drafts")
           .set({
             entity_id: input.candidate.entityId,
-            candidate_payload: jsonObject(input.candidate),
+            candidate_payload: jsonObject(nextPayload),
             version_no: nextVersion,
             updated_at: input.changedAt,
           })
@@ -222,7 +229,7 @@ export class KyselyFollowupConfirmationStore
             id: randomUUID(),
             draft_id: input.draftId,
             revision_no: nextVersion,
-            candidate_payload: jsonObject(input.candidate),
+            candidate_payload: jsonObject(nextPayload),
             changed_by: input.actor.userId,
             changed_at: input.changedAt,
           })
@@ -810,6 +817,7 @@ async function insertAuditEntry(
 }
 
 function mapDraft(row: DraftRow): PersistentFollowupDraft {
+  const agentExecution = decodeAgentExecution(row.candidate_payload);
   return {
     draftId: row.draft_id,
     status: row.status,
@@ -823,7 +831,76 @@ function mapDraft(row: DraftRow): PersistentFollowupDraft {
     confirmedBy: row.confirmed_by,
     cancelledAt: toNullableIsoString(row.cancelled_at),
     followupId: row.followup_id,
+    ...(agentExecution ? { agentExecution } : {}),
   };
+}
+
+function encodeDraftPayload(
+  candidate: PersistentFollowupDraftCandidate,
+  agentExecution?: FollowupAgentExecutionReceipt,
+): PersistentFollowupDraftCandidate & {
+  agentExecution?: FollowupAgentExecutionReceipt;
+} {
+  return {
+    ...candidate,
+    ...(agentExecution ? { agentExecution } : {}),
+  };
+}
+
+function decodeAgentExecution(
+  value: unknown,
+): FollowupAgentExecutionReceipt | undefined {
+  const payload = decodeJsonObject(value);
+  if (payload.agentExecution === undefined) return undefined;
+  const execution = payload.agentExecution;
+  if (
+    !(execution && typeof execution === "object" && !Array.isArray(execution))
+  ) {
+    throw new InvalidFollowupDraftCandidateError();
+  }
+  const candidate = execution as Partial<FollowupAgentExecutionReceipt>;
+  const usage = candidate.usage;
+  if (
+    typeof candidate.provider !== "string" ||
+    !/^[a-z][a-z0-9_-]{0,99}$/.test(candidate.provider) ||
+    typeof candidate.model !== "string" ||
+    candidate.model.length === 0 ||
+    candidate.model.length > 200 ||
+    typeof candidate.promptVersion !== "string" ||
+    candidate.promptVersion.length === 0 ||
+    candidate.promptVersion.length > 200 ||
+    candidate.status !== "succeeded" ||
+    !(
+      candidate.providerRequestId === null ||
+      (typeof candidate.providerRequestId === "string" &&
+        candidate.providerRequestId.length > 0 &&
+        candidate.providerRequestId.length <= 500)
+    ) ||
+    !isBoundedInteger(candidate.durationMs, 0, 600_000) ||
+    !(
+      usage === null ||
+      (usage &&
+        isBoundedInteger(usage.inputTokens, 0, Number.MAX_SAFE_INTEGER) &&
+        isBoundedInteger(usage.outputTokens, 0, Number.MAX_SAFE_INTEGER) &&
+        isBoundedInteger(usage.totalTokens, 0, Number.MAX_SAFE_INTEGER))
+    )
+  ) {
+    throw new InvalidFollowupDraftCandidateError();
+  }
+  return candidate as FollowupAgentExecutionReceipt;
+}
+
+function isBoundedInteger(
+  value: unknown,
+  minimum: number,
+  maximum: number,
+): value is number {
+  return (
+    typeof value === "number" &&
+    Number.isInteger(value) &&
+    value >= minimum &&
+    value <= maximum
+  );
 }
 
 function decodeCandidate(value: unknown): PersistentFollowupDraftCandidate {

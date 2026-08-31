@@ -1,10 +1,13 @@
 import { spawn } from "node:child_process";
 
 const testFiles = [
+  "test/senseaudio-followup-draft-agent.test.ts",
+  "test/followup-draft-provider.test.ts",
   "test/auth.e2e.test.ts",
   "test/app.e2e.test.ts",
   "test/business-entities.e2e.test.ts",
   "test/followup-confirmation.e2e.test.ts",
+  "test/followup-agent-failure.e2e.test.ts",
   "test/battle-analyzer-failure.e2e.test.ts",
   "test/battle-actions.e2e.test.ts",
   "test/notifications.e2e.test.ts",

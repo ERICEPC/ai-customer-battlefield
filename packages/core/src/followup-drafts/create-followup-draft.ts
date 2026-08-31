@@ -17,7 +17,7 @@ export interface FollowupDraft {
     entityId: string;
     summary: string;
     occurredAt: string;
-    followupType: "other";
+    followupType: "meeting" | "call" | "message" | "email" | "other";
     relatedOpportunityIds: string[];
     primaryOpportunityId: string | null;
     facts: Array<{ factType: string; factValue: string }>;
@@ -78,7 +78,7 @@ export class CreateFollowupDraft {
         entityId: input.entityId,
         summary: candidate.summary,
         occurredAt,
-        followupType: "other",
+        followupType: candidate.followupType ?? "other",
         relatedOpportunityIds: candidate.relatedOpportunityIds,
         primaryOpportunityId: candidate.primaryOpportunityId ?? null,
         facts: candidate.facts ?? [],

@@ -5,6 +5,15 @@ export class DeterministicFollowupDraftAgent implements FollowupDraftAgent {
     return {
       summary: input.rawInput,
       relatedOpportunityIds: [],
+      agentExecution: {
+        provider: "deterministic",
+        model: "deterministic-followup-v1",
+        promptVersion: "deterministic-development-v1",
+        status: "succeeded" as const,
+        providerRequestId: null,
+        durationMs: 0,
+        usage: null,
+      },
     };
   }
 }

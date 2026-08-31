@@ -15,6 +15,10 @@ import { type Provider, ServiceUnavailableException } from "@nestjs/common";
 import type { ApplicationDatabaseHandle } from "../database/database.module.js";
 import { DATABASE_HANDLE } from "../database/database.module.js";
 import { DeterministicFollowupDraftAgent } from "./deterministic-followup-draft-agent.js";
+import {
+  SenseAudioFollowupDraftAgent,
+  SenseAudioFollowupDraftAgentError,
+} from "./senseaudio-followup-draft-agent.js";
 
 export const FOLLOWUP_DRAFT_AGENT = Symbol("FOLLOWUP_DRAFT_AGENT");
 export const FOLLOWUP_CONFIRMATION_STORE = Symbol(
@@ -42,10 +46,75 @@ async function unavailable(): Promise<never> {
   );
 }
 
+class UnavailableFollowupDraftAgent implements FollowupDraftAgent {
+  async propose(): Promise<never> {
+    throw new SenseAudioFollowupDraftAgentError(
+      "not_configured",
+      "SenseAudio API key is not configured.",
+    );
+  }
+}
+
+export function createConfiguredFollowupDraftAgent(
+  environment: NodeJS.ProcessEnv,
+): FollowupDraftAgent {
+  const provider =
+    environment.FOLLOWUP_AGENT_PROVIDER?.trim() ||
+    (environment.NODE_ENV === "test" ? "deterministic" : "senseaudio");
+  if (provider === "deterministic" && environment.NODE_ENV !== "production") {
+    return new DeterministicFollowupDraftAgent();
+  }
+  if (provider !== "senseaudio") {
+    return new UnavailableFollowupDraftAgent();
+  }
+
+  const apiKey = environment.SENSEAUDIO_API_KEY?.trim();
+  if (!apiKey) return new UnavailableFollowupDraftAgent();
+  const timeoutMs = boundedInteger(
+    environment.FOLLOWUP_AGENT_TIMEOUT_MS,
+    1_000,
+    60_000,
+  );
+  const maxAttempts = boundedInteger(
+    environment.FOLLOWUP_AGENT_MAX_ATTEMPTS,
+    1,
+    3,
+  );
+
+  return new SenseAudioFollowupDraftAgent({
+    apiKey,
+    ...(environment.SENSEAUDIO_BASE_URL?.trim()
+      ? { baseUrl: environment.SENSEAUDIO_BASE_URL.trim() }
+      : {}),
+    ...(environment.FOLLOWUP_AGENT_MODEL?.trim()
+      ? { model: environment.FOLLOWUP_AGENT_MODEL.trim() }
+      : {}),
+    ...(environment.FOLLOWUP_AGENT_PROMPT?.trim()
+      ? { prompt: environment.FOLLOWUP_AGENT_PROMPT.trim() }
+      : {}),
+    ...(environment.FOLLOWUP_AGENT_PROMPT_VERSION?.trim()
+      ? { promptVersion: environment.FOLLOWUP_AGENT_PROMPT_VERSION.trim() }
+      : {}),
+    ...(timeoutMs === undefined ? {} : { timeoutMs }),
+    ...(maxAttempts === undefined ? {} : { maxAttempts }),
+  });
+}
+
+function boundedInteger(
+  value: string | undefined,
+  minimum: number,
+  maximum: number,
+): number | undefined {
+  if (!value || !/^\d+$/.test(value)) return undefined;
+  const parsed = Number(value);
+  return parsed >= minimum && parsed <= maximum ? parsed : undefined;
+}
+
 export const followupDraftProviders: Provider[] = [
   {
     provide: FOLLOWUP_DRAFT_AGENT,
-    useClass: DeterministicFollowupDraftAgent,
+    useFactory: (): FollowupDraftAgent =>
+      createConfiguredFollowupDraftAgent(process.env),
   },
   {
     provide: FOLLOWUP_CONFIRMATION_STORE,
