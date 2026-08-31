@@ -252,7 +252,7 @@ async function seedPendingProposal(
           primary_opportunity_id: null,
           risk_level: "medium",
           data_sufficiency: "partial",
-          data_gaps: [],
+          data_gaps: JSON.stringify([]),
           summary: "Synthetic reminder acceptance state",
           analysis_run_id: analysisRunId,
           effective_at: "2026-08-31T00:00:30.000Z",

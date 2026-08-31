@@ -103,7 +103,7 @@ export class KyselyReminderStore implements ReminderStore {
             action_version_no: input.actionVersionNo,
             kind: input.kind,
             remind_at: input.remindAt,
-            channels: input.channels,
+            channels: jsonStringArray(input.channels),
             status: "scheduled",
             available_at: input.remindAt,
             attempt_count: 0,
@@ -532,6 +532,10 @@ function renderTemplate(
     throw new InvalidPersistedReminderPolicyError();
   }
   return rendered;
+}
+
+function jsonStringArray(value: string[]) {
+  return sql<string[]>`${JSON.stringify(value)}::jsonb`;
 }
 
 function toIso(value: Date | string): string {

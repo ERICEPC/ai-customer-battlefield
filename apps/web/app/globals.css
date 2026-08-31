@@ -2587,6 +2587,26 @@ button:disabled {
     padding-top: 32px;
   }
 
+  .page-heading > div,
+  .page-heading h1,
+  .page-heading > div > p:last-child,
+  .inbox-workspace,
+  .inbox-toolbar,
+  .inbox-list,
+  .inbox-card,
+  .inbox-card-content {
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .page-heading h1,
+  .page-heading > div > p:last-child,
+  .inbox-card-heading h2,
+  .inbox-card-content > p {
+    overflow-wrap: anywhere;
+  }
+
   .battle-page-heading h1 {
     font-size: 32px;
   }
