@@ -18,6 +18,8 @@ jobs:
     timeout-minutes: 20
     env:
       DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/battlefield_test
+      FEISHU_APP_ID: ""
+      FEISHU_APP_SECRET: ""
     services:
       postgres:
         image: postgres:18-alpine
@@ -59,6 +61,9 @@ jobs:
 
       - name: Verify PostgreSQL migrations and tenant query
         run: pnpm --filter @battlefield/database test:postgres
+
+      - name: Verify PostgreSQL action reminder and inbox flow
+        run: pnpm --filter @battlefield/worker test:postgres
 
       - name: Test
         run: pnpm test

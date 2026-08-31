@@ -15,7 +15,8 @@
     "pretypecheck": "pnpm --filter @battlefield/core build && pnpm --filter @battlefield/database build",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "pretest": "pnpm --filter @battlefield/core build && pnpm --filter @battlefield/database build",
-    "test": "vitest run",
+    "test": "vitest run --exclude test/postgres-reminder-flow.postgres.test.ts",
+    "test:postgres": "vitest run test/postgres-reminder-flow.postgres.test.ts",
     "dev": "tsx src/main.ts"
   },
   "dependencies": {
