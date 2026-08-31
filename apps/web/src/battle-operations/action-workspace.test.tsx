@@ -33,6 +33,7 @@ const proposal: ActionProposalRecord = {
   suggestedPriority: "high",
   suggestedPlannedAt: "2026-09-03T09:00:00.000Z",
   sourceBattleStateVersionId: "b0000000-0000-4000-8000-000000000001",
+  canDecide: true,
   status: "pending_confirmation",
   versionNo: "1",
   proposedAt: "2026-08-31T05:00:00.000Z",
@@ -60,6 +61,7 @@ const formalAction: BusinessActionRecord = {
   confirmedBy: ownerId,
   confirmedAt: "2026-08-31T04:00:00.000Z",
   versionNo: "1",
+  canTransition: true,
 };
 
 const deepLinkedAction: BusinessActionRecord = {
@@ -194,6 +196,41 @@ describe("ActionWorkspace", () => {
     expect(screen.getByText(actionId)).toBeVisible();
   });
 
+  it("renders management-observer proposals read-only without loading owners", async () => {
+    const listOwners = vi
+      .fn()
+      .mockResolvedValue({ items: [], nextCursor: null });
+    render(
+      <ActionWorkspace
+        api={api({
+          listOwners,
+          listProposals: vi.fn().mockResolvedValue({
+            items: [{ ...proposal, canDecide: false }],
+            nextCursor: null,
+          }),
+          listActions: vi.fn().mockResolvedValue({
+            items: [{ ...formalAction, canTransition: false }],
+            nextCursor: null,
+          }),
+        })}
+      />,
+    );
+
+    expect(
+      await screen.findByText("仅可查看，不能代替负责人做决策"),
+    ).toBeVisible();
+    expect(listOwners).not.toHaveBeenCalled();
+    expect(
+      screen.queryByRole("button", { name: "创建经营动作" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "拒绝建议" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "开始执行" }),
+    ).not.toBeInTheDocument();
+  });
+
   it("does not submit an inactive suggested or current owner", async () => {
     const workspaceApi = api({
       listOwners: vi.fn().mockResolvedValue({ items: [], nextCursor: null }),
@@ -226,6 +263,7 @@ describe("ActionWorkspace", () => {
     expect(await screen.findByRole("option", { name: "销售乙" })).toBeVisible();
     expect(listOwners).toHaveBeenLastCalledWith({
       cursor: "owner-next",
+      entityId,
       limit: 50,
     });
   });

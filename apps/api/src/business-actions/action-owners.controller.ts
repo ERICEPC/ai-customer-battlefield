@@ -38,6 +38,7 @@ export class ActionOwnersController {
       return actionOwnerPageSchema.parse(
         await this.reader.listOwners({
           actor,
+          entityId: parsed.data.entityId,
           limit: parsed.data.limit ?? 50,
           ...(parsed.data.cursor ? { cursor: parsed.data.cursor } : {}),
         }),

@@ -8,6 +8,7 @@ import {
   seedSyntheticAcceptedAction,
   seedSyntheticBusinessEntityDirectory,
   seedSyntheticInboxNotification,
+  seedSyntheticManagementObserver,
   seedSyntheticReminderConfiguration,
 } from "@battlefield/database/testing";
 import { createReminderWorker, runWorkerLoop } from "@battlefield/worker";
@@ -29,6 +30,7 @@ console.info("Synthetic demo database created.");
 await migrateDatabase(database.migrations, migrationDirectory);
 console.info("Synthetic demo migrations applied.");
 await seedSyntheticBusinessEntityDirectory(database);
+await seedSyntheticManagementObserver(database);
 await seedSyntheticReminderConfiguration(database);
 await seedSyntheticAcceptedAction(database);
 await seedSyntheticInboxNotification(database, {

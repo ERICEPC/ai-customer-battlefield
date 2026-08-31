@@ -98,6 +98,7 @@ describe("battle operations API client", () => {
       confirmedBy: "30000000-0000-4000-8000-000000000001",
       confirmedAt: "2026-08-31T04:00:00.000Z",
       versionNo: "1",
+      canTransition: true,
     };
     const fetchMock = vi.fn().mockResolvedValue(
       new Response(JSON.stringify(action), {

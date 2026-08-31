@@ -2,7 +2,7 @@
 
 AI Customer Battlefield is an independent customer-operation workspace for sales teams. It is designed around reviewable business facts, human-confirmed AI suggestions, configurable workflows, and replaceable integrations rather than any single collaboration platform or model provider.
 
-The repository now contains a connected operating loop: a persistent tenant-scoped business-entity directory, human-confirmed follow-ups and facts, evidence-backed battle analysis, a customer battle map, and a separately confirmed action workflow. AI output remains a draft or suggestion until a salesperson explicitly confirms it. The complete V1 product is still under active development.
+The repository now contains a connected operating loop: a persistent tenant-scoped business-entity directory, human-confirmed follow-ups and facts, evidence-backed battle analysis, a customer battle map, a separately confirmed action workflow, and a role-scoped sales/management workspace. AI output remains a draft or suggestion until a salesperson explicitly confirms it. The complete V1 product is still under active development.
 
 ## Architecture boundaries
 
@@ -38,7 +38,7 @@ pnpm --filter @battlefield/api dev:demo
 pnpm --filter @battlefield/web dev
 ```
 
-Open `http://localhost:3000/` for the follow-up confirmation workbench, `/entities` for the entity directory, `/battle-map` for evidence-backed positioning, `/actions` for the suggestion decision gate and formal actions, or `/inbox` for durable in-app notifications. The demo API runs the same reminder Worker in-process with external channels disabled. Its database is recreated on every API restart and must never be used as production storage.
+Open `http://localhost:3000/workspace` for the role-scoped sales/management homepage, `/` for the follow-up confirmation workbench, `/entities` for the entity directory, `/battle-map` for evidence-backed positioning, `/actions` for the suggestion decision gate and formal actions, or `/inbox` for durable in-app notifications. The demo API runs the same reminder Worker in-process with external channels disabled. Its database is recreated on every API restart and must never be used as production storage.
 
 For a PostgreSQL-backed environment, use a dedicated PostgreSQL 17+ database, apply forward migrations explicitly, and then start the normal API:
 
@@ -90,6 +90,7 @@ Both integration tests refuse to reset a database whose name does not end in `_t
 - [Follow-up confirmation implementation plan](docs/superpowers/plans/2026-08-31-v1b-followup-confirmation.md)
 - [Battle analysis and actions implementation plan](docs/superpowers/plans/2026-08-31-v1c-battle-analysis-actions.md)
 - [Reminders and notifications implementation plan](docs/superpowers/plans/2026-08-31-v1d-reminders-notifications.md)
+- [Role-scoped workspace implementation plan](docs/superpowers/plans/2026-08-31-v1e-role-scoped-workspace.md)
 
 ## Current scope
 
@@ -103,6 +104,7 @@ Implemented today:
 - responsive Web confirmation workbench with explicit human acknowledgement, optimistic-conflict recovery, stable retry idempotency, and confirmed source/actor receipt;
 - tenant-safe battle analysis, evidence/signal versioning, separately persisted action proposals, explicit accept/reject decisions, and formal action state transitions;
 - responsive battle-map and action workspaces with truthful partial-page counts, exact immutable source-version deep links, cursor-paged active-owner selection, timezone-safe planning, server-authoritative expired suggestions, and ambiguity-safe idempotent retries;
+- role-scoped sales/management homepage with actor-specific KPIs, bounded priority actions, current-versus-previous battle changes, data-gap summaries, exact authorized deep links, and responsive 390px navigation;
 - lease-based Outbox consumption, versioned due reminders, atomic in-app notification materialization, independently retryable channel deliveries, and a responsive notification center;
 - optional Feishu app-bot delivery through a tenant-bound credential/channel adapter, with the Web inbox remaining independent;
 - PGlite local tests and PostgreSQL 18 CI verification of the same SQL migrations.

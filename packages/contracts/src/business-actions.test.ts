@@ -36,6 +36,7 @@ function proposal() {
     suggestedPriority: "high" as const,
     suggestedPlannedAt: "2026-09-03T09:00:00.000Z",
     sourceBattleStateVersionId: stateId,
+    canDecide: true,
     status: "pending_confirmation" as const,
     versionNo: "1",
     proposedAt: "2026-08-31T03:00:02.000Z",
@@ -134,6 +135,7 @@ describe("business action contracts", () => {
       confirmedBy: actorId,
       confirmedAt: "2026-08-31T03:05:00.000Z",
       versionNo: "1",
+      canTransition: true,
     };
     expect(businessActionRecordSchema.parse(action)).toEqual(action);
     expect(
@@ -151,8 +153,15 @@ describe("business action contracts", () => {
 
   it("keeps proposal queue filters bounded and rejects unknown input", () => {
     expect(
-      actionOwnerListQuerySchema.parse({ limit: "50", cursor: "next-page" }),
-    ).toEqual({ limit: 50, cursor: "next-page" });
+      actionOwnerListQuerySchema.parse({
+        entityId,
+        limit: "50",
+        cursor: "next-page",
+      }),
+    ).toEqual({ entityId, limit: 50, cursor: "next-page" });
+    expect(actionOwnerListQuerySchema.safeParse({ limit: 50 }).success).toBe(
+      false,
+    );
     expect(
       actionOwnerPageSchema.parse({
         items: [{ userId: actorId, displayName: "销售甲" }],
@@ -204,6 +213,7 @@ describe("business action contracts", () => {
             confirmedBy: actorId,
             confirmedAt: "2026-08-31T03:05:00.000Z",
             versionNo: "1",
+            canTransition: true,
           },
         ],
         nextCursor: null,

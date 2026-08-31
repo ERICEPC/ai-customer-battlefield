@@ -23,6 +23,7 @@ export const actionProposalRecordSchema = z
     suggestedPriority: prioritySchema,
     suggestedPlannedAt: z.iso.datetime().nullable(),
     sourceBattleStateVersionId: z.uuid(),
+    canDecide: z.boolean(),
     status: actionProposalStatusSchema,
     versionNo: versionNoSchema,
     proposedAt: z.iso.datetime(),
@@ -90,6 +91,7 @@ export const actionOwnerOptionSchema = z.strictObject({
 });
 
 export const actionOwnerListQuerySchema = z.strictObject({
+  entityId: z.uuid(),
   cursor: z.string().trim().min(1).max(4_096).optional(),
   limit: z.coerce.number().int().min(1).max(100).optional(),
 });
@@ -155,6 +157,7 @@ export const businessActionRecordSchema = z
     confirmedBy: z.uuid(),
     confirmedAt: z.iso.datetime(),
     versionNo: versionNoSchema,
+    canTransition: z.boolean(),
   })
   .superRefine((action, context) => {
     if (action.status === "completed" && !action.completedAt) {

@@ -9,6 +9,52 @@ import {
 const REQUEST_ID = "90000000-0000-4000-8000-000000000071";
 const SYNTHETIC_ACTION_ID = "d0000000-0000-4000-8000-000000000071";
 const SYNTHETIC_POLICY_ID = "71000000-0000-4000-8000-000000000071";
+export const SYNTHETIC_MANAGER_USER_ID = "30000000-0000-4000-8000-000000000072";
+
+export async function seedSyntheticManagementObserver(
+  database: DatabaseHandle<BattlefieldDatabase>,
+): Promise<void> {
+  await withTenantTransaction(
+    database.db,
+    {
+      tenantId: SYNTHETIC_TENANT_ID,
+      userId: SYNTHETIC_USER_ID,
+      requestId: REQUEST_ID,
+    },
+    async (transaction) => {
+      await transaction
+        .insertInto("app.users")
+        .values({
+          tenant_id: SYNTHETIC_TENANT_ID,
+          id: SYNTHETIC_MANAGER_USER_ID,
+          display_name: "demo-manager",
+          email: null,
+          mobile: null,
+          status: "active",
+        })
+        .onConflict((conflict) =>
+          conflict.columns(["tenant_id", "id"]).doNothing(),
+        )
+        .executeTakeFirst();
+      await transaction
+        .insertInto("app.entity_assignments")
+        .values({
+          tenant_id: SYNTHETIC_TENANT_ID,
+          id: "61000000-0000-4000-8000-000000000072",
+          entity_id: "50000000-0000-4000-8000-000000000001",
+          user_id: SYNTHETIC_MANAGER_USER_ID,
+          assignment_role: "management_observer",
+          is_primary: false,
+          valid_from: "2026-08-31T00:00:00.000Z",
+          valid_to: null,
+        })
+        .onConflict((conflict) =>
+          conflict.columns(["tenant_id", "id"]).doNothing(),
+        )
+        .executeTakeFirst();
+    },
+  );
+}
 
 export async function seedSyntheticReminderConfiguration(
   database: DatabaseHandle<BattlefieldDatabase>,

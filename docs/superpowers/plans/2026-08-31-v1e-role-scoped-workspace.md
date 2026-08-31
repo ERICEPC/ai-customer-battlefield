@@ -214,7 +214,7 @@ Commit: `feat: add sales and management workspace`
 - Modify: this plan's checkboxes/evidence
 - Update ignored: `task_plan.md`, `progress.md`, `findings.md`
 
-- [ ] **Step 1: Run the complete local gate**
+- [x] **Step 1: Run the complete local gate**
 
 ```bash
 pnpm install --frozen-lockfile
@@ -230,17 +230,19 @@ git diff --check
 
 On real PostgreSQL 18 or the CI integration path, prove an owner cannot see another user's action, a management observer can see an observed entity's open action, an ended assignment removes scope, and no foreign-tenant row changes any count.
 
-- [ ] **Step 3: Run real browser acceptance**
+- [x] **Step 3: Run real browser acceptance**
 
 At desktop and true 390×844 CSS viewport, prove personal workspace → action deep link → notification/workbench links and observed-portfolio workspace → changed entity/map deep link. Assert no horizontal overflow and zero console warnings/errors.
 
-- [ ] **Step 4: Update living docs without overstating V1**
+- [x] **Step 4: Update living docs without overstating V1**
 
 Mark the sales/management homepage delivered. Keep management queries, weekly reports, reminder escalation, production OIDC/RBAC, configuration UI, import and deployment recovery explicit.
 
 - [ ] **Step 5: Review, push directly to `main`, and watch matching CI**
 
 Record SHA, exact test counts, PostgreSQL evidence, browser evidence, CI URL/duration and deferred boundaries. Close only V1-E, then continue to management queries/reports.
+
+**Pre-delivery evidence:** the fresh complete local gate passed with contracts 52/52, core 38/38, database 94/94, API E2E 30/30, worker 13/13 and Web 78/78 (305/305 total), plus frozen install, public-boundary, Biome, typecheck, production build and diff checks. The boundary suite proves personal, observer, ended, unassigned and cross-tenant behavior for workspace projections plus action/map landing reads; proposal reads, accept/reject writes, action transitions and idempotency replay all repeat the same assignment boundary. Proposal/action responses expose `canDecide`/`canTransition`, while owner candidates require an entity-scoped current owner/collaborator relationship. Real Nest + PGlite browser acceptance passed at 1280×900 and 390×844 for both `alpha-owner` and the synthetic `demo-manager`: notification, follow-up workbench, exact action and exact battle-state links all reached the expected target; the observer saw one explicitly observed object and its open action owned by `alpha-owner`; both mobile views had `scrollWidth === innerWidth === 390` and a 44px minimum main-link height. A final 1280px observer regression additionally proved that the exact action remains visible but all transition controls are absent and the read-only boundary is explicit. Matching PostgreSQL 18 CI, commit SHA and run URL remain required before Steps 2 and 5 close.
 
 ## Acceptance Gate
 

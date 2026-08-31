@@ -9,7 +9,9 @@ export {
   seedSyntheticBusinessEntityDirectory,
 } from "./synthetic-directory.js";
 export {
+  SYNTHETIC_MANAGER_USER_ID,
   seedSyntheticAcceptedAction,
   seedSyntheticInboxNotification,
+  seedSyntheticManagementObserver,
   seedSyntheticReminderConfiguration,
 } from "./synthetic-reminders.js";

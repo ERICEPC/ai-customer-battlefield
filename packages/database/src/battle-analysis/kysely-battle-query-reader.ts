@@ -110,6 +110,7 @@ export class KyselyBattleQueryReader implements BattleQueryReader {
           where state.tenant_id = ${input.actor.tenantId}::uuid
             and state.entity_id = ${input.entityId}::uuid
           ${versionFilter}
+          ${stateVisibilityFilter(input.actor)}
           limit 1
         `.execute(transaction);
         const state = stateResult.rows[0];
@@ -255,7 +256,11 @@ export class KyselyBattleQueryReader implements BattleQueryReader {
               and assignment.entity_id = entity.id
               and assignment.assignment_role = 'owner'
               and assignment.is_primary
-              and assignment.valid_to is null
+              and assignment.valid_from <= current_timestamp
+              and (
+                assignment.valid_to is null
+                or assignment.valid_to > current_timestamp
+              )
             order by assignment.valid_from desc, assignment.id desc
             limit 1
           ) as primary_owner on true
@@ -273,6 +278,7 @@ export class KyselyBattleQueryReader implements BattleQueryReader {
               and link.fact_id is not null
           ) as evidence on true
           where entity.tenant_id = ${input.actor.tenantId}::uuid
+          ${entityVisibilityFilter(input.actor)}
           ${entityFilter}
           ${t0Filter}
           ${quadrantFilter}
@@ -310,6 +316,40 @@ export class KyselyBattleQueryReader implements BattleQueryReader {
       },
     );
   }
+}
+
+function stateVisibilityFilter(actor: ActorScope) {
+  return sql`
+    and exists (
+      select 1
+      from app.entity_assignments as visible_assignment
+      where visible_assignment.tenant_id = ${actor.tenantId}::uuid
+        and visible_assignment.entity_id = state.entity_id
+        and visible_assignment.user_id = ${actor.userId}::uuid
+        and visible_assignment.valid_from <= current_timestamp
+        and (
+          visible_assignment.valid_to is null
+          or visible_assignment.valid_to > current_timestamp
+        )
+    )
+  `;
+}
+
+function entityVisibilityFilter(actor: ActorScope) {
+  return sql`
+    and exists (
+      select 1
+      from app.entity_assignments as visible_assignment
+      where visible_assignment.tenant_id = ${actor.tenantId}::uuid
+        and visible_assignment.entity_id = entity.id
+        and visible_assignment.user_id = ${actor.userId}::uuid
+        and visible_assignment.valid_from <= current_timestamp
+        and (
+          visible_assignment.valid_to is null
+          or visible_assignment.valid_to > current_timestamp
+        )
+    )
+  `;
 }
 
 function mapState(row: StateRow, evidenceFactIds: string[]): BattleStateRecord {

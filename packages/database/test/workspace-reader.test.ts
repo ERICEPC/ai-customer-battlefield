@@ -1,8 +1,13 @@
 import { fileURLToPath } from "node:url";
-import { BusinessActionNotFoundError } from "@battlefield/core";
+import {
+  ActionProposalNotFoundError,
+  BattleStateNotFoundError,
+  BusinessActionNotFoundError,
+} from "@battlefield/core";
 import { afterEach, beforeEach, describe, expect, test } from "vitest";
 
 import { KyselyActionQueryReader } from "../src/action-decisions/kysely-action-query-reader.js";
+import { KyselyBattleQueryReader } from "../src/battle-analysis/kysely-battle-query-reader.js";
 import type { DatabaseHandle } from "../src/database-handle.js";
 import type { BattlefieldDatabase } from "../src/database-types.js";
 import { migrateDatabase } from "../src/migrate.js";
@@ -30,6 +35,7 @@ const NOW = "2026-09-01T00:00:00.000Z";
 const COLLEAGUE_ID = "30000000-0000-4000-8000-000000000003";
 const MANAGER_ID = "30000000-0000-4000-8000-000000000004";
 const UNASSIGNED_USER_ID = "30000000-0000-4000-8000-000000000005";
+const FUTURE_OWNER_ID = "30000000-0000-4000-8000-000000000006";
 const OBSERVED_ENTITY_ID = "50000000-0000-4000-8000-000000000003";
 const UNASSIGNED_ENTITY_ID = "50000000-0000-4000-8000-000000000004";
 const ENDED_ENTITY_ID = "50000000-0000-4000-8000-000000000005";
@@ -44,6 +50,10 @@ const OBSERVED_ACTION_ID = "d1000000-0000-4000-8000-000000000003";
 const COMPLETED_OBSERVED_ACTION_ID = "d1000000-0000-4000-8000-000000000004";
 const UNASSIGNED_ACTION_ID = "d1000000-0000-4000-8000-000000000005";
 const ENDED_ACTION_ID = "d1000000-0000-4000-8000-000000000006";
+const OWN_PROPOSAL_ID = "c1000000-0000-4000-8000-000000000001";
+const OBSERVED_PROPOSAL_ID = "c1000000-0000-4000-8000-000000000002";
+const UNASSIGNED_PROPOSAL_ID = "c1000000-0000-4000-8000-000000000003";
+const ENDED_PROPOSAL_ID = "c1000000-0000-4000-8000-000000000005";
 const actor = { tenantId: SYNTHETIC_TENANT_ID, userId: SYNTHETIC_USER_ID };
 const manager = { tenantId: SYNTHETIC_TENANT_ID, userId: MANAGER_ID };
 const colleague = { tenantId: SYNTHETIC_TENANT_ID, userId: COLLEAGUE_ID };
@@ -252,6 +262,95 @@ describe("Kysely role-scoped workspace reader", () => {
     ).resolves.toEqual({ items: [], nextCursor: null });
   });
 
+  test("keeps proposal reads inside active assignment scope while allowing observer read-only access", async () => {
+    const actionReader = new KyselyActionQueryReader(database.db);
+
+    await expect(
+      actionReader.getProposal({ actor, proposalId: OWN_PROPOSAL_ID }),
+    ).resolves.toMatchObject({ proposalId: OWN_PROPOSAL_ID, canDecide: true });
+    await expect(
+      actionReader.getProposal({
+        actor: manager,
+        proposalId: OBSERVED_PROPOSAL_ID,
+      }),
+    ).resolves.toMatchObject({
+      proposalId: OBSERVED_PROPOSAL_ID,
+      canDecide: false,
+    });
+    await expect(
+      actionReader.listProposals({
+        actor: manager,
+        status: "pending_confirmation",
+        limit: 20,
+      }),
+    ).resolves.toMatchObject({
+      items: [expect.objectContaining({ proposalId: OBSERVED_PROPOSAL_ID })],
+      nextCursor: null,
+    });
+
+    for (const [deniedActor, proposalId] of [
+      [actor, UNASSIGNED_PROPOSAL_ID],
+      [actor, ENDED_PROPOSAL_ID],
+      [unassignedUser, OWN_PROPOSAL_ID],
+      [otherActor, OWN_PROPOSAL_ID],
+    ] as const) {
+      await expect(
+        actionReader.getProposal({ actor: deniedActor, proposalId }),
+      ).rejects.toBeInstanceOf(ActionProposalNotFoundError);
+    }
+    await expect(
+      actionReader.listProposals({ actor: unassignedUser, limit: 20 }),
+    ).resolves.toEqual({ items: [], nextCursor: null });
+  });
+
+  test("keeps map lists and exact battle-state reads inside active assignment scope", async () => {
+    const battleReader = new KyselyBattleQueryReader(database.db);
+
+    await expect(
+      battleReader.listMap({ actor: manager, limit: 20 }),
+    ).resolves.toMatchObject({
+      items: [
+        expect.objectContaining({
+          entityId: OBSERVED_ENTITY_ID,
+          primaryOwnerName: "协同销售",
+        }),
+      ],
+      nextCursor: null,
+    });
+    await expect(
+      battleReader.getVersion({
+        actor: manager,
+        entityId: OBSERVED_ENTITY_ID,
+        battleStateVersionId: OBSERVED_SOURCE_STATE_ID,
+      }),
+    ).resolves.toMatchObject({
+      state: { battleStateVersionId: OBSERVED_SOURCE_STATE_ID },
+    });
+
+    for (const [entityId, stateId] of [
+      [UNASSIGNED_ENTITY_ID, UNASSIGNED_STATE_ID],
+      [ENDED_ENTITY_ID, ENDED_STATE_ID],
+    ] as const) {
+      await expect(
+        battleReader.getVersion({
+          actor,
+          entityId,
+          battleStateVersionId: stateId,
+        }),
+      ).rejects.toBeInstanceOf(BattleStateNotFoundError);
+    }
+    await expect(
+      battleReader.getVersion({
+        actor: otherActor,
+        entityId: SYNTHETIC_ENTITY_ID,
+        battleStateVersionId: OWNED_CURRENT_STATE_ID,
+      }),
+    ).rejects.toBeInstanceOf(BattleStateNotFoundError);
+    await expect(
+      battleReader.listMap({ actor: unassignedUser, limit: 20 }),
+    ).resolves.toEqual({ items: [], nextCursor: null });
+  });
+
   test("rejects an invalid projection instant before opening a query snapshot", async () => {
     await expect(
       reader.read({ actor, now: "not-an-instant" }),
@@ -272,6 +371,7 @@ async function seedWorkspaceScenario(
           userRow(COLLEAGUE_ID, "协同销售"),
           userRow(MANAGER_ID, "观察管理者"),
           userRow(UNASSIGNED_USER_ID, "无责任用户"),
+          userRow(FUTURE_OWNER_ID, "未来负责人"),
         ])
         .execute();
       await transaction
@@ -291,13 +391,16 @@ async function seedWorkspaceScenario(
             SYNTHETIC_USER_ID,
             "collaborator",
           ),
-          assignmentRow(
-            "61000000-0000-4000-8000-000000000002",
-            OBSERVED_ENTITY_ID,
-            COLLEAGUE_ID,
-            "owner",
-            true,
-          ),
+          {
+            ...assignmentRow(
+              "61000000-0000-4000-8000-000000000002",
+              OBSERVED_ENTITY_ID,
+              COLLEAGUE_ID,
+              "owner",
+              true,
+            ),
+            valid_to: "2099-01-01T00:00:00.000Z",
+          },
           assignmentRow(
             "61000000-0000-4000-8000-000000000003",
             OBSERVED_ENTITY_ID,
@@ -333,6 +436,16 @@ async function seedWorkspaceScenario(
             ),
             valid_from: "2026-08-01T00:00:00.000Z",
             valid_to: "2026-08-15T00:00:00.000Z",
+          },
+          {
+            ...assignmentRow(
+              "61000000-0000-4000-8000-000000000008",
+              OBSERVED_ENTITY_ID,
+              FUTURE_OWNER_ID,
+              "owner",
+              true,
+            ),
+            valid_from: "2099-01-01T00:00:00.000Z",
           },
         ])
         .execute();
@@ -705,6 +818,13 @@ async function seedPendingProposals(
           stateId: OWNED_CURRENT_STATE_ID,
           ownerId: SYNTHETIC_USER_ID,
           expiresAt: "2026-08-31T23:00:00.000Z",
+        },
+        {
+          id: ENDED_PROPOSAL_ID,
+          entityId: ENDED_ENTITY_ID,
+          stateId: ENDED_STATE_ID,
+          ownerId: SYNTHETIC_USER_ID,
+          expiresAt: "2026-09-03T00:00:00.000Z",
         },
       ];
       await transaction

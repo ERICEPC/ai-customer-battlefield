@@ -46,6 +46,11 @@ export class KyselyActionDecisionStore implements ActionDecisionStore {
           priority: input.priority,
           plannedAt: input.plannedAt,
         });
+        const proposal = await lockProposal(
+          transaction,
+          input.actor,
+          input.proposalId,
+        );
         const existing = await beginIdempotentDecision(transaction, {
           tenantId: input.actor.tenantId,
           userId: input.actor.userId,
@@ -57,12 +62,6 @@ export class KyselyActionDecisionStore implements ActionDecisionStore {
         if (existing) {
           return decodeDecisionResult(existing, "accepted");
         }
-
-        const proposal = await lockProposal(
-          transaction,
-          input.actor.tenantId,
-          input.proposalId,
-        );
         assertPendingProposal(proposal, input.versionNo, input.decidedAt);
         if (Date.parse(input.plannedAt) <= Date.parse(input.decidedAt)) {
           throw new RangeError(
@@ -70,11 +69,26 @@ export class KyselyActionDecisionStore implements ActionDecisionStore {
           );
         }
         const owner = await transaction
-          .selectFrom("app.users")
-          .select("id")
-          .where("tenant_id", "=", input.actor.tenantId)
-          .where("id", "=", input.ownerUserId)
-          .where("status", "=", "active")
+          .selectFrom("app.users as app_user")
+          .select("app_user.id")
+          .where("app_user.tenant_id", "=", input.actor.tenantId)
+          .where("app_user.id", "=", input.ownerUserId)
+          .where("app_user.status", "=", "active")
+          .where(
+            sql<boolean>`exists (
+              select 1
+              from app.entity_assignments as owner_assignment
+              where owner_assignment.tenant_id = ${input.actor.tenantId}::uuid
+                and owner_assignment.entity_id = ${proposal.entity_id}::uuid
+                and owner_assignment.user_id = ${input.ownerUserId}::uuid
+                and owner_assignment.assignment_role in ('owner', 'collaborator')
+                and owner_assignment.valid_from <= current_timestamp
+                and (
+                  owner_assignment.valid_to is null
+                  or owner_assignment.valid_to > current_timestamp
+                )
+            )`,
+          )
           .forUpdate()
           .executeTakeFirst();
         if (!owner) {
@@ -207,6 +221,11 @@ export class KyselyActionDecisionStore implements ActionDecisionStore {
           versionNo: input.versionNo,
           reason: input.reason,
         });
+        const proposal = await lockProposal(
+          transaction,
+          input.actor,
+          input.proposalId,
+        );
         const existing = await beginIdempotentDecision(transaction, {
           tenantId: input.actor.tenantId,
           userId: input.actor.userId,
@@ -218,12 +237,6 @@ export class KyselyActionDecisionStore implements ActionDecisionStore {
         if (existing) {
           return decodeDecisionResult(existing, "rejected");
         }
-
-        const proposal = await lockProposal(
-          transaction,
-          input.actor.tenantId,
-          input.proposalId,
-        );
         assertPendingProposal(proposal, input.versionNo, input.decidedAt);
         const nextVersion = String(BigInt(proposal.version_no) + 1n);
         await transaction
@@ -298,10 +311,26 @@ export class KyselyActionDecisionStore implements ActionDecisionStore {
       { ...input.actor, requestId: input.actionId },
       async (transaction) => {
         const action = await transaction
-          .selectFrom("app.business_actions")
-          .select(["id", "status", "version_no"])
-          .where("tenant_id", "=", input.actor.tenantId)
-          .where("id", "=", input.actionId)
+          .selectFrom("app.business_actions as action")
+          .select(["action.id", "action.status", "action.version_no"])
+          .where("action.tenant_id", "=", input.actor.tenantId)
+          .where("action.id", "=", input.actionId)
+          .where("action.owner_user_id", "=", input.actor.userId)
+          .where(
+            sql<boolean>`exists (
+              select 1
+              from app.entity_assignments as action_assignment
+              where action_assignment.tenant_id = ${input.actor.tenantId}::uuid
+                and action_assignment.entity_id = action.entity_id
+                and action_assignment.user_id = ${input.actor.userId}::uuid
+                and action_assignment.assignment_role in ('owner', 'collaborator')
+                and action_assignment.valid_from <= current_timestamp
+                and (
+                  action_assignment.valid_to is null
+                  or action_assignment.valid_to > current_timestamp
+                )
+            )`,
+          )
           .forUpdate()
           .executeTakeFirst();
         if (!action) {
@@ -389,21 +418,36 @@ export class KyselyActionDecisionStore implements ActionDecisionStore {
 
 async function lockProposal(
   transaction: DatabaseTransaction,
-  tenantId: string,
+  actor: { tenantId: string; userId: string },
   proposalId: string,
 ) {
   const row = await transaction
-    .selectFrom("app.action_proposals")
+    .selectFrom("app.action_proposals as proposal")
     .select([
-      "id",
-      "entity_id",
-      "opportunity_id",
-      "status",
-      "version_no",
-      "expires_at",
+      "proposal.id",
+      "proposal.entity_id",
+      "proposal.opportunity_id",
+      "proposal.status",
+      "proposal.version_no",
+      "proposal.expires_at",
     ])
-    .where("tenant_id", "=", tenantId)
-    .where("id", "=", proposalId)
+    .where("proposal.tenant_id", "=", actor.tenantId)
+    .where("proposal.id", "=", proposalId)
+    .where(
+      sql<boolean>`exists (
+        select 1
+        from app.entity_assignments as decision_assignment
+        where decision_assignment.tenant_id = ${actor.tenantId}::uuid
+          and decision_assignment.entity_id = proposal.entity_id
+          and decision_assignment.user_id = ${actor.userId}::uuid
+          and decision_assignment.assignment_role in ('owner', 'collaborator')
+          and decision_assignment.valid_from <= current_timestamp
+          and (
+            decision_assignment.valid_to is null
+            or decision_assignment.valid_to > current_timestamp
+          )
+      )`,
+    )
     .forUpdate()
     .executeTakeFirst();
   if (!row) {

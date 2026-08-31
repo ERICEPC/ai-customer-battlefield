@@ -133,12 +133,24 @@ export function ActionWorkspace({
     setLoadError(null);
     setOperationError(null);
     Promise.all([
-      api.listOwners({ limit: 50 }),
-      api.listProposals({ status: "pending_confirmation", limit: 50 }),
+      (async () => {
+        const proposalPage = await api.listProposals({
+          status: "pending_confirmation",
+          limit: 50,
+        });
+        const initialProposal = proposalPage.items[0] ?? null;
+        const ownerPage = initialProposal?.canDecide
+          ? await api.listOwners({
+              entityId: initialProposal.entityId,
+              limit: 50,
+            })
+          : { items: [], nextCursor: null };
+        return { proposalPage, initialProposal, ownerPage };
+      })(),
       api.listActions({ limit: 50 }),
       initialActionId ? api.getAction(initialActionId) : Promise.resolve(null),
     ])
-      .then(([ownerPage, proposalPage, actionPage, targetAction]) => {
+      .then(([proposalLoad, actionPage, targetAction]) => {
         if (
           !current ||
           ownerVersion !== ownerRequestVersion.current ||
@@ -146,18 +158,14 @@ export function ActionWorkspace({
           actionVersion !== actionRequestVersion.current
         )
           return;
+        const { proposalPage, initialProposal, ownerPage } = proposalLoad;
         setProposals(proposalPage.items);
         setActions(actionsWithTargetFirst(actionPage.items, targetAction));
         setOwners(ownerPage.items);
         setOwnerCursor(ownerPage.nextCursor);
         setProposalCursor(proposalPage.nextCursor);
         setActionCursor(actionPage.nextCursor);
-        setSelectedProposalId((selected) =>
-          selected &&
-          proposalPage.items.some((item) => item.proposalId === selected)
-            ? selected
-            : (proposalPage.items[0]?.proposalId ?? null),
-        );
+        setSelectedProposalId(initialProposal?.proposalId ?? null);
       })
       .catch((error: unknown) => {
         if (
@@ -244,12 +252,43 @@ export function ActionWorkspace({
     }
   }
 
+  async function selectProposal(proposal: ActionProposalRecord): Promise<void> {
+    const requestVersion = ownerRequestVersion.current + 1;
+    ownerRequestVersion.current = requestVersion;
+    setSelectedProposalId(proposal.proposalId);
+    setDecisionReceipt(null);
+    setOwners([]);
+    setOwnerCursor(null);
+    setOperationError(null);
+    setIsLoadingMoreOwners(proposal.canDecide);
+    if (!proposal.canDecide) return;
+    try {
+      const page = await api.listOwners({
+        entityId: proposal.entityId,
+        limit: 50,
+      });
+      if (requestVersion !== ownerRequestVersion.current) return;
+      setOwners(page.items);
+      setOwnerCursor(page.nextCursor);
+    } catch (error) {
+      if (requestVersion === ownerRequestVersion.current)
+        setOperationError(errorMessage(error));
+    } finally {
+      if (requestVersion === ownerRequestVersion.current)
+        setIsLoadingMoreOwners(false);
+    }
+  }
+
   async function loadMoreOwners(): Promise<void> {
-    if (!ownerCursor || isLoadingMoreOwners) return;
+    if (!selected?.canDecide || !ownerCursor || isLoadingMoreOwners) return;
     const requestVersion = ownerRequestVersion.current;
     setIsLoadingMoreOwners(true);
     try {
-      const page = await api.listOwners({ limit: 50, cursor: ownerCursor });
+      const page = await api.listOwners({
+        entityId: selected.entityId,
+        limit: 50,
+        cursor: ownerCursor,
+      });
       if (requestVersion !== ownerRequestVersion.current) return;
       setOwners((current) => mergeById(current, page.items, "userId"));
       setOwnerCursor(page.nextCursor);
@@ -354,10 +393,7 @@ export function ActionWorkspace({
                           : undefined
                       }
                       disabled={decisionProposalId !== null}
-                      onClick={() => {
-                        setSelectedProposalId(proposal.proposalId);
-                        setDecisionReceipt(null);
-                      }}
+                      onClick={() => void selectProposal(proposal)}
                     >
                       <span>建议 {index + 1}</span>
                       <strong>{proposal.title}</strong>
@@ -535,6 +571,7 @@ function ProposalDecisionCard({
   );
 
   const canAccept =
+    proposal.canDecide &&
     !isSubmitting &&
     (acceptAttempt !== null ||
       (title.trim().length > 0 &&
@@ -577,7 +614,7 @@ function ProposalDecisionCard({
   }
 
   async function reject(): Promise<void> {
-    if (!rejectionReason.trim() || isSubmitting) return;
+    if (!proposal.canDecide || !rejectionReason.trim() || isSubmitting) return;
     setIsSubmitting(true);
     setError(null);
     const attempt =
@@ -658,6 +695,31 @@ function ProposalDecisionCard({
         <h3>建议已过期</h3>
         <p>
           该建议已越过确认窗口，不能再创建经营动作；重新分析后可生成新建议。
+        </p>
+      </article>
+    );
+  }
+
+  if (!proposal.canDecide) {
+    return (
+      <article className="proposal-decision-card">
+        <div className="proposal-source">
+          <span className="pending-badge">待负责人确认</span>
+          <span>来源状态版本</span>
+          <code>{proposal.sourceBattleStateVersionId}</code>
+          <span>经营对象</span>
+          <strong>{proposal.entityName}</strong>
+          <Link
+            className="proposal-source-link"
+            href={`/battle-map?entityId=${encodeURIComponent(proposal.entityId)}&stateVersion=${encodeURIComponent(proposal.sourceBattleStateVersionId)}`}
+          >
+            在地图查看来源与证据
+          </Link>
+        </div>
+        <h3>{proposal.title}</h3>
+        <p>{proposal.description}</p>
+        <p className="source-boundary" role="status">
+          仅可查看，不能代替负责人做决策
         </p>
       </article>
     );
@@ -930,6 +992,7 @@ function FormalActionCard({
   async function transition(
     toStatus: "in_progress" | "completed" | "cancelled",
   ) {
+    if (!action.canTransition) return;
     setIsChanging(true);
     setError(null);
     try {
@@ -997,36 +1060,42 @@ function FormalActionCard({
           {error}
         </p>
       ) : null}
-      <div className="formal-action-buttons">
-        {action.status === "planned" ? (
-          <button
-            type="button"
-            disabled={isChanging}
-            onClick={() => transition("in_progress")}
-          >
-            开始执行
-          </button>
-        ) : null}
-        {action.status === "in_progress" ? (
-          <button
-            type="button"
-            disabled={isChanging}
-            onClick={() => transition("completed")}
-          >
-            标记完成
-          </button>
-        ) : null}
-        {action.status === "planned" || action.status === "in_progress" ? (
-          <button
-            type="button"
-            className="secondary-button"
-            disabled={isChanging}
-            onClick={() => transition("cancelled")}
-          >
-            取消动作
-          </button>
-        ) : null}
-      </div>
+      {action.canTransition ? (
+        <div className="formal-action-buttons">
+          {action.status === "planned" ? (
+            <button
+              type="button"
+              disabled={isChanging}
+              onClick={() => transition("in_progress")}
+            >
+              开始执行
+            </button>
+          ) : null}
+          {action.status === "in_progress" ? (
+            <button
+              type="button"
+              disabled={isChanging}
+              onClick={() => transition("completed")}
+            >
+              标记完成
+            </button>
+          ) : null}
+          {action.status === "planned" || action.status === "in_progress" ? (
+            <button
+              type="button"
+              className="secondary-button"
+              disabled={isChanging}
+              onClick={() => transition("cancelled")}
+            >
+              取消动作
+            </button>
+          ) : null}
+        </div>
+      ) : (
+        <p className="source-boundary" role="status">
+          仅可查看，动作状态由当前负责人维护。
+        </p>
+      )}
     </article>
   );
 }

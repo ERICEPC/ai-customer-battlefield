@@ -22,6 +22,7 @@ export interface ActionProposalRecord {
   suggestedPriority: ActionPriority;
   suggestedPlannedAt: string | null;
   sourceBattleStateVersionId: string;
+  canDecide: boolean;
   status: ActionProposalStatus;
   versionNo: string;
   proposedAt: string;
@@ -49,6 +50,7 @@ export interface BusinessActionRecord {
   confirmedBy: string;
   confirmedAt: string;
   versionNo: string;
+  canTransition: boolean;
 }
 
 export interface ActionProposalPage {
@@ -69,6 +71,7 @@ export interface BusinessActionPage {
 export interface ActionQueryReader {
   listOwners(input: {
     actor: ActorScope;
+    entityId: string;
     cursor?: string;
     limit: number;
   }): Promise<{

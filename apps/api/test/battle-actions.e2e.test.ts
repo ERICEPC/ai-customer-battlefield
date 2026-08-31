@@ -134,7 +134,11 @@ describe("battle analysis and confirmed action API", () => {
 
     expect(
       actionOwnerPageSchema.parse(
-        (await actorRequest(app).get("/api/v1/action-owners").expect(200)).body,
+        (
+          await actorRequest(app)
+            .get(`/api/v1/action-owners?entityId=${SYNTHETIC_ENTITY_ID}`)
+            .expect(200)
+        ).body,
       ).items,
     ).toContainEqual({
       userId: SYNTHETIC_USER_ID,
@@ -252,6 +256,52 @@ describe("battle analysis and confirmed action API", () => {
       .set("x-user-id", UNASSIGNED_API_USER_ID)
       .expect(404);
     expect(sameTenantDenied.body).toMatchObject({ code: "ACTION_NOT_FOUND" });
+    const proposalDenied = await request(app.getHttpServer())
+      .get(`/api/v1/action-proposals/${proposal.proposalId}`)
+      .set("x-tenant-id", SYNTHETIC_TENANT_ID)
+      .set("x-user-id", UNASSIGNED_API_USER_ID)
+      .expect(404);
+    expect(proposalDenied.body).toMatchObject({
+      code: "ACTION_PROPOSAL_NOT_FOUND",
+    });
+    expect(
+      actionProposalPageSchema.parse(
+        (
+          await request(app.getHttpServer())
+            .get("/api/v1/action-proposals")
+            .set("x-tenant-id", SYNTHETIC_TENANT_ID)
+            .set("x-user-id", UNASSIGNED_API_USER_ID)
+            .expect(200)
+        ).body,
+      ),
+    ).toEqual({ items: [], nextCursor: null });
+    const acceptDenied = await request(app.getHttpServer())
+      .post(`/api/v1/action-proposals/${proposal.proposalId}/accept`)
+      .set("x-tenant-id", SYNTHETIC_TENANT_ID)
+      .set("x-user-id", UNASSIGNED_API_USER_ID)
+      .set("idempotency-key", "unassigned-accept-proposal")
+      .send({
+        versionNo: "2",
+        title: proposal.title,
+        description: proposal.description,
+        ownerUserId: SYNTHETIC_USER_ID,
+        priority: "high",
+        plannedAt: new Date(Date.now() + 86_400_000).toISOString(),
+      })
+      .expect(404);
+    expect(acceptDenied.body).toMatchObject({
+      code: "ACTION_PROPOSAL_NOT_FOUND",
+    });
+    const rejectDenied = await request(app.getHttpServer())
+      .post(`/api/v1/action-proposals/${proposal.proposalId}/reject`)
+      .set("x-tenant-id", SYNTHETIC_TENANT_ID)
+      .set("x-user-id", UNASSIGNED_API_USER_ID)
+      .set("idempotency-key", "unassigned-reject-proposal")
+      .send({ versionNo: "2", reason: "无权决策" })
+      .expect(404);
+    expect(rejectDenied.body).toMatchObject({
+      code: "ACTION_PROPOSAL_NOT_FOUND",
+    });
     expect(
       businessActionPageSchema.parse(
         (
@@ -263,12 +313,39 @@ describe("battle analysis and confirmed action API", () => {
         ).body,
       ),
     ).toEqual({ items: [], nextCursor: null });
+    expect(
+      battleMapPageSchema.parse(
+        (
+          await request(app.getHttpServer())
+            .get("/api/v1/battle-map")
+            .set("x-tenant-id", SYNTHETIC_TENANT_ID)
+            .set("x-user-id", UNASSIGNED_API_USER_ID)
+            .expect(200)
+        ).body,
+      ),
+    ).toEqual({ items: [], nextCursor: null });
+    const battleStateDenied = await request(app.getHttpServer())
+      .get(`/api/v1/business-entities/${SYNTHETIC_ENTITY_ID}/battle-state`)
+      .set("x-tenant-id", SYNTHETIC_TENANT_ID)
+      .set("x-user-id", UNASSIGNED_API_USER_ID)
+      .expect(404);
+    expect(battleStateDenied.body).toMatchObject({
+      code: "BATTLE_STATE_NOT_FOUND",
+    });
     const crossTenantDenied = await request(app.getHttpServer())
       .get(`/api/v1/actions/${accepted.actionId}`)
       .set("x-tenant-id", SYNTHETIC_OTHER_TENANT_ID)
       .set("x-user-id", SYNTHETIC_OTHER_USER_ID)
       .expect(404);
     expect(crossTenantDenied.body).toMatchObject({ code: "ACTION_NOT_FOUND" });
+
+    const transitionDenied = await request(app.getHttpServer())
+      .post(`/api/v1/actions/${accepted.actionId}/transition`)
+      .set("x-tenant-id", SYNTHETIC_TENANT_ID)
+      .set("x-user-id", UNASSIGNED_API_USER_ID)
+      .send({ versionNo: "1", toStatus: "in_progress" })
+      .expect(404);
+    expect(transitionDenied.body).toMatchObject({ code: "ACTION_NOT_FOUND" });
 
     const transitioned = actionTransitionResponseSchema.parse(
       (

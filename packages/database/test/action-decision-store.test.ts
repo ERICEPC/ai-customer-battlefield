@@ -42,7 +42,17 @@ const MIGRATION_DIRECTORY = fileURLToPath(
 const REQUEST_ID = "90000000-0000-4000-8000-000000000031";
 const RUN_ID = "a0000000-0000-4000-8000-000000000031";
 const ACTION_ID = "d0000000-0000-4000-8000-000000000031";
+const UNASSIGNED_USER_ID = "30000000-0000-4000-8000-000000000032";
+const OBSERVER_USER_ID = "30000000-0000-4000-8000-000000000033";
 const actor = { tenantId: SYNTHETIC_TENANT_ID, userId: SYNTHETIC_USER_ID };
+const unassignedActor = {
+  tenantId: SYNTHETIC_TENANT_ID,
+  userId: UNASSIGNED_USER_ID,
+};
+const observerActor = {
+  tenantId: SYNTHETIC_TENANT_ID,
+  userId: OBSERVER_USER_ID,
+};
 const otherActor = {
   tenantId: SYNTHETIC_OTHER_TENANT_ID,
   userId: SYNTHETIC_OTHER_USER_ID,
@@ -105,6 +115,93 @@ describe("Kysely action decision persistence", () => {
         title: "篡改后的动作",
       }),
     ).rejects.toBeInstanceOf(ActionIdempotencyConflictError);
+  });
+
+  test("allows observers to read proposals but denies observer and unassigned decisions", async () => {
+    await seedUnauthorizedDecisionActors(database);
+    const reader = new KyselyActionQueryReader(database.db);
+    await expect(
+      reader.getProposal({ actor: observerActor, proposalId }),
+    ).resolves.toMatchObject({ proposalId, canDecide: false });
+    await expect(
+      reader.listOwners({
+        actor: observerActor,
+        entityId: SYNTHETIC_ENTITY_ID,
+        limit: 20,
+      }),
+    ).resolves.toEqual({ items: [], nextCursor: null });
+
+    for (const deniedActor of [observerActor, unassignedActor]) {
+      await expect(
+        store.accept({
+          ...acceptanceInput(proposalId),
+          actor: deniedActor,
+          actionId:
+            deniedActor.userId === OBSERVER_USER_ID
+              ? "d0000000-0000-4000-8000-000000000032"
+              : "d0000000-0000-4000-8000-000000000033",
+          idempotencyKey: `denied-accept-${deniedActor.userId}`,
+        }),
+      ).rejects.toBeInstanceOf(ActionProposalNotFoundError);
+      await expect(
+        store.reject({
+          actor: deniedActor,
+          proposalId,
+          versionNo: "1",
+          idempotencyKey: `denied-reject-${deniedActor.userId}`,
+          reason: "无权决策",
+          decidedAt: "2026-08-31T03:05:00.000Z",
+        }),
+      ).rejects.toBeInstanceOf(ActionProposalNotFoundError);
+    }
+  });
+
+  test("denies proposal decisions after the actor assignment ends", async () => {
+    await endActorAssignment(database);
+
+    await expect(
+      store.accept({
+        ...acceptanceInput(proposalId),
+        idempotencyKey: "ended-assignment-accept",
+      }),
+    ).rejects.toBeInstanceOf(ActionProposalNotFoundError);
+    await expect(
+      store.reject({
+        actor,
+        proposalId,
+        versionNo: "1",
+        idempotencyKey: "ended-assignment-reject",
+        reason: "责任已结束",
+        decidedAt: "2026-08-31T03:05:00.000Z",
+      }),
+    ).rejects.toBeInstanceOf(ActionProposalNotFoundError);
+  });
+
+  test("allows only the current action owner to transition a formal action", async () => {
+    await seedUnauthorizedDecisionActors(database);
+    await store.accept(acceptanceInput(proposalId));
+
+    for (const deniedActor of [observerActor, unassignedActor]) {
+      await expect(
+        store.transition({
+          actor: deniedActor,
+          actionId: ACTION_ID,
+          versionNo: "1",
+          toStatus: "in_progress",
+          changedAt: "2026-09-01T09:00:00.000Z",
+        }),
+      ).rejects.toBeInstanceOf(BusinessActionNotFoundError);
+    }
+    await endActorAssignment(database);
+    await expect(
+      store.transition({
+        actor,
+        actionId: ACTION_ID,
+        versionNo: "1",
+        toStatus: "in_progress",
+        changedAt: "2026-09-01T09:00:00.000Z",
+      }),
+    ).rejects.toBeInstanceOf(BusinessActionNotFoundError);
   });
 
   test("projects elapsed pending proposals as expired and removes them from the pending queue", async () => {
@@ -206,17 +303,27 @@ describe("Kysely action decision persistence", () => {
       database.db,
       { ...actor, requestId: REQUEST_ID },
       async (transaction) => {
+        const users = Array.from({ length: 105 }, (_, index) => ({
+          tenant_id: actor.tenantId,
+          id: `30000000-0000-4000-8001-${String(index + 1).padStart(12, "0")}`,
+          display_name: `分页销售 ${String(index + 1).padStart(3, "0")}`,
+          email: null,
+          mobile: null,
+          status: index === 104 ? ("inactive" as const) : ("active" as const),
+        }));
+        await transaction.insertInto("app.users").values(users).execute();
         await transaction
-          .insertInto("app.users")
+          .insertInto("app.entity_assignments")
           .values(
-            Array.from({ length: 105 }, (_, index) => ({
+            users.slice(0, 104).map((user, index) => ({
               tenant_id: actor.tenantId,
-              id: `30000000-0000-4000-8001-${String(index + 1).padStart(12, "0")}`,
-              display_name: `分页销售 ${String(index + 1).padStart(3, "0")}`,
-              email: null,
-              mobile: null,
-              status:
-                index === 104 ? ("inactive" as const) : ("active" as const),
+              id: `61000000-0000-4000-8001-${String(index + 1).padStart(12, "0")}`,
+              entity_id: SYNTHETIC_ENTITY_ID,
+              user_id: user.id,
+              assignment_role: "collaborator" as const,
+              is_primary: false,
+              valid_from: "2026-08-01T00:00:00.000Z",
+              valid_to: null,
             })),
           )
           .execute();
@@ -228,6 +335,7 @@ describe("Kysely action decision persistence", () => {
     do {
       const page = await reader.listOwners({
         actor,
+        entityId: SYNTHETIC_ENTITY_ID,
         limit: 40,
         ...(cursor ? { cursor } : {}),
       });
@@ -416,6 +524,72 @@ describe("Kysely action decision persistence", () => {
     ).rejects.toBeInstanceOf(BusinessActionNotFoundError);
   });
 });
+
+async function seedUnauthorizedDecisionActors(
+  database: DatabaseHandle<BattlefieldDatabase>,
+): Promise<void> {
+  await withTenantTransaction(
+    database.db,
+    { ...actor, requestId: REQUEST_ID },
+    async (transaction) => {
+      await transaction
+        .insertInto("app.users")
+        .values([
+          {
+            tenant_id: SYNTHETIC_TENANT_ID,
+            id: UNASSIGNED_USER_ID,
+            display_name: "无责任用户",
+            email: null,
+            mobile: null,
+            status: "active",
+          },
+          {
+            tenant_id: SYNTHETIC_TENANT_ID,
+            id: OBSERVER_USER_ID,
+            display_name: "只读观察者",
+            email: null,
+            mobile: null,
+            status: "active",
+          },
+        ])
+        .execute();
+      await transaction
+        .insertInto("app.entity_assignments")
+        .values({
+          tenant_id: SYNTHETIC_TENANT_ID,
+          id: "61000000-0000-4000-8000-000000000031",
+          entity_id: SYNTHETIC_ENTITY_ID,
+          user_id: OBSERVER_USER_ID,
+          assignment_role: "management_observer",
+          is_primary: false,
+          valid_from: "2026-08-01T00:00:00.000Z",
+          valid_to: null,
+        })
+        .executeTakeFirstOrThrow();
+    },
+  );
+}
+
+async function endActorAssignment(
+  database: DatabaseHandle<BattlefieldDatabase>,
+): Promise<void> {
+  await withTenantTransaction(
+    database.db,
+    { ...actor, requestId: REQUEST_ID },
+    async (transaction) => {
+      await transaction
+        .updateTable("app.entity_assignments")
+        .set({
+          valid_from: "2020-01-01T00:00:00.000Z",
+          valid_to: "2021-01-01T00:00:00.000Z",
+        })
+        .where("tenant_id", "=", SYNTHETIC_TENANT_ID)
+        .where("entity_id", "=", SYNTHETIC_ENTITY_ID)
+        .where("user_id", "=", SYNTHETIC_USER_ID)
+        .executeTakeFirstOrThrow();
+    },
+  );
+}
 
 function acceptanceInput(proposalId: string) {
   return {

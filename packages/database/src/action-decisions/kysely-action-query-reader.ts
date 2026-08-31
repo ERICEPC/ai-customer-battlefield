@@ -26,6 +26,7 @@ interface ProposalRow {
   suggested_priority: ActionPriority;
   suggested_planned_at: Date | string | null;
   source_state_id: string;
+  can_decide: boolean;
   status: ActionProposalStatus;
   version_no: bigint | number | string;
   proposed_at: Date | string;
@@ -53,6 +54,7 @@ interface ActionRow {
   confirmed_by: string;
   confirmed_at: Date | string;
   version_no: bigint | number | string;
+  can_transition: boolean;
 }
 
 interface ProposalCursor {
@@ -117,6 +119,32 @@ export class KyselyActionQueryReader implements ActionQueryReader {
           from app.users as app_user
           where app_user.tenant_id = ${input.actor.tenantId}::uuid
             and app_user.status = 'active'
+            and exists (
+              select 1
+              from app.entity_assignments as candidate_assignment
+              where candidate_assignment.tenant_id = ${input.actor.tenantId}::uuid
+                and candidate_assignment.entity_id = ${input.entityId}::uuid
+                and candidate_assignment.user_id = app_user.id
+                and candidate_assignment.assignment_role in ('owner', 'collaborator')
+                and candidate_assignment.valid_from <= current_timestamp
+                and (
+                  candidate_assignment.valid_to is null
+                  or candidate_assignment.valid_to > current_timestamp
+                )
+            )
+            and exists (
+              select 1
+              from app.entity_assignments as actor_assignment
+              where actor_assignment.tenant_id = ${input.actor.tenantId}::uuid
+                and actor_assignment.entity_id = ${input.entityId}::uuid
+                and actor_assignment.user_id = ${input.actor.userId}::uuid
+                and actor_assignment.assignment_role in ('owner', 'collaborator')
+                and actor_assignment.valid_from <= current_timestamp
+                and (
+                  actor_assignment.valid_to is null
+                  or actor_assignment.valid_to > current_timestamp
+                )
+            )
           ${cursorFilter}
           order by
             sort_rank,
@@ -153,9 +181,10 @@ export class KyselyActionQueryReader implements ActionQueryReader {
       { ...input.actor, requestId: input.proposalId },
       async (transaction) => {
         const result = await sql<ProposalRow>`
-          ${proposalSelect()}
+          ${proposalSelect(input.actor)}
           where proposal.tenant_id = ${input.actor.tenantId}::uuid
             and proposal.id = ${input.proposalId}::uuid
+          ${proposalVisibilityFilter(input.actor)}
         `.execute(transaction);
         const row = result.rows[0];
         if (!row) throw new ActionProposalNotFoundError();
@@ -189,8 +218,9 @@ export class KyselyActionQueryReader implements ActionQueryReader {
             )`
           : sql``;
         const result = await sql<ProposalRow>`
-          ${proposalSelect()}
+          ${proposalSelect(input.actor)}
           where proposal.tenant_id = ${input.actor.tenantId}::uuid
+          ${proposalVisibilityFilter(input.actor)}
           ${statusFilter}
           ${priorityFilter}
           ${entityFilter}
@@ -223,7 +253,7 @@ export class KyselyActionQueryReader implements ActionQueryReader {
       { ...input.actor, requestId: input.actionId },
       async (transaction) => {
         const result = await sql<ActionRow>`
-          ${actionSelect()}
+          ${actionSelect(input.actor)}
           where action.tenant_id = ${input.actor.tenantId}::uuid
             and action.id = ${input.actionId}::uuid
           ${actionVisibilityFilter(input.actor)}
@@ -263,7 +293,7 @@ export class KyselyActionQueryReader implements ActionQueryReader {
             )`
           : sql``;
         const result = await sql<ActionRow>`
-          ${actionSelect()}
+          ${actionSelect(input.actor)}
           where action.tenant_id = ${input.actor.tenantId}::uuid
           ${statusFilter}
           ${priorityFilter}
@@ -292,7 +322,7 @@ export class KyselyActionQueryReader implements ActionQueryReader {
   }
 }
 
-function proposalSelect() {
+function proposalSelect(actor: { tenantId: string; userId: string }) {
   return sql`
     select
       proposal.id::text as proposal_id,
@@ -306,6 +336,19 @@ function proposalSelect() {
       proposal.suggested_priority,
       proposal.suggested_planned_at,
       proposal.source_battle_state_version_id::text as source_state_id,
+      exists (
+        select 1
+        from app.entity_assignments as decision_assignment
+        where decision_assignment.tenant_id = ${actor.tenantId}::uuid
+          and decision_assignment.entity_id = proposal.entity_id
+          and decision_assignment.user_id = ${actor.userId}::uuid
+          and decision_assignment.assignment_role in ('owner', 'collaborator')
+          and decision_assignment.valid_from <= current_timestamp
+          and (
+            decision_assignment.valid_to is null
+            or decision_assignment.valid_to > current_timestamp
+          )
+      ) as can_decide,
       case
         when proposal.status = 'pending_confirmation'
           and proposal.expires_at <= current_timestamp
@@ -332,7 +375,7 @@ function proposalSelect() {
   `;
 }
 
-function actionSelect() {
+function actionSelect(actor: { tenantId: string; userId: string }) {
   return sql`
     select
       action.id::text as action_id,
@@ -350,7 +393,23 @@ function actionSelect() {
       action.source_proposal_id::text as source_proposal_id,
       action.confirmed_by::text as confirmed_by,
       action.confirmed_at,
-      action.version_no
+      action.version_no,
+      (
+        action.owner_user_id = ${actor.userId}::uuid
+        and exists (
+          select 1
+          from app.entity_assignments as transition_assignment
+          where transition_assignment.tenant_id = ${actor.tenantId}::uuid
+            and transition_assignment.entity_id = action.entity_id
+            and transition_assignment.user_id = ${actor.userId}::uuid
+            and transition_assignment.assignment_role in ('owner', 'collaborator')
+            and transition_assignment.valid_from <= current_timestamp
+            and (
+              transition_assignment.valid_to is null
+              or transition_assignment.valid_to > current_timestamp
+            )
+        )
+      ) as can_transition
     from app.business_actions as action
     join app.business_entities as entity
       on entity.tenant_id = action.tenant_id
@@ -385,6 +444,23 @@ function actionVisibilityFilter(actor: { tenantId: string; userId: string }) {
   `;
 }
 
+function proposalVisibilityFilter(actor: { tenantId: string; userId: string }) {
+  return sql`
+    and exists (
+      select 1
+      from app.entity_assignments as visible_assignment
+      where visible_assignment.tenant_id = ${actor.tenantId}::uuid
+        and visible_assignment.entity_id = proposal.entity_id
+        and visible_assignment.user_id = ${actor.userId}::uuid
+        and visible_assignment.valid_from <= current_timestamp
+        and (
+          visible_assignment.valid_to is null
+          or visible_assignment.valid_to > current_timestamp
+        )
+    )
+  `;
+}
+
 function mapProposal(row: ProposalRow): ActionProposalRecord {
   return {
     proposalId: row.proposal_id,
@@ -398,6 +474,7 @@ function mapProposal(row: ProposalRow): ActionProposalRecord {
     suggestedPriority: row.suggested_priority,
     suggestedPlannedAt: toNullableIsoString(row.suggested_planned_at),
     sourceBattleStateVersionId: row.source_state_id,
+    canDecide: row.can_decide,
     status: row.status,
     versionNo: String(row.version_no),
     proposedAt: toIsoString(row.proposed_at),
@@ -427,6 +504,7 @@ function mapAction(row: ActionRow): BusinessActionRecord {
     confirmedBy: row.confirmed_by,
     confirmedAt: toIsoString(row.confirmed_at),
     versionNo: String(row.version_no),
+    canTransition: row.can_transition,
   };
 }
 
