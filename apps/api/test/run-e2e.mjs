@@ -9,6 +9,7 @@ const testFiles = [
   "test/notifications.e2e.test.ts",
   "test/workspace.e2e.test.ts",
   "test/management-queries.e2e.test.ts",
+  "test/weekly-reports.e2e.test.ts",
 ];
 
 for (const testFile of testFiles) {

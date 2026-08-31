@@ -7,6 +7,7 @@ import { FollowupDraftsModule } from "./followup-drafts/followup-drafts.module.j
 import { HealthController } from "./health/health.controller.js";
 import { ManagementQueriesModule } from "./management-queries/management-queries.module.js";
 import { NotificationsModule } from "./notifications/notifications.module.js";
+import { WeeklyReportsModule } from "./weekly-reports/weekly-reports.module.js";
 import { WorkspaceModule } from "./workspace/workspace.module.js";
 
 @Module({
@@ -18,6 +19,7 @@ import { WorkspaceModule } from "./workspace/workspace.module.js";
     NotificationsModule,
     WorkspaceModule,
     ManagementQueriesModule,
+    WeeklyReportsModule,
   ],
   controllers: [HealthController],
 })
