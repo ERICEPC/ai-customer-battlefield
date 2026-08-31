@@ -195,7 +195,7 @@ export function AppShell({
 
         <div className="sidebar-footer">
           <span className="environment-dot" />
-          演示环境 · 合成数据
+          开发环境 · PostgreSQL
         </div>
       </aside>
 

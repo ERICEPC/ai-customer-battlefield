@@ -52,6 +52,19 @@ const leaderSession = {
 afterEach(cleanup);
 
 describe("AppShell", () => {
+  it("identifies the running application as PostgreSQL-backed rather than synthetic", () => {
+    render(
+      <SessionProvider initialSession={salesSession}>
+        <AppShell activeItem="经营总览" breadcrumb="销售工作台 / 经营总览">
+          <p>工作台内容</p>
+        </AppShell>
+      </SessionProvider>,
+    );
+
+    expect(screen.getByText("开发环境 · PostgreSQL")).toBeVisible();
+    expect(screen.queryByText("演示环境 · 合成数据")).not.toBeInTheDocument();
+  });
+
   it("exposes real desktop and mobile routes for the implemented workspaces", () => {
     render(
       <SessionProvider initialSession={leaderSession}>
