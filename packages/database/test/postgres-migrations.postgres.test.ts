@@ -344,9 +344,11 @@ describe("PostgreSQL migrations", () => {
       "0004_battle_analysis_actions",
       "0005_reminders_notifications",
       "0006_weekly_reports",
+      "0007_weekly_report_hardening",
+      "0008_two_level_identity",
     ]);
     expect(secondRun).toEqual([]);
-    expect(rlsState.rows[0]).toEqual({ protected_count: 47, total_count: 47 });
+    expect(rlsState.rows[0]).toEqual({ protected_count: 49, total_count: 49 });
     expect(page.items.map((item) => item.id)).toEqual([SYNTHETIC_ENTITY_ID]);
     expect(confirmation.status).toBe("confirmed");
     expect(analysis.status).toBe("completed");
