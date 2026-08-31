@@ -43,6 +43,7 @@ const detail: WeeklyReportDetail = {
   },
   dataCutoffAt: "2026-08-31T00:00:00.000Z",
   scope: { label: "本人责任范围", entityCount: 1, contributorCount: 1 },
+  dataSufficiency: "partial",
   metrics: {
     confirmedFollowupCount: 2,
     validFactCount: 1,
@@ -51,7 +52,13 @@ const detail: WeeklyReportDetail = {
     openActionCount: 1,
     overdueActionCount: 1,
   },
-  generator: { kind: "deterministic", version: "weekly-progress-v1" },
+  generator: {
+    kind: "deterministic",
+    version: "weekly-progress-v1",
+    ruleVersion: "weekly-progress-v1",
+    promptVersion: null,
+  },
+  delivery: { status: "not_started", channels: [] },
   sections: [
     {
       kind: "progress",
@@ -210,6 +217,7 @@ function api(
       lockVersion: 2,
       status: "published",
       publishedAt: "2026-08-31T03:00:00.000Z",
+      delivery: { status: "pending", channels: [] },
       capabilities: { canReview: false, canPublish: false, canRevise: true },
     }),
     revise: vi.fn().mockResolvedValue({
@@ -246,6 +254,10 @@ describe("WeeklyReportWorkspace", () => {
     expect(within(report).getByText("数据截止")).toBeVisible();
     expect(
       within(report).getByText("确定性生成 · weekly-progress-v1"),
+    ).toBeVisible();
+    expect(within(report).getByText("数据充分度 · 部分充分")).toBeVisible();
+    expect(
+      within(report).getByText("规则 weekly-progress-v1 · Prompt 未使用"),
     ).toBeVisible();
     for (const heading of [
       "本周进展",
@@ -354,7 +366,9 @@ describe("WeeklyReportWorkspace", () => {
   });
 
   test("explains optimistic conflicts and reloads the exact current version", async () => {
+    const latest = { ...detail, lockVersion: 2, note: "服务端已有备注" };
     const reportApi = api({
+      get: vi.fn().mockResolvedValueOnce(detail).mockResolvedValueOnce(latest),
       review: vi
         .fn()
         .mockRejectedValue(
@@ -369,13 +383,52 @@ describe("WeeklyReportWorkspace", () => {
       <WeeklyReportWorkspace api={reportApi} initialVersionId={versionId} />,
     );
     await screen.findByRole("region", { name: "个人周报 第1版" });
+    fireEvent.change(screen.getByLabelText("审阅备注"), {
+      target: { value: "我的未保存审阅" },
+    });
+    fireEvent.click(screen.getByLabelText("不纳入：本周确认进展"));
     fireEvent.click(screen.getByRole("button", { name: "保存审阅" }));
     expect(await screen.findByRole("alert")).toHaveTextContent(
       "版本已变化，请重新载入后再审阅",
     );
     fireEvent.click(screen.getByRole("button", { name: "重新载入当前版本" }));
-    await act(async () => Promise.resolve());
+    expect(
+      await screen.findByText(
+        "已载入最新版本，并保留你的审阅修改，请再次保存。",
+      ),
+    ).toBeVisible();
     expect(reportApi.get).toHaveBeenCalledTimes(2);
+    expect(screen.getByLabelText("审阅备注")).toHaveValue("我的未保存审阅");
+    expect(screen.getByLabelText("纳入：本周确认进展")).not.toBeChecked();
+  });
+
+  test("reuses the same idempotency key after an uncertain generate failure", async () => {
+    const generate = vi
+      .fn()
+      .mockRejectedValueOnce(new Error("网络连接中断"))
+      .mockResolvedValueOnce(detail);
+    const idempotencyKeyFactory = vi
+      .fn()
+      .mockReturnValueOnce("stable-generate-key")
+      .mockReturnValueOnce("unexpected-new-key");
+    render(
+      <WeeklyReportWorkspace
+        api={api({ generate })}
+        now={() => new Date("2026-08-31T04:00:00.000Z")}
+        idempotencyKeyFactory={idempotencyKeyFactory}
+      />,
+    );
+    await screen.findByRole("button", { name: /个人周报 · 第1版/ });
+    fireEvent.click(screen.getByRole("button", { name: "生成周报" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("网络连接中断");
+    fireEvent.click(screen.getByRole("button", { name: "生成周报" }));
+    expect(await screen.findByText("周报已生成，等待人工审阅。")).toBeVisible();
+    expect(generate).toHaveBeenCalledTimes(2);
+    expect(generate.mock.calls.map((call) => call[1])).toEqual([
+      "stable-generate-key",
+      "stable-generate-key",
+    ]);
+    expect(idempotencyKeyFactory).toHaveBeenCalledTimes(1);
   });
 
   test("shows slow, empty and recoverable history states", async () => {

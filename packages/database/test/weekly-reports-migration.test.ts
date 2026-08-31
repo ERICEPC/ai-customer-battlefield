@@ -101,6 +101,27 @@ describe("0006_weekly_reports migration", () => {
     });
   });
 
+  test("keeps report-series identity immutable after creation", async () => {
+    await insertReport(database);
+    await insertVersion(database);
+
+    await expect(
+      sql`
+        update app.weekly_reports
+        set period_start = '2026-08-25T00:00:00.000Z'::timestamptz
+        where tenant_id = ${TENANT_ALPHA}::uuid
+          and id = ${REPORT_ALPHA}::uuid
+      `.execute(database.db),
+    ).rejects.toThrow(/series identity is immutable/i);
+    await expect(
+      sql`
+        delete from app.weekly_reports
+        where tenant_id = ${TENANT_ALPHA}::uuid
+          and id = ${REPORT_ALPHA}::uuid
+      `.execute(database.db),
+    ).rejects.toThrow(/series identity is immutable/i);
+  });
+
   test("requires coherent revision lineage, cutoffs and publication metadata", async () => {
     await insertReport(database);
     await insertVersion(database);
@@ -125,10 +146,12 @@ describe("0006_weekly_reports migration", () => {
       `.execute(database.db),
     ).rejects.toThrow();
 
+    await transitionVersionToReview(database);
+
     await sql`
       update app.weekly_report_versions
       set status = 'published', published_at = now(),
-          published_by = ${USER_ALPHA}::uuid, lock_version = 2,
+          published_by = ${USER_ALPHA}::uuid, lock_version = 3,
           updated_at = now()
       where tenant_id = ${TENANT_ALPHA}::uuid and id = ${VERSION_ALPHA}::uuid
     `.execute(database.db);
@@ -149,6 +172,7 @@ describe("0006_weekly_reports migration", () => {
     await insertEvidence(database);
     await insertContributor(database);
     await insertAudience(database);
+    await transitionVersionToReview(database);
 
     await expect(
       sql`
@@ -165,11 +189,16 @@ describe("0006_weekly_reports migration", () => {
       where tenant_id = ${TENANT_ALPHA}::uuid and id = ${ITEM_ALPHA}::uuid
     `.execute(database.db);
     expect(item.rows[0]?.included).toBe(false);
+    await expect(
+      insertEvidence(database, {
+        evidenceId: "70000000-0000-4000-8000-000000000002",
+      }),
+    ).rejects.toThrow(/assembled only while draft/i);
 
     await sql`
       update app.weekly_report_versions
       set status = 'published', published_at = now(),
-          published_by = ${USER_ALPHA}::uuid, lock_version = 2,
+          published_by = ${USER_ALPHA}::uuid, lock_version = 3,
           updated_at = now()
       where tenant_id = ${TENANT_ALPHA}::uuid and id = ${VERSION_ALPHA}::uuid
     `.execute(database.db);
@@ -184,11 +213,6 @@ describe("0006_weekly_reports migration", () => {
         delete from app.report_evidence_links
         where tenant_id = ${TENANT_ALPHA}::uuid and report_item_id = ${ITEM_ALPHA}::uuid
       `.execute(database.db),
-    ).rejects.toThrow();
-    await expect(
-      insertEvidence(database, {
-        evidenceId: "70000000-0000-4000-8000-000000000002",
-      }),
     ).rejects.toThrow();
     await expect(
       insertContributor(database, { userId: USER_ALPHA_SECOND }),
@@ -316,6 +340,7 @@ async function insertVersion(
     revisionNo?: number;
     previousVersionId?: string | null;
     dataCutoffAt?: string;
+    status?: "draft" | "in_review";
   } = {},
 ): Promise<void> {
   await sql`
@@ -329,7 +354,7 @@ async function insertVersion(
     ) values (
       ${TENANT_ALPHA}::uuid, ${input.versionId ?? VERSION_ALPHA}::uuid,
       ${input.reportId ?? REPORT_ALPHA}::uuid, ${input.revisionNo ?? 1}, 1,
-      'in_review',
+      ${input.status ?? "draft"},
       ${input.dataCutoffAt ?? "2026-08-31T00:00:00.000Z"}::timestamptz,
       '个人周报', '', ${"a".repeat(64)}, 1, 1, 2, 3, 1, 1, 2, 1,
       'deterministic', 'weekly-progress-v1',
@@ -360,14 +385,24 @@ async function insertItem(
 ): Promise<void> {
   await sql`
     insert into app.weekly_report_items (
-      tenant_id, id, report_version_id, section_type, entity_id,
+      tenant_id, id, report_version_id, section_type, entity_id, entity_name,
       title, summary, severity, occurred_at, included, sort_order, created_at
     ) values (
       ${TENANT_ALPHA}::uuid, ${ITEM_ALPHA}::uuid, ${VERSION_ALPHA}::uuid,
-      'progress', ${input.entityId ?? ENTITY_ALPHA}::uuid,
+      'progress', ${input.entityId ?? ENTITY_ALPHA}::uuid, 'alpha-entity',
       '本周进展', '客户确认安全评审时间', 'positive',
       '2026-08-30T03:00:00.000Z'::timestamptz, true, 1, now()
     )
+  `.execute(database.db);
+}
+
+async function transitionVersionToReview(
+  database: DatabaseHandle<BattlefieldDatabase>,
+): Promise<void> {
+  await sql`
+    update app.weekly_report_versions
+    set status = 'in_review', lock_version = 2, updated_at = now()
+    where tenant_id = ${TENANT_ALPHA}::uuid and id = ${VERSION_ALPHA}::uuid
   `.execute(database.db);
 }
 

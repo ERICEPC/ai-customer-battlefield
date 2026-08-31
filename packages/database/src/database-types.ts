@@ -665,6 +665,7 @@ export interface WeeklyReportItemTable {
   report_version_id: string;
   section_type: "progress" | "risk" | "next_action" | "data_gap";
   entity_id: string;
+  entity_name: string;
   title: string;
   summary: string;
   severity: "positive" | "info" | "warning" | "critical";

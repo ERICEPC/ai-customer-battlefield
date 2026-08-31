@@ -33,6 +33,7 @@ const detail: WeeklyReportDetail = {
   period: { start: request.periodStart, end: request.periodEnd },
   dataCutoffAt: request.periodEnd,
   scope: { label: "本人责任范围", entityCount: 1, contributorCount: 1 },
+  dataSufficiency: "sufficient",
   metrics: {
     confirmedFollowupCount: 0,
     validFactCount: 0,
@@ -41,7 +42,13 @@ const detail: WeeklyReportDetail = {
     openActionCount: 0,
     overdueActionCount: 0,
   },
-  generator: { kind: "deterministic", version: "weekly-progress-v1" },
+  generator: {
+    kind: "deterministic",
+    version: "weekly-progress-v1",
+    ruleVersion: "weekly-progress-v1",
+    promptVersion: null,
+  },
+  delivery: { status: "not_started", channels: [] },
   sections: [
     { kind: "progress", items: [] },
     { kind: "risk", items: [] },

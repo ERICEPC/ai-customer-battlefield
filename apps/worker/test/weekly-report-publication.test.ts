@@ -34,7 +34,6 @@ describe("weekly-report publication notification", () => {
     await migrateDatabase(database.migrations, MIGRATION_DIRECTORY);
     await seedSyntheticBusinessEntityDirectory(database);
     await seedSyntheticReminderConfiguration(database);
-    await seedReportNotificationTemplate(database);
   });
 
   afterEach(async () => {
@@ -42,6 +41,7 @@ describe("weekly-report publication notification", () => {
   });
 
   test("turns one publication Outbox message into in-app truth and optional Feishu delivery", async () => {
+    await seedReportNotificationTemplate(database);
     const actor = {
       tenantId: SYNTHETIC_TENANT_ID,
       userId: SYNTHETIC_USER_ID,
@@ -104,11 +104,58 @@ describe("weekly-report publication notification", () => {
     );
     const counts = await deliveryCounts(database, published.versionId);
     expect(counts).toEqual({ eventCount: 1, inAppCount: 1, feishuCount: 1 });
+    const deliveredReport = await repository.get({
+      actor,
+      versionId: published.versionId,
+    });
+    expect(deliveredReport.delivery).toEqual({
+      status: "delivered",
+      channels: [
+        { channel: "feishu", status: "delivered" },
+        { channel: "in_app", status: "delivered" },
+      ],
+    });
+  });
+
+  test("rejects a published template that drops the exact report identifiers", async () => {
+    await seedReportNotificationTemplate(database, "/reports");
+    const actor = {
+      tenantId: SYNTHETIC_TENANT_ID,
+      userId: SYNTHETIC_USER_ID,
+    };
+    const repository = new KyselyWeeklyReportRepository(database.db);
+    const generated = await repository.generate({
+      actor,
+      idempotencyKey: "worker-invalid-link-generate",
+      reportType: "personal",
+      periodStart: PERIOD_START,
+      periodEnd: PERIOD_END,
+      generatedAt: PERIOD_END,
+      dataCutoffAt: PERIOD_END,
+    });
+    const published = await repository.publish({
+      actor,
+      versionId: generated.versionId,
+      lockVersion: generated.lockVersion,
+      idempotencyKey: "worker-invalid-link-publish",
+    });
+
+    await expect(
+      new KyselyNotificationStore(database.db).materialize({
+        actor,
+        reportId: published.reportId,
+        reportVersionId: published.versionId,
+        recipientUserId: SYNTHETIC_USER_ID,
+        reportType: "personal",
+        publishedAt: published.publishedAt ?? PERIOD_END,
+      }),
+    ).rejects.toThrow(/notification template is invalid/i);
   });
 });
 
 async function seedReportNotificationTemplate(
   database: DatabaseHandle<BattlefieldDatabase>,
+  deepLinkTemplate = "/reports?reportId={{report_id}}&versionId={{report_version_id}}",
 ): Promise<void> {
   await withTenantTransaction(
     database.db,
@@ -136,8 +183,7 @@ async function seedReportNotificationTemplate(
           status: "published",
           title_template: "本周战报已发布",
           body_template: "《{{report_title}}》已完成审阅并发布。",
-          deep_link_template:
-            "/reports?reportId={{report_id}}&versionId={{report_version_id}}",
+          deep_link_template: deepLinkTemplate,
           priority: "medium",
           effective_at: "2026-08-01T00:00:00.000Z",
           published_by: SYNTHETIC_USER_ID,

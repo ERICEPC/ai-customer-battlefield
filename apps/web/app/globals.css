@@ -1936,7 +1936,7 @@ button:disabled {
   gap: 6px;
   align-items: center;
   flex: 0 0 auto;
-  min-height: 36px;
+  min-height: 44px;
   color: #475467;
   font-size: 9px;
   font-weight: 750;
@@ -2000,6 +2000,9 @@ button:disabled {
 }
 
 .report-evidence-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
   overflow: hidden;
   color: var(--blue);
   font-size: 10px;

@@ -143,10 +143,35 @@ export const weeklyReportDetailSchema = z
       entityCount: boundedCountSchema,
       contributorCount: boundedCountSchema,
     }),
+    dataSufficiency: z.enum(["sufficient", "partial", "insufficient"]),
     metrics: weeklyReportMetricsSchema,
     generator: z.strictObject({
       kind: z.enum(["deterministic", "agent"]),
       version: z.string().trim().min(1).max(200),
+      ruleVersion: z.string().trim().min(1).max(200),
+      promptVersion: z.string().trim().min(1).max(200).nullable(),
+    }),
+    delivery: z.strictObject({
+      status: z.enum([
+        "not_started",
+        "pending",
+        "delivered",
+        "partial",
+        "failed",
+      ]),
+      channels: z.array(
+        z.strictObject({
+          channel: z.enum(["in_app", "feishu", "email"]),
+          status: z.enum([
+            "pending",
+            "processing",
+            "delivered",
+            "failed",
+            "cancelled",
+            "dead_lettered",
+          ]),
+        }),
+      ),
     }),
     sections: z.array(weeklyReportSectionSchema).length(4),
     previousVersionId: z.uuid().nullable(),
@@ -212,6 +237,19 @@ export const weeklyReportDetailSchema = z
         code: "custom",
         path: ["publishedAt"],
         message: "Only a published report has a publication timestamp.",
+      });
+    }
+    if (
+      (report.status === "published" &&
+        report.delivery.status === "not_started") ||
+      (report.status !== "published" &&
+        (report.delivery.status !== "not_started" ||
+          report.delivery.channels.length > 0))
+    ) {
+      context.addIssue({
+        code: "custom",
+        path: ["delivery"],
+        message: "Delivery state must match the report publication state.",
       });
     }
   });

@@ -11,6 +11,16 @@ export type WeeklyReportSectionKind =
   | "risk"
   | "next_action"
   | "data_gap";
+export type WeeklyReportDataSufficiency =
+  | "sufficient"
+  | "partial"
+  | "insufficient";
+export type WeeklyReportDeliveryStatus =
+  | "not_started"
+  | "pending"
+  | "delivered"
+  | "partial"
+  | "failed";
 
 export interface WeeklyReportMetrics {
   confirmedFollowupCount: number;
@@ -56,8 +66,27 @@ export interface WeeklyReportDetail {
   period: { start: string; end: string };
   dataCutoffAt: string;
   scope: { label: string; entityCount: number; contributorCount: number };
+  dataSufficiency: WeeklyReportDataSufficiency;
   metrics: WeeklyReportMetrics;
-  generator: { kind: "deterministic" | "agent"; version: string };
+  generator: {
+    kind: "deterministic" | "agent";
+    version: string;
+    ruleVersion: string;
+    promptVersion: string | null;
+  };
+  delivery: {
+    status: WeeklyReportDeliveryStatus;
+    channels: Array<{
+      channel: "in_app" | "feishu" | "email";
+      status:
+        | "pending"
+        | "processing"
+        | "delivered"
+        | "failed"
+        | "cancelled"
+        | "dead_lettered";
+    }>;
+  };
   sections: Array<{ kind: WeeklyReportSectionKind; items: WeeklyReportItem[] }>;
   previousVersionId: string | null;
   createdAt: string;

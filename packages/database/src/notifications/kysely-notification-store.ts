@@ -603,13 +603,21 @@ function renderWeeklyReportTemplate(
     body: replace(template.body_template),
     deepLink: replace(template.deep_link_template),
   };
+  const deepLink = new URL(rendered.deepLink, "https://battlefield.local");
+  const reportIds = deepLink.searchParams.getAll("reportId");
+  const versionIds = deepLink.searchParams.getAll("versionId");
   if (
     rendered.title.trim().length === 0 ||
     rendered.title.length > 200 ||
     rendered.body.trim().length === 0 ||
     rendered.body.length > 2_000 ||
     !/^\/(?!\/)[^\r\n]*$/.test(rendered.deepLink) ||
-    rendered.deepLink.length > 2_000
+    rendered.deepLink.length > 2_000 ||
+    deepLink.pathname !== "/reports" ||
+    reportIds.length !== 1 ||
+    reportIds[0] !== values.reportId ||
+    versionIds.length !== 1 ||
+    versionIds[0] !== values.reportVersionId
   ) {
     throw new Error(
       "The published weekly-report notification template is invalid.",

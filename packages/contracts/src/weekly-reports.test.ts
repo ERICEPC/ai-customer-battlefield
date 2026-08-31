@@ -41,6 +41,7 @@ function detail() {
       entityCount: 1,
       contributorCount: 1,
     },
+    dataSufficiency: "sufficient" as const,
     metrics: {
       confirmedFollowupCount: 2,
       validFactCount: 3,
@@ -49,7 +50,13 @@ function detail() {
       openActionCount: 2,
       overdueActionCount: 1,
     },
-    generator: { kind: "deterministic", version: "weekly-progress-v1" },
+    generator: {
+      kind: "deterministic" as const,
+      version: "weekly-progress-v1",
+      ruleVersion: "weekly-progress-v1",
+      promptVersion: null,
+    },
+    delivery: { status: "not_started" as const, channels: [] },
     sections: [
       {
         kind: "progress" as const,

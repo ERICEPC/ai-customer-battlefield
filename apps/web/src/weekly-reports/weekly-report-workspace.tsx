@@ -57,6 +57,13 @@ const defaultApi: WeeklyReportWorkspaceApi = {
 };
 
 type Operation = "generate" | "review" | "publish" | "revise" | null;
+type IdempotentOperation = "generate" | "publish" | "revise";
+
+interface ReviewRecoveryDraft {
+  versionId: string;
+  note: string;
+  included: Record<string, boolean>;
+}
 
 export function WeeklyReportWorkspace({
   api = defaultApi,
@@ -98,6 +105,10 @@ export function WeeklyReportWorkspace({
   const detailRequestVersion = useRef(0);
   const hydratedSelection = useRef("");
   const operationInFlight = useRef(false);
+  const retryKeys = useRef(
+    new Map<IdempotentOperation, { signature: string; key: string }>(),
+  );
+  const reviewRecovery = useRef<ReviewRecoveryDraft | null>(null);
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: historyReload intentionally triggers recovery.
   useEffect(() => {
@@ -158,7 +169,18 @@ export function WeeklyReportWorkspace({
       .get(selectedVersionId)
       .then((report) => {
         if (detailRequestVersion.current !== version) return;
-        applyDetail(report, setDetail, setNote, setIncluded);
+        const recovery = reviewRecovery.current;
+        if (recovery?.versionId === report.versionId) {
+          setDetail(report);
+          setNote(recovery.note);
+          setIncluded(mergeReviewSelection(report, recovery.included));
+          setOperationMessage(
+            "已载入最新版本，并保留你的审阅修改，请再次保存。",
+          );
+          reviewRecovery.current = null;
+        } else {
+          applyDetail(report, setDetail, setNote, setIncluded);
+        }
       })
       .catch((error: unknown) => {
         if (detailRequestVersion.current !== version) return;
@@ -192,56 +214,103 @@ export function WeeklyReportWorkspace({
       setOperationError(request);
       return;
     }
-    await runOperation("generate", async () => {
-      const report = await api.generate(request, idempotencyKeyFactory());
-      showReport(report, "周报已生成，等待人工审阅。", true);
-    });
+    await runIdempotentOperation(
+      "generate",
+      JSON.stringify(request),
+      async (key) => {
+        const report = await api.generate(request, key);
+        showReport(report, "周报已生成，等待人工审阅。", true);
+      },
+    );
   }
 
   async function saveReview(): Promise<void> {
     if (!detail) return;
-    await runOperation("review", async () => {
-      const report = await api.review(detail.versionId, {
-        lockVersion: detail.lockVersion,
-        note,
-        items: detail.sections.flatMap((section) =>
-          section.items.map((item) => ({
-            itemId: item.itemId,
-            included: included[item.itemId] ?? item.included,
-          })),
-        ),
-      });
-      showReport(report, "审阅已保存", true);
-    });
+    const recovery = {
+      versionId: detail.versionId,
+      note,
+      included: { ...included },
+    };
+    await runOperation(
+      "review",
+      async () => {
+        const report = await api.review(detail.versionId, {
+          lockVersion: detail.lockVersion,
+          note,
+          items: detail.sections.flatMap((section) =>
+            section.items.map((item) => ({
+              itemId: item.itemId,
+              included: included[item.itemId] ?? item.included,
+            })),
+          ),
+        });
+        reviewRecovery.current = null;
+        showReport(report, "审阅已保存", true);
+      },
+      () => {
+        reviewRecovery.current = recovery;
+      },
+    );
   }
 
   async function publish(): Promise<void> {
     if (!detail) return;
-    await runOperation("publish", async () => {
-      const report = await api.publish(
-        detail.versionId,
-        { lockVersion: detail.lockVersion },
-        idempotencyKeyFactory(),
-      );
-      showReport(report, "发布完成 · 通知独立投递", true);
-    });
+    await runIdempotentOperation(
+      "publish",
+      `${detail.versionId}:${detail.lockVersion}`,
+      async (key) => {
+        const report = await api.publish(
+          detail.versionId,
+          { lockVersion: detail.lockVersion },
+          key,
+        );
+        showReport(report, "发布完成 · 通知独立投递", true);
+      },
+    );
   }
 
   async function revise(): Promise<void> {
     if (!detail) return;
-    await runOperation("revise", async () => {
-      const report = await api.revise(
-        detail.versionId,
-        { lockVersion: detail.lockVersion },
-        idempotencyKeyFactory(),
-      );
-      showReport(report, "修订版已创建，原发布版本保持不变。", true);
+    await runIdempotentOperation(
+      "revise",
+      `${detail.versionId}:${detail.lockVersion}`,
+      async (key) => {
+        const report = await api.revise(
+          detail.versionId,
+          { lockVersion: detail.lockVersion },
+          key,
+        );
+        showReport(report, "修订版已创建，原发布版本保持不变。", true);
+      },
+    );
+  }
+
+  async function runIdempotentOperation(
+    kind: IdempotentOperation,
+    signature: string,
+    execute: (key: string) => Promise<void>,
+  ): Promise<void> {
+    const existing = retryKeys.current.get(kind);
+    const key =
+      existing?.signature === signature
+        ? existing.key
+        : idempotencyKeyFactory();
+    retryKeys.current.set(kind, { signature, key });
+    await runOperation(kind, async () => {
+      try {
+        await execute(key);
+        retryKeys.current.delete(kind);
+      } catch (error) {
+        if (isDefinitiveClientFailure(error)) retryKeys.current.delete(kind);
+        throw error;
+      }
     });
   }
 
   async function runOperation(
     kind: Exclude<Operation, null>,
     execute: () => Promise<void>,
+    onConflict?: () => void,
   ): Promise<void> {
     if (operationInFlight.current) return;
     operationInFlight.current = true;
@@ -253,6 +322,7 @@ export function WeeklyReportWorkspace({
       await execute();
     } catch (error) {
       const conflict = isReportConflict(error);
+      if (conflict) onConflict?.();
       setNeedsReload(conflict);
       setOperationError(
         conflict
@@ -539,6 +609,13 @@ function ReportDetail(props: {
             {formatDateTime(report.dataCutoffAt)}
           </time>
           <small>确定性生成 · {report.generator.version}</small>
+          <small>
+            数据充分度 · {dataSufficiencyLabel(report.dataSufficiency)}
+          </small>
+          <small>
+            规则 {report.generator.ruleVersion} · Prompt{" "}
+            {report.generator.promptVersion ?? "未使用"}
+          </small>
         </div>
       </header>
 
@@ -688,7 +765,16 @@ function ReportDetail(props: {
         </div>
         {report.status === "published" ? (
           <p className="report-delivery-note">
-            发布完成 · 通知独立投递；外部渠道失败不会回滚该版本。
+            发布完成 · {deliveryStatusLabel(report.delivery.status)}
+            {report.delivery.channels.length > 0
+              ? `（${report.delivery.channels
+                  .map(
+                    (delivery) =>
+                      `${deliveryChannelLabel(delivery.channel)} ${deliveryStateLabel(delivery.status)}`,
+                  )
+                  .join("、")}）`
+              : ""}
+            ；外部渠道失败不会回滚该版本。
           </p>
         ) : null}
       </section>
@@ -756,6 +842,20 @@ function applyDetail(
   );
 }
 
+function mergeReviewSelection(
+  report: WeeklyReportDetail,
+  recovery: Record<string, boolean>,
+): Record<string, boolean> {
+  return Object.fromEntries(
+    report.sections.flatMap((section) =>
+      section.items.map((item) => [
+        item.itemId,
+        recovery[item.itemId] ?? item.included,
+      ]),
+    ),
+  );
+}
+
 function generationRequest(
   reportType: GenerateWeeklyReportRequest["reportType"],
   startDate: string,
@@ -808,6 +908,14 @@ function isReportConflict(error: unknown): boolean {
   );
 }
 
+function isDefinitiveClientFailure(error: unknown): boolean {
+  return (
+    error instanceof WeeklyReportApiError &&
+    error.status >= 400 &&
+    error.status < 500
+  );
+}
+
 function mergeHistory(
   primary: WeeklyReportListItem[],
   secondary: WeeklyReportListItem[],
@@ -845,6 +953,47 @@ function statusLabel(status: WeeklyReportDetail["status"]): string {
     in_review: "待审阅",
     published: "已发布",
     cancelled: "已取消",
+  }[status];
+}
+
+function dataSufficiencyLabel(
+  sufficiency: WeeklyReportDetail["dataSufficiency"],
+): string {
+  return {
+    sufficient: "充分",
+    partial: "部分充分",
+    insufficient: "不足",
+  }[sufficiency];
+}
+
+function deliveryStatusLabel(
+  status: WeeklyReportDetail["delivery"]["status"],
+): string {
+  return {
+    not_started: "尚未开始投递",
+    pending: "通知等待投递",
+    delivered: "通知已送达",
+    partial: "部分渠道已送达",
+    failed: "通知投递失败",
+  }[status];
+}
+
+function deliveryChannelLabel(
+  channel: WeeklyReportDetail["delivery"]["channels"][number]["channel"],
+): string {
+  return { in_app: "站内", feishu: "飞书", email: "邮箱" }[channel];
+}
+
+function deliveryStateLabel(
+  status: WeeklyReportDetail["delivery"]["channels"][number]["status"],
+): string {
+  return {
+    pending: "待投递",
+    processing: "投递中",
+    delivered: "已送达",
+    failed: "失败",
+    cancelled: "已取消",
+    dead_lettered: "已终止",
   }[status];
 }
 

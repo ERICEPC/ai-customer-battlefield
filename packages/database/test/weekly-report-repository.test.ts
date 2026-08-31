@@ -68,14 +68,20 @@ describe("KyselyWeeklyReportRepository generation", () => {
 
     const first = await repository.generate(input);
     const replay = await repository.generate(input);
+    const delayedReplay = await repository.generate({
+      ...input,
+      generatedAt: "2026-08-31T03:00:00.000Z",
+      dataCutoffAt: "2026-08-31T00:00:01.000Z",
+    });
 
     expect(replay).toEqual(first);
+    expect(delayedReplay).toEqual(first);
     expect(first).toMatchObject({
       reportId: REPORT_ID,
       versionId: VERSION_ID,
       reportType: "personal",
       revisionNo: 1,
-      lockVersion: 1,
+      lockVersion: 2,
       status: "in_review",
       title: "个人周报",
       note: "",
@@ -314,6 +320,46 @@ describe("KyselyWeeklyReportRepository generation", () => {
     });
   });
 
+  test("excludes backdated followups and facts confirmed after the cutoff", async () => {
+    await seedWeeklyActivity(database);
+    await sql`
+      update app.followups
+      set confirmed_at = '2026-09-01T00:00:00.000Z'::timestamptz
+      where tenant_id = ${TENANT_ALPHA}::uuid
+        and entity_id = ${ENTITY_ALPHA}::uuid
+    `.execute(database.db);
+    await sql`
+      update app.business_facts
+      set confirmed_at = '2026-09-01T00:00:00.000Z'::timestamptz
+      where tenant_id = ${TENANT_ALPHA}::uuid
+        and entity_id = ${ENTITY_ALPHA}::uuid
+    `.execute(database.db);
+
+    const itemIds = [PROGRESS_ITEM_ID, RISK_ITEM_ID, NEXT_ACTION_ITEM_ID];
+    const report = await new KyselyWeeklyReportRepository(database.db, {
+      reportIdFactory: () => REPORT_ID,
+      versionIdFactory: () => VERSION_ID,
+      itemIdFactory: () => itemIds.shift() ?? ITEM_ID,
+    }).generate({
+      actor: { tenantId: TENANT_ALPHA, userId: SELLER_ALPHA },
+      idempotencyKey: "personal-report-late-confirmation",
+      reportType: "personal",
+      periodStart: PERIOD_START,
+      periodEnd: PERIOD_END,
+      generatedAt: GENERATED_AT,
+      dataCutoffAt: PERIOD_END,
+    });
+
+    expect(report.metrics.confirmedFollowupCount).toBe(0);
+    expect(report.metrics.validFactCount).toBe(0);
+    expect(
+      report.sections
+        .flatMap((section) => section.items)
+        .flatMap((item) => item.evidence)
+        .map((evidence) => evidence.kind),
+    ).not.toEqual(expect.arrayContaining(["followup", "fact"]));
+  });
+
   test("fails closed when the actor has no report scope", async () => {
     const repository = createRepository(database);
     await expect(
@@ -451,12 +497,12 @@ describe("KyselyWeeklyReportRepository generation", () => {
     const reviewed = await repository.review({
       actor: { tenantId: TENANT_ALPHA, userId: SELLER_ALPHA },
       versionId: VERSION_ID,
-      lockVersion: 1,
+      lockVersion: generated.lockVersion,
       note: "本周优先补齐作战状态。",
       items: [{ itemId: ITEM_ID, included: false }],
     });
     expect(reviewed).toMatchObject({
-      lockVersion: 2,
+      lockVersion: generated.lockVersion + 1,
       note: "本周优先补齐作战状态。",
       status: "in_review",
     });
@@ -465,7 +511,7 @@ describe("KyselyWeeklyReportRepository generation", () => {
       repository.review({
         actor: { tenantId: TENANT_ALPHA, userId: SELLER_ALPHA },
         versionId: VERSION_ID,
-        lockVersion: 1,
+        lockVersion: generated.lockVersion,
         note: "stale",
         items: [],
       }),
@@ -474,19 +520,19 @@ describe("KyselyWeeklyReportRepository generation", () => {
     const published = await repository.publish({
       actor: { tenantId: TENANT_ALPHA, userId: SELLER_ALPHA },
       versionId: VERSION_ID,
-      lockVersion: 2,
+      lockVersion: reviewed.lockVersion,
       idempotencyKey: "publish-personal-report",
     });
     const replay = await repository.publish({
       actor: { tenantId: TENANT_ALPHA, userId: SELLER_ALPHA },
       versionId: VERSION_ID,
-      lockVersion: 2,
+      lockVersion: reviewed.lockVersion,
       idempotencyKey: "publish-personal-report",
     });
     expect(replay).toEqual(published);
     expect(published).toMatchObject({
       status: "published",
-      lockVersion: 3,
+      lockVersion: reviewed.lockVersion + 1,
       capabilities: { canReview: false, canPublish: false, canRevise: true },
     });
     expect(published.publishedAt).not.toBeNull();
@@ -494,7 +540,7 @@ describe("KyselyWeeklyReportRepository generation", () => {
       repository.review({
         actor: { tenantId: TENANT_ALPHA, userId: SELLER_ALPHA },
         versionId: VERSION_ID,
-        lockVersion: 3,
+        lockVersion: published.lockVersion,
         note: "tampered",
         items: [],
       }),
@@ -504,6 +550,7 @@ describe("KyselyWeeklyReportRepository generation", () => {
       event_count: number;
       outbox_count: number;
       publish_audit_count: number;
+      review_audit_count: number;
     }>`
       select
         (select count(*)::int from app.domain_events
@@ -512,18 +559,35 @@ describe("KyselyWeeklyReportRepository generation", () => {
           where topic = 'weekly_report.published.v1') as outbox_count,
         (select count(*)::int from app.audit_entries
           where aggregate_type = 'weekly_report'
-            and action = 'weekly_report.published') as publish_audit_count
+            and action = 'weekly_report.published') as publish_audit_count,
+        (select count(*)::int from app.audit_entries
+          where aggregate_type = 'weekly_report'
+            and action = 'weekly_report.reviewed'
+            and after_payload ->> 'excludedCount' = '1') as review_audit_count
     `.execute(database.db);
     expect(persisted.rows[0]).toEqual({
       event_count: 1,
       outbox_count: 1,
       publish_audit_count: 1,
+      review_audit_count: 1,
     });
+
+    await sql`
+      update app.business_entities
+      set name = 'renamed-after-publication'
+      where tenant_id = ${TENANT_ALPHA}::uuid
+        and id = ${ENTITY_ALPHA}::uuid
+    `.execute(database.db);
+    const frozen = await repository.get({
+      actor: { tenantId: TENANT_ALPHA, userId: SELLER_ALPHA },
+      versionId: VERSION_ID,
+    });
+    expect(frozen.sections[3]?.items[0]?.entityName).toBe("alpha-entity");
   });
 
   test("revalidates the current scope before publication", async () => {
     const repository = createRepository(database);
-    await repository.generate({
+    const generated = await repository.generate({
       actor: { tenantId: TENANT_ALPHA, userId: MANAGER_ALPHA },
       idempotencyKey: "managed-before-publish",
       reportType: "managed_portfolio",
@@ -546,7 +610,7 @@ describe("KyselyWeeklyReportRepository generation", () => {
       repository.publish({
         actor: { tenantId: TENANT_ALPHA, userId: MANAGER_ALPHA },
         versionId: VERSION_ID,
-        lockVersion: 1,
+        lockVersion: generated.lockVersion,
         idempotencyKey: "publish-revoked-managed-report",
       }),
     ).rejects.toBeInstanceOf(WeeklyReportScopeConflictError);
@@ -572,7 +636,7 @@ describe("KyselyWeeklyReportRepository generation", () => {
       eventIdFactory: () => EVENT_ID,
       outboxIdFactory: () => OUTBOX_ID,
     });
-    await repository.generate({
+    const generated = await repository.generate({
       actor: { tenantId: TENANT_ALPHA, userId: SELLER_ALPHA },
       idempotencyKey: "personal-before-revision",
       reportType: "personal",
@@ -584,7 +648,7 @@ describe("KyselyWeeklyReportRepository generation", () => {
     const published = await repository.publish({
       actor: { tenantId: TENANT_ALPHA, userId: SELLER_ALPHA },
       versionId: VERSION_ID,
-      lockVersion: 1,
+      lockVersion: generated.lockVersion,
       idempotencyKey: "publish-before-revision",
     });
     await sql`
@@ -615,7 +679,7 @@ describe("KyselyWeeklyReportRepository generation", () => {
       reportId: REPORT_ID,
       versionId: VERSION_ID_SECOND,
       revisionNo: 2,
-      lockVersion: 1,
+      lockVersion: 2,
       status: "in_review",
       previousVersionId: VERSION_ID,
       scope: { entityCount: 2, contributorCount: 1 },

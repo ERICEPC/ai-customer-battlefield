@@ -100,6 +100,7 @@ export async function projectWeeklyProgress(
     .where("occurred_at", ">=", sql<Date>`${input.periodStart}::timestamptz`)
     .where("occurred_at", "<", sql<Date>`${input.periodEnd}::timestamptz`)
     .where("occurred_at", "<=", sql<Date>`${input.dataCutoffAt}::timestamptz`)
+    .where("confirmed_at", "<=", sql<Date>`${input.dataCutoffAt}::timestamptz`)
     .limit(input.maxEventRowsPerKind + 1)
     .execute();
   input.assertRowLimit(followups.length, input.maxEventRowsPerKind);
@@ -125,6 +126,7 @@ export async function projectWeeklyProgress(
     .where("occurred_at", ">=", sql<Date>`${input.periodStart}::timestamptz`)
     .where("occurred_at", "<", sql<Date>`${input.periodEnd}::timestamptz`)
     .where("occurred_at", "<=", sql<Date>`${input.dataCutoffAt}::timestamptz`)
+    .where("confirmed_at", "<=", sql<Date>`${input.dataCutoffAt}::timestamptz`)
     .limit(input.maxEventRowsPerKind + 1)
     .execute();
   input.assertRowLimit(facts.length, input.maxEventRowsPerKind);

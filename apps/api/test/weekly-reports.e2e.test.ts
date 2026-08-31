@@ -112,11 +112,17 @@ describe("weekly report API", () => {
     expect(generated).toMatchObject({
       reportType: "personal",
       revisionNo: 1,
-      lockVersion: 1,
+      lockVersion: 2,
       status: "in_review",
       dataCutoffAt: FIXED_NOW,
       scope: { label: "本人责任范围", entityCount: 1 },
-      generator: { kind: "deterministic", version: "weekly-progress-v1" },
+      generator: {
+        kind: "deterministic",
+        version: "weekly-progress-v1",
+        ruleVersion: "weekly-progress-v1",
+        promptVersion: null,
+      },
+      delivery: { status: "not_started", channels: [] },
     });
     expect(generated.sections.map((section) => section.kind)).toEqual([
       "progress",
@@ -160,7 +166,7 @@ describe("weekly report API", () => {
       .expect(200);
     const reviewed = weeklyReportDetailSchema.parse(reviewedResponse.body);
     expect(reviewed).toMatchObject({
-      lockVersion: 2,
+      lockVersion: generated.lockVersion + 1,
       note: "本周重点已人工核对。",
       status: "in_review",
     });
@@ -174,7 +180,7 @@ describe("weekly report API", () => {
 
     const staleReview = await sellerRequest(app)
       .patch(`/api/v1/reports/${generated.versionId}/review`)
-      .send({ lockVersion: 1, note: "stale", items: [] })
+      .send({ lockVersion: generated.lockVersion, note: "stale", items: [] })
       .expect(409);
     expect(weeklyReportApiErrorSchema.parse(staleReview.body).code).toBe(
       "WEEKLY_REPORT_VERSION_CONFLICT",
@@ -188,7 +194,8 @@ describe("weekly report API", () => {
     const published = weeklyReportDetailSchema.parse(publishedResponse.body);
     expect(published).toMatchObject({
       status: "published",
-      lockVersion: 3,
+      lockVersion: reviewed.lockVersion + 1,
+      delivery: { status: "pending", channels: [] },
       capabilities: { canReview: false, canPublish: false, canRevise: true },
     });
     expect(published.publishedAt).not.toBeNull();

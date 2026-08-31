@@ -120,7 +120,6 @@ export class KyselyWeeklyReportRepository implements WeeklyReportRepository {
         const requestHash = hashJson({
           actorTenantId: input.actor.tenantId,
           actorUserId: input.actor.userId,
-          dataCutoffAt: input.dataCutoffAt,
           periodEnd: input.periodEnd,
           periodStart: input.periodStart,
           reportType: input.reportType,
@@ -235,7 +234,7 @@ export class KyselyWeeklyReportRepository implements WeeklyReportRepository {
             report_id: reportId,
             revision_no: 1,
             lock_version: 1,
-            status: "in_review",
+            status: "draft",
             data_cutoff_at: input.dataCutoffAt,
             title,
             note: "",
@@ -297,13 +296,23 @@ export class KyselyWeeklyReportRepository implements WeeklyReportRepository {
           projection,
           contributorMap,
         });
+        await transaction
+          .updateTable("app.weekly_report_versions")
+          .set({
+            status: "in_review",
+            lock_version: 2,
+            updated_at: input.generatedAt,
+          })
+          .where("tenant_id", "=", input.actor.tenantId)
+          .where("id", "=", versionId)
+          .executeTakeFirstOrThrow();
 
         const result: WeeklyReportDetail = {
           reportId,
           versionId,
           reportType: input.reportType,
           revisionNo: 1,
-          lockVersion: 1,
+          lockVersion: 2,
           status: "in_review",
           title,
           note: "",
@@ -314,8 +323,10 @@ export class KyselyWeeklyReportRepository implements WeeklyReportRepository {
             entityCount: entities.length,
             contributorCount: contributorIds.size,
           },
+          dataSufficiency: deriveDataSufficiency(sections, entities.length),
           metrics: projection.metrics,
-          generator: { kind: "deterministic", version: "weekly-progress-v1" },
+          generator: deterministicGeneratorMetadata(),
+          delivery: { status: "not_started", channels: [] },
           sections,
           previousVersionId: null,
           createdAt: input.generatedAt,
@@ -488,9 +499,10 @@ export class KyselyWeeklyReportRepository implements WeeklyReportRepository {
     note: string;
     items: Array<{ itemId: string; included: boolean }>;
   }): Promise<WeeklyReportDetail> {
+    const requestId = this.requestIdFactory();
     return withTenantTransaction(
       this.database,
-      { ...input.actor, requestId: this.requestIdFactory() },
+      { ...input.actor, requestId },
       async (transaction) => {
         const version = await transaction
           .selectFrom("app.weekly_report_versions as version")
@@ -499,7 +511,12 @@ export class KyselyWeeklyReportRepository implements WeeklyReportRepository {
               .onRef("audience.tenant_id", "=", "version.tenant_id")
               .onRef("audience.report_version_id", "=", "version.id"),
           )
-          .select(["version.status", "version.lock_version"])
+          .select([
+            "version.report_id",
+            "version.status",
+            "version.lock_version",
+            "version.note",
+          ])
           .where("version.tenant_id", "=", input.actor.tenantId)
           .where("version.id", "=", input.versionId)
           .where("audience.user_id", "=", input.actor.userId)
@@ -534,6 +551,43 @@ export class KyselyWeeklyReportRepository implements WeeklyReportRepository {
           })
           .where("tenant_id", "=", input.actor.tenantId)
           .where("id", "=", input.versionId)
+          .executeTakeFirstOrThrow();
+        const inclusionCounts = await transaction
+          .selectFrom("app.weekly_report_items")
+          .select([
+            sql<number>`count(*) filter (where included)::int`.as(
+              "included_count",
+            ),
+            sql<number>`count(*) filter (where not included)::int`.as(
+              "excluded_count",
+            ),
+          ])
+          .where("tenant_id", "=", input.actor.tenantId)
+          .where("report_version_id", "=", input.versionId)
+          .executeTakeFirstOrThrow();
+        await transaction
+          .insertInto("app.audit_entries")
+          .values({
+            tenant_id: input.actor.tenantId,
+            aggregate_type: "weekly_report",
+            aggregate_id: version.report_id,
+            action: "weekly_report.reviewed",
+            actor_user_id: input.actor.userId,
+            request_id: requestId,
+            before_payload: jsonObject({
+              lockVersion: input.lockVersion,
+              noteChanged: version.note !== input.note,
+            }),
+            after_payload: jsonObject({
+              versionId: input.versionId,
+              lockVersion: input.lockVersion + 1,
+              reviewedItemCount: input.items.length,
+              includedCount: inclusionCounts.included_count,
+              excludedCount: inclusionCounts.excluded_count,
+            }),
+            reason: null,
+            occurred_at: changedAt,
+          })
           .executeTakeFirstOrThrow();
         return readDetail(transaction, input);
       },
@@ -826,7 +880,7 @@ export class KyselyWeeklyReportRepository implements WeeklyReportRepository {
             report_id: version.report_id,
             revision_no: revisionNo,
             lock_version: 1,
-            status: "in_review",
+            status: "draft",
             data_cutoff_at: dataCutoffAt,
             title: version.title,
             note: version.note,
@@ -887,12 +941,22 @@ export class KyselyWeeklyReportRepository implements WeeklyReportRepository {
           projection,
           contributorMap: groupContributors(contributors),
         });
+        await transaction
+          .updateTable("app.weekly_report_versions")
+          .set({
+            status: "in_review",
+            lock_version: 2,
+            updated_at: generatedAt,
+          })
+          .where("tenant_id", "=", input.actor.tenantId)
+          .where("id", "=", versionId)
+          .executeTakeFirstOrThrow();
         const result: WeeklyReportDetail = {
           reportId: version.report_id,
           versionId,
           reportType: version.report_type,
           revisionNo,
-          lockVersion: 1,
+          lockVersion: 2,
           status: "in_review",
           title: version.title,
           note: version.note,
@@ -906,8 +970,10 @@ export class KyselyWeeklyReportRepository implements WeeklyReportRepository {
             entityCount: entities.length,
             contributorCount: contributorIds.size,
           },
+          dataSufficiency: deriveDataSufficiency(sections, entities.length),
           metrics: projection.metrics,
-          generator: { kind: "deterministic", version: "weekly-progress-v1" },
+          generator: deterministicGeneratorMetadata(),
+          delivery: { status: "not_started", channels: [] },
           sections,
           previousVersionId: input.versionId,
           createdAt: generatedAt,
@@ -1095,6 +1161,7 @@ export class KyselyWeeklyReportRepository implements WeeklyReportRepository {
         report_version_id: input.versionId,
         section_type: input.item.sectionKind,
         entity_id: input.item.entityId,
+        entity_name: input.item.entityName,
         title: input.item.title,
         summary: input.item.summary,
         severity: input.item.severity,
@@ -1276,13 +1343,7 @@ async function readDetail(
     [
       transaction
         .selectFrom("app.weekly_report_items as item")
-        .innerJoin("app.business_entities as entity", (join) =>
-          join
-            .onRef("entity.tenant_id", "=", "item.tenant_id")
-            .onRef("entity.id", "=", "item.entity_id"),
-        )
         .selectAll("item")
-        .select("entity.name as entity_name")
         .where("item.tenant_id", "=", input.actor.tenantId)
         .where("item.report_version_id", "=", input.versionId)
         .orderBy("item.section_type")
@@ -1384,6 +1445,11 @@ async function readDetail(
     });
   }
   const canEdit = row.status === "in_review" && Boolean(reviewer);
+  const delivery = await readDelivery(transaction, {
+    tenantId: input.actor.tenantId,
+    versionId: input.versionId,
+    published: row.status === "published",
+  });
   return {
     reportId: row.report_id,
     versionId: row.version_id,
@@ -1401,6 +1467,7 @@ async function readDetail(
       entityCount: row.scope_entity_count,
       contributorCount: row.contributor_count,
     },
+    dataSufficiency: deriveDataSufficiency(sections, row.scope_entity_count),
     metrics: {
       confirmedFollowupCount: row.confirmed_followup_count,
       validFactCount: row.valid_fact_count,
@@ -1412,7 +1479,14 @@ async function readDetail(
     generator: {
       kind: row.generator_kind,
       version: row.generator_version,
+      ruleVersion:
+        row.generator_kind === "deterministic"
+          ? row.generator_version
+          : "weekly-progress-v1",
+      promptVersion:
+        row.generator_kind === "agent" ? row.generator_version : null,
     },
+    delivery,
     sections,
     previousVersionId: row.previous_version_id,
     createdAt: toIso(row.created_at),
@@ -1423,6 +1497,43 @@ async function readDetail(
       canRevise: row.status === "published" && Boolean(reviewer),
     },
   };
+}
+
+async function readDelivery(
+  transaction: DatabaseTransaction,
+  input: { tenantId: string; versionId: string; published: boolean },
+): Promise<WeeklyReportDetail["delivery"]> {
+  if (!input.published) return { status: "not_started", channels: [] };
+  const event = await transaction
+    .selectFrom("app.notification_events")
+    .select("id")
+    .where("tenant_id", "=", input.tenantId)
+    .where("report_version_id", "=", input.versionId)
+    .executeTakeFirst();
+  if (!event) return { status: "pending", channels: [] };
+  const channels = await transaction
+    .selectFrom("app.notification_deliveries")
+    .select(["channel", "status"])
+    .where("tenant_id", "=", input.tenantId)
+    .where("notification_event_id", "=", event.id)
+    .orderBy("channel")
+    .execute();
+  if (channels.length === 0) return { status: "pending", channels: [] };
+  const delivered = channels.filter(
+    (delivery) => delivery.status === "delivered",
+  ).length;
+  const failed = channels.filter((delivery) =>
+    ["failed", "cancelled", "dead_lettered"].includes(delivery.status),
+  ).length;
+  const status: WeeklyReportDetail["delivery"]["status"] =
+    delivered === channels.length
+      ? "delivered"
+      : failed === channels.length
+        ? "failed"
+        : delivered > 0 && failed > 0
+          ? "partial"
+          : "pending";
+  return { status, channels };
 }
 
 async function currentTimestamp(
@@ -1571,6 +1682,28 @@ function contributorDtos(contributors: ContributorRow[]) {
     userId: contributor.user_id,
     displayName: contributor.display_name,
   }));
+}
+
+function deterministicGeneratorMetadata(): WeeklyReportDetail["generator"] {
+  return {
+    kind: "deterministic",
+    version: "weekly-progress-v1",
+    ruleVersion: "weekly-progress-v1",
+    promptVersion: null,
+  };
+}
+
+function deriveDataSufficiency(
+  sections: WeeklyReportDetail["sections"],
+  entityCount: number,
+): WeeklyReportDetail["dataSufficiency"] {
+  const gapEntityCount = new Set(
+    sections
+      .find((section) => section.kind === "data_gap")
+      ?.items.map((item) => item.entityId) ?? [],
+  ).size;
+  if (gapEntityCount === 0) return "sufficient";
+  return gapEntityCount >= entityCount ? "insufficient" : "partial";
 }
 
 function progressSummary(entity: EntityProjection): string {
