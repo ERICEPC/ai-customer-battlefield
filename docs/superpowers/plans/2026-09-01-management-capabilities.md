@@ -107,4 +107,21 @@
 - [x] Add capability-protected REST endpoints and focused API E2E coverage.
 - [x] Apply no schema migration: this slice intentionally reuses the already deployed grant, idempotency, and audit tables.
 - [x] Run affected package typechecks, focused tests, differential Biome, public-boundary and staged-diff checks.
-- [ ] Commit and push directly to `main`, then add the permission card to the existing system-management page.
+- [x] Commit and push directly to `main`, then add the permission card to the existing system-management page.
+
+### Task 6: Visible role-permission management
+
+**Files:**
+- Modify: `apps/web/src/system-management/api-client.ts`
+- Modify: `apps/web/src/system-management/system-management-workspace.tsx`
+- Modify: `apps/web/app/globals.css`
+- Modify: focused Web tests.
+
+**Interfaces:**
+- Produces: an access-control card that displays both roles, active account counts, the complete capability set, mandatory change reasons, and audited full-set saves.
+
+- [x] Add strict Web API calls for reading the current snapshot and replacing one role's complete desired capability set.
+- [x] Render the card above Agent runtime configuration and explain that function grants do not widen customer or opportunity responsibility scope.
+- [x] Keep save disabled until the desired set changes and a reason is entered; send a fresh idempotency key for each deliberate save.
+- [x] Load and render the card only when the signed-in session has `access_control.manage`, so independently delegated runtime operators can still use the rest of system management.
+- [x] Verify the real leader view without mutating real grants; run the two focused Web specs and Web typecheck.

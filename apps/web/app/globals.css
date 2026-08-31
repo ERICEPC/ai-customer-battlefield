@@ -6363,6 +6363,185 @@ section.workspace-attention a:hover {
   text-align: right;
 }
 
+.access-scope-note {
+  display: flex;
+  gap: 20px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px;
+  color: #235a48;
+  border: 1px solid #bde5d4;
+  border-radius: 12px;
+  background: #ecfaf4;
+}
+
+.access-scope-note strong,
+.access-scope-note p {
+  margin: 0;
+}
+
+.access-scope-note strong {
+  font-size: 13px;
+}
+
+.access-scope-note p {
+  max-width: 600px;
+  font-size: 12px;
+  line-height: 1.6;
+  text-align: right;
+}
+
+.role-capability-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  align-items: start;
+}
+
+.role-capability-grid > article {
+  min-width: 0;
+  padding: 20px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: #fbfcfe;
+}
+
+.role-capability-heading {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+
+.role-capability-heading span {
+  color: var(--blue);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+}
+
+.role-capability-heading h3,
+.role-capability-heading p {
+  margin: 0;
+}
+
+.role-capability-heading h3 {
+  margin-top: 5px;
+  font-size: 18px;
+}
+
+.role-capability-heading p {
+  padding: 5px 9px;
+  color: #475467;
+  font-size: 11px;
+  white-space: nowrap;
+  border-radius: 999px;
+  background: #edf1f6;
+}
+
+.role-capability-grid fieldset {
+  display: grid;
+  gap: 9px;
+  min-width: 0;
+  margin: 18px 0 0;
+  padding: 0;
+  border: 0;
+}
+
+.role-capability-grid legend {
+  margin-bottom: 9px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 750;
+}
+
+.role-capability-grid fieldset > label {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: start;
+  padding: 11px 12px;
+  border: 1px solid #dbe2ec;
+  border-radius: 11px;
+  background: #ffffff;
+  cursor: pointer;
+}
+
+.role-capability-grid fieldset input {
+  width: 16px;
+  height: 16px;
+  margin: 2px 0 0;
+  accent-color: var(--blue);
+}
+
+.role-capability-grid fieldset span,
+.role-capability-grid fieldset strong,
+.role-capability-grid fieldset small {
+  display: block;
+  min-width: 0;
+}
+
+.role-capability-grid fieldset strong {
+  color: #25344d;
+  font-size: 13px;
+}
+
+.role-capability-grid fieldset small {
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.role-capability-grid fieldset em {
+  padding: 3px 7px;
+  color: #475467;
+  font-size: 10px;
+  font-style: normal;
+  white-space: nowrap;
+  border-radius: 999px;
+  background: #edf1f6;
+}
+
+.role-capability-grid fieldset input:checked ~ em {
+  color: #116149;
+  background: #dcf4e9;
+}
+
+.role-capability-save {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: end;
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+}
+
+.role-capability-save label {
+  display: grid;
+  gap: 7px;
+  color: #344054;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.role-capability-save input {
+  min-height: 42px;
+  width: 100%;
+  padding: 0 11px;
+  color: var(--ink);
+  border: 1px solid #cfd7e5;
+  border-radius: 10px;
+  background: #ffffff;
+}
+
+.role-capability-save button {
+  min-height: 42px;
+  white-space: nowrap;
+}
+
 .runtime-version-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
@@ -6721,7 +6900,8 @@ section.workspace-attention a:hover {
 
 @media (max-width: 980px) {
   .admin-form-grid,
-  .queue-health-grid {
+  .queue-health-grid,
+  .role-capability-grid {
     grid-template-columns: 1fr;
   }
 
@@ -6755,11 +6935,21 @@ section.workspace-attention a:hover {
     text-align: left;
   }
 
+  .access-scope-note {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .access-scope-note p {
+    text-align: left;
+  }
+
   .runtime-version-grid,
   .admin-parameter-grid,
   .failure-list dl,
   .failure-replay,
-  .admin-audit-list > article {
+  .admin-audit-list > article,
+  .role-capability-save {
     grid-template-columns: 1fr;
   }
 

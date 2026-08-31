@@ -1,30 +1,43 @@
 "use client";
 
 import {
+  type AccessControlSnapshot,
   type AiRuntimeConfigVersion,
   type AiRuntimeConfigVersionPage,
   type AsyncWorkFailurePage,
   type AsyncWorkFailureRecord,
   type AuditEntryPage,
   type CreateAiRuntimeConfigVersionRequest,
+  type ManagementCapability,
   type ReleasedAiRuntimeConfig,
+  type RoleCapabilityUpdate,
   type SenseAudioTextModelId,
   senseAudioTextModelIds,
   type WorkerOperationsHealth,
 } from "@battlefield/contracts";
 import { type FormEvent, useEffect, useMemo, useState } from "react";
 
+import { useOptionalSession } from "../auth/session-provider";
 import {
   createAiRuntimeConfigVersion,
+  getAccessControlSnapshot,
   getWorkerOperationsHealth,
   listAiRuntimeConfigVersions,
   listAsyncWorkFailures,
   listRecentAuditEntries,
   releaseAiRuntimeConfigVersion,
+  replaceRoleCapabilities,
   replayAsyncWorkItem,
 } from "./api-client";
 
 export interface SystemManagementWorkspaceApi {
+  getAccessControl(): Promise<AccessControlSnapshot>;
+  replaceRoleCapabilities(
+    roleCode: string,
+    capabilities: ManagementCapability[],
+    reason: string,
+    idempotencyKey: string,
+  ): Promise<RoleCapabilityUpdate>;
   listVersions(): Promise<AiRuntimeConfigVersionPage>;
   createVersion(
     input: CreateAiRuntimeConfigVersionRequest,
@@ -44,6 +57,8 @@ export interface SystemManagementWorkspaceApi {
 }
 
 const defaultApi: SystemManagementWorkspaceApi = {
+  getAccessControl: getAccessControlSnapshot,
+  replaceRoleCapabilities,
   listVersions: listAiRuntimeConfigVersions,
   createVersion: createAiRuntimeConfigVersion,
   releaseVersion: releaseAiRuntimeConfigVersion,
@@ -64,18 +79,25 @@ export function SystemManagementWorkspace({
 }: {
   api?: SystemManagementWorkspaceApi;
 }) {
+  const sessionContext = useOptionalSession();
+  const canManageAccess =
+    sessionContext?.session?.capabilities.includes("access_control.manage") ??
+    true;
   const [versions, setVersions] = useState<AiRuntimeConfigVersionPage | null>(
     null,
   );
   const [health, setHealth] = useState<WorkerOperationsHealth | null>(null);
   const [failures, setFailures] = useState<AsyncWorkFailurePage | null>(null);
   const [audits, setAudits] = useState<AuditEntryPage | null>(null);
+  const [accessControl, setAccessControl] =
+    useState<AccessControlSnapshot | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [isCreating, setIsCreating] = useState(false);
   const [isReleasing, setIsReleasing] = useState(false);
   const [replayingId, setReplayingId] = useState<string | null>(null);
+  const [savingRoleCode, setSavingRoleCode] = useState<string | null>(null);
   const [name, setName] = useState("跟进拆解新版本");
   const [model, setModel] = useState<SenseAudioTextModelId>(
     "senseaudio-s2-flash",
@@ -88,34 +110,58 @@ export function SystemManagementWorkspace({
   const [replayReasons, setReplayReasons] = useState<Record<string, string>>(
     {},
   );
+  const [capabilityDrafts, setCapabilityDrafts] = useState<
+    Record<string, ManagementCapability[]>
+  >({});
+  const [capabilityReasons, setCapabilityReasons] = useState<
+    Record<string, string>
+  >({});
 
   useEffect(() => {
     let active = true;
+    const accessControlRequest: Promise<AccessControlSnapshot | null> =
+      canManageAccess ? api.getAccessControl() : Promise.resolve(null);
     void Promise.all([
       api.listVersions(),
       api.getHealth(),
       api.listFailures(),
       api.listAudits(),
+      accessControlRequest,
     ])
-      .then(([loadedVersions, loadedHealth, loadedFailures, loadedAudits]) => {
-        if (!active) return;
-        setVersions(loadedVersions);
-        setHealth(loadedHealth);
-        setFailures(loadedFailures);
-        setAudits(loadedAudits);
-        const baseline =
-          loadedVersions.items.find(
-            (version) => version.versionId === loadedVersions.currentVersionId,
-          ) ?? loadedVersions.items[0];
-        if (baseline) {
-          setModel(baseline.defaultModelId);
-          setSystemPrompt(baseline.systemPrompt);
-          setTemperature(String(baseline.parameters.temperature));
-          setMaxTokens(String(baseline.parameters.maxTokens));
-          setName(`${baseline.name} · 新版本`);
-          setReleaseVersionId(baseline.versionId);
-        }
-      })
+      .then(
+        ([
+          loadedVersions,
+          loadedHealth,
+          loadedFailures,
+          loadedAudits,
+          loadedAccessControl,
+        ]) => {
+          if (!active) return;
+          setVersions(loadedVersions);
+          setHealth(loadedHealth);
+          setFailures(loadedFailures);
+          setAudits(loadedAudits);
+          setAccessControl(loadedAccessControl);
+          setCapabilityDrafts(
+            loadedAccessControl
+              ? capabilityDraftsFrom(loadedAccessControl)
+              : {},
+          );
+          const baseline =
+            loadedVersions.items.find(
+              (version) =>
+                version.versionId === loadedVersions.currentVersionId,
+            ) ?? loadedVersions.items[0];
+          if (baseline) {
+            setModel(baseline.defaultModelId);
+            setSystemPrompt(baseline.systemPrompt);
+            setTemperature(String(baseline.parameters.temperature));
+            setMaxTokens(String(baseline.parameters.maxTokens));
+            setName(`${baseline.name} · 新版本`);
+            setReleaseVersionId(baseline.versionId);
+          }
+        },
+      )
       .catch((cause: unknown) => {
         if (active) setError(errorMessage(cause));
       })
@@ -125,7 +171,7 @@ export function SystemManagementWorkspace({
     return () => {
       active = false;
     };
-  }, [api]);
+  }, [api, canManageAccess]);
 
   const currentVersion = useMemo(
     () =>
@@ -230,6 +276,74 @@ export function SystemManagementWorkspace({
     }
   }
 
+  function toggleCapability(
+    roleCode: string,
+    capability: ManagementCapability,
+    checked: boolean,
+  ) {
+    if (!accessControl) return;
+    setCapabilityDrafts((current) => {
+      const selected = new Set(current[roleCode] ?? []);
+      if (checked) selected.add(capability);
+      else selected.delete(capability);
+      return {
+        ...current,
+        [roleCode]: accessControl.capabilities
+          .map((item) => item.code)
+          .filter((code) => selected.has(code)),
+      };
+    });
+  }
+
+  async function saveRoleCapabilities(roleCode: string, displayName: string) {
+    const reason = capabilityReasons[roleCode]?.trim() ?? "";
+    const desired = capabilityDrafts[roleCode] ?? [];
+    if (!reason || savingRoleCode) return;
+    setSavingRoleCode(roleCode);
+    setError(null);
+    setMessage(null);
+    try {
+      const updated = await api.replaceRoleCapabilities(
+        roleCode,
+        desired,
+        reason,
+        crypto.randomUUID(),
+      );
+      setAccessControl((current) =>
+        current
+          ? {
+              ...current,
+              roles: current.roles.map((role) =>
+                role.roleCode === roleCode
+                  ? { ...role, capabilities: updated.capabilities }
+                  : role,
+              ),
+            }
+          : current,
+      );
+      setCapabilityDrafts((current) => ({
+        ...current,
+        [roleCode]: updated.capabilities,
+      }));
+      setCapabilityReasons((current) => ({ ...current, [roleCode]: "" }));
+      setMessage(
+        updated.changed
+          ? `${displayName}的功能权限已更新。`
+          : `${displayName}的功能权限没有变化。`,
+      );
+      try {
+        setAudits(await api.listAudits());
+      } catch {
+        // The change itself succeeded. A simultaneous audit-capability revoke
+        // may make this optional refresh unavailable on the same screen.
+      }
+    } catch (cause) {
+      setError(errorMessage(cause));
+    } finally {
+      setSavingRoleCode(null);
+    }
+  }
+
   if (isLoading) {
     return (
       <section className="admin-state" role="status">
@@ -239,7 +353,13 @@ export function SystemManagementWorkspace({
     );
   }
 
-  if (!versions || !health || !failures || !audits) {
+  if (
+    !versions ||
+    !health ||
+    !failures ||
+    !audits ||
+    (canManageAccess && !accessControl)
+  ) {
     return (
       <section className="admin-state admin-error" role="alert">
         <h1>系统管理暂时不可用</h1>
@@ -274,6 +394,106 @@ export function SystemManagementWorkspace({
         <p className="admin-inline-error" role="alert">
           {error}
         </p>
+      ) : null}
+
+      {accessControl ? (
+        <section className="admin-section" aria-labelledby="access-title">
+          <div className="admin-section-heading">
+            <div>
+              <span>ACCESS CONTROL</span>
+              <h2 id="access-title">角色与功能权限</h2>
+            </div>
+            <p>按角色配置管理功能入口；每次保存都要求说明原因并写入审计。</p>
+          </div>
+          <div className="access-scope-note">
+            <strong>功能权限不会扩大客户与商机数据范围</strong>
+            <p>
+              客户、商机、跟进和作战地图仍按负责人、协同人与管理观察关系独立裁剪。
+            </p>
+          </div>
+          <div className="role-capability-grid">
+            {accessControl.roles.map((role) => {
+              const draft = capabilityDrafts[role.roleCode] ?? [];
+              const changed = !sameCapabilitySet(draft, role.capabilities);
+              const reason = capabilityReasons[role.roleCode] ?? "";
+              return (
+                <article key={role.roleCode}>
+                  <div className="role-capability-heading">
+                    <div>
+                      <span>{role.roleCode}</span>
+                      <h3>{role.displayName}</h3>
+                    </div>
+                    <p>
+                      {role.displayName} · {role.activeUserCount} 个有效账号
+                    </p>
+                  </div>
+                  <fieldset>
+                    <legend>可使用的管理功能</legend>
+                    {accessControl.capabilities.map((capability) => {
+                      const checked = draft.includes(capability.code);
+                      return (
+                        <label key={capability.code}>
+                          <input
+                            aria-label={`${role.displayName} · ${capability.name}`}
+                            type="checkbox"
+                            checked={checked}
+                            disabled={savingRoleCode !== null}
+                            onChange={(event) =>
+                              toggleCapability(
+                                role.roleCode,
+                                capability.code,
+                                event.target.checked,
+                              )
+                            }
+                          />
+                          <span>
+                            <strong>{capability.name}</strong>
+                            <small>{capability.description}</small>
+                          </span>
+                          <em>{checked ? "已授权" : "未授权"}</em>
+                        </label>
+                      );
+                    })}
+                  </fieldset>
+                  <div className="role-capability-save">
+                    <label>
+                      授权变更原因
+                      <input
+                        aria-label={`授权变更原因 ${role.displayName}`}
+                        value={reason}
+                        disabled={savingRoleCode !== null}
+                        onChange={(event) =>
+                          setCapabilityReasons((current) => ({
+                            ...current,
+                            [role.roleCode]: event.target.value,
+                          }))
+                        }
+                        placeholder="例如：销售主管新增审计自查职责"
+                      />
+                    </label>
+                    <button
+                      className="secondary-button"
+                      type="button"
+                      disabled={
+                        savingRoleCode !== null || !changed || !reason.trim()
+                      }
+                      onClick={() =>
+                        void saveRoleCapabilities(
+                          role.roleCode,
+                          role.displayName,
+                        )
+                      }
+                    >
+                      {savingRoleCode === role.roleCode
+                        ? "正在保存…"
+                        : `保存${role.displayName}权限`}
+                    </button>
+                  </div>
+                </article>
+              );
+            })}
+          </div>
+        </section>
       ) : null}
 
       <section className="admin-section" aria-labelledby="runtime-title">
@@ -602,4 +822,22 @@ function formatDateTime(value: string): string {
 
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : "系统管理操作失败。";
+}
+
+function capabilityDraftsFrom(
+  snapshot: AccessControlSnapshot,
+): Record<string, ManagementCapability[]> {
+  return Object.fromEntries(
+    snapshot.roles.map((role) => [role.roleCode, [...role.capabilities]]),
+  );
+}
+
+function sameCapabilitySet(
+  left: readonly ManagementCapability[],
+  right: readonly ManagementCapability[],
+): boolean {
+  return (
+    left.length === right.length &&
+    left.every((capability, index) => capability === right[index])
+  );
 }

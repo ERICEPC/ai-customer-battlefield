@@ -1,4 +1,5 @@
 import type {
+  AccessControlSnapshot,
   AiRuntimeConfigVersionPage,
   AsyncWorkReplayResponse,
 } from "@battlefield/contracts";
@@ -6,8 +7,10 @@ import { afterEach, describe, expect, test, vi } from "vitest";
 
 import {
   createAiRuntimeConfigVersion,
+  getAccessControlSnapshot,
   listAiRuntimeConfigVersions,
   releaseAiRuntimeConfigVersion,
+  replaceRoleCapabilities,
   replayAsyncWorkItem,
   SystemManagementApiError,
 } from "./api-client";
@@ -18,6 +21,23 @@ const versionPage: AiRuntimeConfigVersionPage = {
   items: [],
   currentVersionId: null,
   nextCursor: null,
+};
+const accessControl: AccessControlSnapshot = {
+  capabilities: [
+    {
+      code: "audit.read",
+      name: "审计日志读取",
+      description: "读取受控审计元数据。",
+    },
+  ],
+  roles: [
+    {
+      roleCode: "sales",
+      displayName: "销售",
+      activeUserCount: 1,
+      capabilities: [],
+    },
+  ],
 };
 
 afterEach(() => vi.unstubAllGlobals());
@@ -106,6 +126,46 @@ describe("system-management API client", () => {
         credentials: "include",
         headers: expect.objectContaining({
           "Idempotency-Key": "worker-replay-1",
+        }),
+      }),
+    );
+  });
+
+  test("loads and replaces role capabilities with an explicit reason", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(response(accessControl))
+      .mockResolvedValueOnce(
+        response({
+          roleCode: "sales",
+          capabilities: ["audit.read"],
+          changed: true,
+          updatedAt: "2026-09-01T07:40:00.000Z",
+        }),
+      );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await getAccessControlSnapshot();
+    await replaceRoleCapabilities(
+      "sales",
+      ["audit.read"],
+      "销售骨干负责日志自查",
+      "access-change-1",
+    );
+
+    expect(fetchMock.mock.calls.map((call) => call[0])).toEqual([
+      "http://localhost:3001/api/v1/access-control/role-capabilities",
+      "http://localhost:3001/api/v1/access-control/roles/sales/capabilities",
+    ]);
+    expect(fetchMock.mock.calls[1]?.[1]).toEqual(
+      expect.objectContaining({
+        method: "PUT",
+        headers: expect.objectContaining({
+          "Idempotency-Key": "access-change-1",
+        }),
+        body: JSON.stringify({
+          capabilities: ["audit.read"],
+          reason: "销售骨干负责日志自查",
         }),
       }),
     );

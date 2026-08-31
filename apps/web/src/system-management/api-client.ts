@@ -1,10 +1,14 @@
 import {
+  type AccessControlSnapshot,
   type AiRuntimeConfigVersion,
   type AiRuntimeConfigVersionPage,
   type AsyncWorkFailurePage,
   type AsyncWorkKind,
   type AsyncWorkReplayResponse,
   type AuditEntryPage,
+  accessControlApiErrorSchema,
+  accessControlRoleCodeSchema,
+  accessControlSnapshotSchema,
   aiRuntimeConfigApiErrorSchema,
   aiRuntimeConfigVersionPageSchema,
   aiRuntimeConfigVersionSchema,
@@ -15,10 +19,14 @@ import {
   type CreateAiRuntimeConfigVersionRequest,
   createAiRuntimeConfigVersionRequestSchema,
   idempotencyKeySchema,
+  type ManagementCapability,
   type ReleasedAiRuntimeConfig,
+  type RoleCapabilityUpdate,
   releaseAiRuntimeConfigVersionRequestSchema,
   releasedAiRuntimeConfigSchema,
+  replaceRoleCapabilitiesRequestSchema,
   replayAsyncWorkItemRequestSchema,
+  roleCapabilityUpdateSchema,
   type WorkerOperationsHealth,
   workerOperationsApiErrorSchema,
   workerOperationsHealthSchema,
@@ -117,6 +125,39 @@ export function listRecentAuditEntries(): Promise<AuditEntryPage> {
   return request("/audit-entries?limit=20", auditEntryPageSchema);
 }
 
+export function getAccessControlSnapshot(): Promise<AccessControlSnapshot> {
+  return request(
+    "/access-control/role-capabilities",
+    accessControlSnapshotSchema,
+  );
+}
+
+export function replaceRoleCapabilities(
+  roleCode: string,
+  capabilities: ManagementCapability[],
+  reason: string,
+  idempotencyKey: string,
+): Promise<RoleCapabilityUpdate> {
+  const role = accessControlRoleCodeSchema.parse(roleCode);
+  const body = replaceRoleCapabilitiesRequestSchema.parse({
+    capabilities,
+    reason,
+  });
+  const key = idempotencyKeySchema.parse(idempotencyKey);
+  return request(
+    `/access-control/roles/${encodeURIComponent(role)}/capabilities`,
+    roleCapabilityUpdateSchema,
+    {
+      method: "PUT",
+      headers: {
+        "content-type": "application/json",
+        "Idempotency-Key": key,
+      },
+      body: JSON.stringify(body),
+    },
+  );
+}
+
 async function request<Output>(
   path: string,
   schema: { parse(input: unknown): Output },
@@ -136,6 +177,7 @@ function decodeError(
   payload: unknown,
 ): SystemManagementApiError {
   for (const schema of [
+    accessControlApiErrorSchema,
     aiRuntimeConfigApiErrorSchema,
     workerOperationsApiErrorSchema,
     auditLogApiErrorSchema,

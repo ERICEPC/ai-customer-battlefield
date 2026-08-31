@@ -1,11 +1,13 @@
 import "@testing-library/jest-dom/vitest";
 
 import type {
+  AccessControlSnapshot,
   AiRuntimeConfigVersion,
   AiRuntimeConfigVersionPage,
   AsyncWorkFailureRecord,
   AuditEntryPage,
   CreateAiRuntimeConfigVersionRequest,
+  SessionProfile,
   WorkerOperationsHealth,
 } from "@battlefield/contracts";
 import {
@@ -17,6 +19,7 @@ import {
 } from "@testing-library/react";
 import { afterEach, describe, expect, test, vi } from "vitest";
 
+import { SessionProvider } from "../auth/session-provider";
 import {
   SystemManagementWorkspace,
   type SystemManagementWorkspaceApi,
@@ -84,6 +87,34 @@ const audits: AuditEntryPage = {
   ],
   nextCursor: null,
 };
+const accessControl: AccessControlSnapshot = {
+  capabilities: [
+    {
+      code: "access_control.manage",
+      name: "权限管理",
+      description: "查看和维护租户内角色能力授权。",
+    },
+    {
+      code: "audit.read",
+      name: "审计日志读取",
+      description: "在业务数据范围内检索受控审计元数据。",
+    },
+  ],
+  roles: [
+    {
+      roleCode: "department_leader",
+      displayName: "部门领导",
+      activeUserCount: 1,
+      capabilities: ["access_control.manage", "audit.read"],
+    },
+    {
+      roleCode: "sales",
+      displayName: "销售",
+      activeUserCount: 1,
+      capabilities: [],
+    },
+  ],
+};
 
 afterEach(cleanup);
 
@@ -96,9 +127,67 @@ describe("SystemManagementWorkspace", () => {
     expect(screen.getByText("当前发布")).toBeVisible();
     expect(screen.getByText("消息自动重试次数已用尽。")).toBeVisible();
     expect(screen.getByText("ai_runtime_config.released")).toBeVisible();
+    expect(screen.getByText("角色与功能权限")).toBeVisible();
+    expect(
+      screen.getByText("功能权限不会扩大客户与商机数据范围"),
+    ).toBeVisible();
+    expect(screen.getByText("部门领导 · 1 个有效账号")).toBeVisible();
     expect(
       within(screen.getByLabelText("租户默认模型")).getAllByRole("option"),
     ).toHaveLength(19);
+  });
+
+  test("saves a complete role capability set with a mandatory reason", async () => {
+    const managementApi = api();
+    render(<SystemManagementWorkspace api={managementApi} />);
+    await screen.findByText("角色与功能权限");
+
+    fireEvent.click(screen.getByLabelText("销售 · 审计日志读取"));
+    fireEvent.change(screen.getByLabelText("授权变更原因 销售"), {
+      target: { value: "销售骨干负责日志自查" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "保存销售权限" }));
+
+    expect(managementApi.replaceRoleCapabilities).toHaveBeenCalledWith(
+      "sales",
+      ["audit.read"],
+      "销售骨干负责日志自查",
+      expect.any(String),
+    );
+    expect(await screen.findByText("销售的功能权限已更新。")).toBeVisible();
+  });
+
+  test("keeps the management workspace usable without access-control capability", async () => {
+    const managementApi = api();
+    const runtimeOperator: SessionProfile = {
+      user: {
+        id: "30000000-0000-4000-8000-000000000073",
+        displayName: "运行管理员",
+        email: "runtime-operator@demo.local",
+      },
+      role: "department_leader",
+      capabilities: [
+        "ai_runtime_config.manage",
+        "audit.read",
+        "worker_operations.manage",
+      ],
+      department: {
+        id: "20000000-0000-4000-8000-000000000001",
+        name: "商业化一部",
+      },
+      directLeader: null,
+      teamMembers: [],
+      expiresAt: "2026-09-01T08:00:00.000Z",
+    };
+    render(
+      <SessionProvider initialSession={runtimeOperator}>
+        <SystemManagementWorkspace api={managementApi} />
+      </SessionProvider>,
+    );
+
+    expect(await screen.findByText("Worker 运行正常")).toBeVisible();
+    expect(screen.queryByText("角色与功能权限")).not.toBeInTheDocument();
+    expect(managementApi.getAccessControl).not.toHaveBeenCalled();
   });
 
   test("creates an immutable version before allowing a separate release", async () => {
@@ -161,6 +250,13 @@ function api(): SystemManagementWorkspaceApi {
     "销售跟进拆解 V3",
   );
   return {
+    getAccessControl: vi.fn().mockResolvedValue(accessControl),
+    replaceRoleCapabilities: vi.fn().mockResolvedValue({
+      roleCode: "sales",
+      capabilities: ["audit.read"],
+      changed: true,
+      updatedAt: "2026-09-01T07:40:00.000Z",
+    }),
     listVersions: vi
       .fn()
       .mockResolvedValueOnce(versions)
