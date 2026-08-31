@@ -101,6 +101,7 @@ export {
   InvalidActorDatabaseContextError,
   withTenantTransaction,
 } from "./tenant-session.js";
+export * from "./weekly-reports/index.js";
 export {
   InvalidWorkspaceNowError,
   KyselyWorkspaceReader,

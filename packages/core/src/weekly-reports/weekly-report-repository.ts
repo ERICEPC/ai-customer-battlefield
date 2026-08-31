@@ -162,3 +162,10 @@ export class WeeklyReportResultLimitExceededError extends Error {
     this.name = "WeeklyReportResultLimitExceededError";
   }
 }
+
+export class InvalidWeeklyReportCursorError extends Error {
+  constructor(options?: ErrorOptions) {
+    super("The weekly report cursor is invalid.", options);
+    this.name = "InvalidWeeklyReportCursorError";
+  }
+}

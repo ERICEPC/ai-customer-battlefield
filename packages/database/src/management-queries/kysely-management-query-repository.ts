@@ -15,6 +15,7 @@ import { type Kysely, type RawBuilder, sql, type Transaction } from "kysely";
 
 import type { BattlefieldDatabase } from "../database-types.js";
 import { withTenantTransaction } from "../tenant-session.js";
+import { projectWeeklyProgress } from "../weekly-progress/weekly-progress-projection.js";
 
 type DatabaseTransaction = Transaction<BattlefieldDatabase>;
 
@@ -49,28 +50,12 @@ interface SubjectScopeRow {
   scope_kind: "self" | "observed_portfolio";
 }
 
-interface OpenActionRow {
-  id: string;
-  entity_id: string;
-  title: string;
-  planned_at: Date | string;
-  confirmed_at: Date | string;
-}
-
-interface BattleStateRow {
-  id: string;
-  entity_id: string;
-  summary: string;
-  effective_at: Date | string;
-}
-
 interface EntityAggregate extends ManagementQueryHighlight {
   hasBattleState: boolean;
 }
 
 const DEFAULT_MAX_SCOPED_ENTITIES = 500;
 const DEFAULT_MAX_EVENT_ROWS_PER_KIND = 5_000;
-const MAX_EVIDENCE_LABEL_LENGTH = 500;
 
 export interface KyselyManagementQueryRepositoryOptions {
   queryIdFactory?: () => string;
@@ -319,265 +304,36 @@ export class KyselyManagementQueryRepository
         });
         if (replay) return replay;
         const queryId = this.queryIdFactory();
-        const aggregates = new Map<string, EntityAggregate>(
-          entities.map((entity) => [
-            entity.entity_id,
-            createAggregate(entity.entity_id, entity.entity_name),
-          ]),
-        );
-
-        if (entityIds.length > 0) {
-          const followups = await transaction
-            .selectFrom("app.followups")
-            .select(["id", "entity_id", "occurred_at", "summary"])
-            .where("tenant_id", "=", input.actor.tenantId)
-            .where("entity_id", "in", entityIds)
-            .where(
-              "occurred_at",
-              ">=",
-              sql<Date>`${input.periodStart}::timestamptz`,
-            )
-            .where(
-              "occurred_at",
-              "<",
-              sql<Date>`${input.periodEnd}::timestamptz`,
-            )
-            .where(
-              "occurred_at",
-              "<=",
-              sql<Date>`${input.dataCutoffAt}::timestamptz`,
-            )
-            .limit(this.maxEventRowsPerKind + 1)
-            .execute();
-          assertResultRowLimit(followups.length, this.maxEventRowsPerKind);
-          for (const row of followups) {
-            const aggregate = aggregates.get(row.entity_id);
-            if (!aggregate) continue;
-            aggregate.confirmedFollowupCount += 1;
-            addEvidence(aggregate, {
-              kind: "followup",
-              evidenceId: row.id,
-              occurredAt: toIsoString(row.occurred_at),
-              label: evidenceLabel(row.summary),
-              deepLink: `/battle-map?entityId=${row.entity_id}`,
-            });
+        const projection = await projectWeeklyProgress(transaction, {
+          tenantId: input.actor.tenantId,
+          entities,
+          actionOwnerUserIds: [input.subjectUserId],
+          periodStart: input.periodStart,
+          periodEnd: input.periodEnd,
+          dataCutoffAt: input.dataCutoffAt,
+          maxEventRowsPerKind: this.maxEventRowsPerKind,
+          assertRowLimit: assertResultRowLimit,
+        });
+        const aggregates = new Map<string, EntityAggregate>();
+        for (const entity of projection.entities) {
+          const aggregate = createAggregate(entity.entityId, entity.entityName);
+          aggregate.confirmedFollowupCount = entity.confirmedFollowupCount;
+          aggregate.validFactCount = entity.validFactCount;
+          aggregate.stageChangeCount = entity.stageChangeCount;
+          aggregate.completedActionCount = entity.completedActionCount;
+          aggregate.openActionCount = entity.openActionCount;
+          aggregate.overdueActionCount = entity.overdueActionCount;
+          for (const evidence of [
+            ...entity.progressEvidence,
+            ...entity.openActionEvidence,
+          ]) {
+            addEvidence(aggregate, evidence);
           }
-
-          const facts = await transaction
-            .selectFrom("app.business_facts")
-            .select(["id", "entity_id", "occurred_at", "fact_value"])
-            .where("tenant_id", "=", input.actor.tenantId)
-            .where("entity_id", "in", entityIds)
-            .where("valid_status", "=", "valid")
-            .where(
-              "occurred_at",
-              ">=",
-              sql<Date>`${input.periodStart}::timestamptz`,
-            )
-            .where(
-              "occurred_at",
-              "<",
-              sql<Date>`${input.periodEnd}::timestamptz`,
-            )
-            .where(
-              "occurred_at",
-              "<=",
-              sql<Date>`${input.dataCutoffAt}::timestamptz`,
-            )
-            .limit(this.maxEventRowsPerKind + 1)
-            .execute();
-          assertResultRowLimit(facts.length, this.maxEventRowsPerKind);
-          for (const row of facts) {
-            const aggregate = aggregates.get(row.entity_id);
-            if (!aggregate) continue;
-            aggregate.validFactCount += 1;
-            addEvidence(aggregate, {
-              kind: "fact",
-              evidenceId: row.id,
-              occurredAt: toIsoString(row.occurred_at),
-              label: evidenceLabel(row.fact_value),
-              deepLink: `/battle-map?entityId=${row.entity_id}`,
-            });
-          }
-
-          const stageChanges = await transaction
-            .selectFrom("app.opportunity_stage_history as history")
-            .innerJoin("app.opportunities as opportunity", (join) =>
-              join
-                .onRef("opportunity.tenant_id", "=", "history.tenant_id")
-                .onRef("opportunity.id", "=", "history.opportunity_id"),
-            )
-            .select([
-              "history.id",
-              "opportunity.entity_id",
-              "history.changed_at",
-              "history.from_stage_code",
-              "history.to_stage_code",
-            ])
-            .where("history.tenant_id", "=", input.actor.tenantId)
-            .where("opportunity.entity_id", "in", entityIds)
-            .where(
-              "history.changed_at",
-              ">=",
-              sql<Date>`${input.periodStart}::timestamptz`,
-            )
-            .where(
-              "history.changed_at",
-              "<",
-              sql<Date>`${input.periodEnd}::timestamptz`,
-            )
-            .where(
-              "history.changed_at",
-              "<=",
-              sql<Date>`${input.dataCutoffAt}::timestamptz`,
-            )
-            .limit(this.maxEventRowsPerKind + 1)
-            .execute();
-          assertResultRowLimit(stageChanges.length, this.maxEventRowsPerKind);
-          for (const row of stageChanges) {
-            const aggregate = aggregates.get(row.entity_id);
-            if (!aggregate) continue;
-            aggregate.stageChangeCount += 1;
-            addEvidence(aggregate, {
-              kind: "stage_change",
-              evidenceId: row.id,
-              occurredAt: toIsoString(row.changed_at),
-              label: evidenceLabel(
-                `${row.from_stage_code ?? "未设置"} → ${row.to_stage_code}`,
-              ),
-              deepLink: `/battle-map?entityId=${row.entity_id}`,
-            });
-          }
-
-          const completedActions = await transaction
-            .selectFrom("app.action_status_history as history")
-            .innerJoin("app.business_actions as action", (join) =>
-              join
-                .onRef("action.tenant_id", "=", "history.tenant_id")
-                .onRef("action.id", "=", "history.action_id"),
-            )
-            .select([
-              "action.id",
-              "action.entity_id",
-              "action.title",
-              "history.changed_at",
-            ])
-            .where("history.tenant_id", "=", input.actor.tenantId)
-            .where("action.entity_id", "in", entityIds)
-            .where("action.owner_user_id", "=", input.subjectUserId)
-            .where("history.to_status", "=", "completed")
-            .where(
-              "history.changed_at",
-              ">=",
-              sql<Date>`${input.periodStart}::timestamptz`,
-            )
-            .where(
-              "history.changed_at",
-              "<",
-              sql<Date>`${input.periodEnd}::timestamptz`,
-            )
-            .where(
-              "history.changed_at",
-              "<=",
-              sql<Date>`${input.dataCutoffAt}::timestamptz`,
-            )
-            .limit(this.maxEventRowsPerKind + 1)
-            .execute();
-          assertResultRowLimit(
-            completedActions.length,
-            this.maxEventRowsPerKind,
-          );
-          for (const row of completedActions) {
-            const aggregate = aggregates.get(row.entity_id);
-            if (!aggregate) continue;
-            aggregate.completedActionCount += 1;
-            addEvidence(aggregate, {
-              kind: "action",
-              evidenceId: row.id,
-              occurredAt: toIsoString(row.changed_at),
-              label: evidenceLabel(row.title),
-              deepLink: `/actions?actionId=${row.id}`,
-            });
-          }
-
-          const openActions = await sql<OpenActionRow>`
-            select
-              action.id::text as id,
-              action.entity_id::text as entity_id,
-              action.title,
-              action.planned_at,
-              action.confirmed_at
-            from app.business_actions as action
-            inner join lateral (
-              select history.to_status
-              from app.action_status_history as history
-              where history.tenant_id = action.tenant_id
-                and history.action_id = action.id
-                and history.changed_at < ${input.periodEnd}::timestamptz
-                and history.changed_at <= ${input.dataCutoffAt}::timestamptz
-              order by history.version_no desc
-              limit 1
-            ) as cutoff_status on true
-            where action.tenant_id = ${input.actor.tenantId}::uuid
-              and action.entity_id in (
-                ${sql.join(entityIds.map((id) => sql`${id}::uuid`))}
-              )
-              and action.owner_user_id = ${input.subjectUserId}::uuid
-              and action.confirmed_at < ${input.periodEnd}::timestamptz
-              and action.confirmed_at <= ${input.dataCutoffAt}::timestamptz
-              and cutoff_status.to_status in ('planned', 'in_progress')
-            limit ${this.maxEventRowsPerKind - completedActions.length + 1}
-          `.execute(transaction);
-          assertResultRowLimit(
-            completedActions.length + openActions.rows.length,
-            this.maxEventRowsPerKind,
-          );
-          for (const row of openActions.rows) {
-            const aggregate = aggregates.get(row.entity_id);
-            if (!aggregate) continue;
-            aggregate.openActionCount += 1;
-            if (
-              new Date(row.planned_at).getTime() <=
-              Date.parse(input.dataCutoffAt)
-            ) {
-              aggregate.overdueActionCount += 1;
-            }
-            addEvidence(aggregate, {
-              kind: "action",
-              evidenceId: row.id,
-              occurredAt: toIsoString(row.confirmed_at),
-              label: evidenceLabel(row.title),
-              deepLink: `/actions?actionId=${row.id}`,
-            });
-          }
-
-          const states = await sql<BattleStateRow>`
-            select distinct on (state.entity_id)
-              state.id::text as id,
-              state.entity_id::text as entity_id,
-              state.summary,
-              state.effective_at
-            from app.battle_state_versions as state
-            where state.tenant_id = ${input.actor.tenantId}::uuid
-              and state.entity_id in (
-                ${sql.join(entityIds.map((id) => sql`${id}::uuid`))}
-              )
-              and state.effective_at < ${input.periodEnd}::timestamptz
-              and state.effective_at <= ${input.dataCutoffAt}::timestamptz
-            order by state.entity_id, state.effective_at desc, state.version_no desc
-          `.execute(transaction);
-          for (const row of states.rows) {
-            const aggregate = aggregates.get(row.entity_id);
-            if (!aggregate) continue;
+          if (entity.battleStateEvidence) {
             aggregate.hasBattleState = true;
-            addEvidence(aggregate, {
-              kind: "battle_state",
-              evidenceId: row.id,
-              occurredAt: toIsoString(row.effective_at),
-              label: evidenceLabel(row.summary),
-              deepLink: `/battle-map?entityId=${row.entity_id}&stateVersion=${row.id}`,
-            });
+            addEvidence(aggregate, entity.battleStateEvidence);
           }
+          aggregates.set(entity.entityId, aggregate);
         }
 
         const metrics = emptyMetrics();
@@ -869,12 +625,6 @@ function activeAssignmentsSql(tenantId: string, activeAt: RawBuilder<unknown>) {
   `;
 }
 
-function evidenceLabel(value: string): string {
-  const normalized = value.trim();
-  if (normalized.length <= MAX_EVIDENCE_LABEL_LENGTH) return normalized;
-  return `${normalized.slice(0, MAX_EVIDENCE_LABEL_LENGTH - 1)}…`;
-}
-
 function assertResultRowLimit(actual: number, maximum: number): void {
   if (actual > maximum) {
     throw new ManagementQueryResultLimitExceededError();
@@ -934,12 +684,4 @@ function isUuid(value: string): boolean {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
     value,
   );
-}
-
-function toIsoString(value: Date | string): string {
-  const date = value instanceof Date ? value : new Date(value);
-  if (Number.isNaN(date.getTime())) {
-    throw new Error("Database timestamp is invalid.");
-  }
-  return date.toISOString();
 }

@@ -101,7 +101,7 @@ export class ReviewWeeklyReport {
     items: Array<{ itemId: string; included: boolean }>;
   }) {
     validatePositiveVersion(input.lockVersion);
-    if (input.note.length > 2_000 || input.items.length > 400) {
+    if (input.note.length > 2_000 || input.items.length > 2_000) {
       throw new InvalidWeeklyReportReviewError();
     }
     if (

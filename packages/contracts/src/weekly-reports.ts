@@ -59,7 +59,7 @@ export const reviewWeeklyReportRequestSchema = z.strictObject({
         included: z.boolean(),
       }),
     )
-    .max(400)
+    .max(2_000)
     .superRefine((items, context) => {
       if (new Set(items.map((item) => item.itemId)).size !== items.length) {
         context.addIssue({
@@ -111,7 +111,7 @@ export const weeklyReportItemSchema = z.strictObject({
 
 export const weeklyReportSectionSchema = z.strictObject({
   kind: weeklyReportSectionKindSchema,
-  items: z.array(weeklyReportItemSchema).max(100),
+  items: z.array(weeklyReportItemSchema).max(500),
 });
 
 export const weeklyReportMetricsSchema = z.strictObject({
