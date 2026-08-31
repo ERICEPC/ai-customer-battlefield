@@ -614,7 +614,7 @@ Against Nest + PGlite demo and the same in-process worker, prove: confirmed fact
 
 Run the same acceptance with empty Feishu credentials. Inbox must still succeed, no Feishu delivery is created, and no user-facing error claims the business action failed.
 
-- [ ] **Step 5: Review, push directly to `main`, and watch CI**
+- [x] **Step 5: Review, push directly to `main`, and watch CI**
 
 Run the repository review gate, fix every Critical/Important finding, commit the verified slice, `git push origin main`, and watch the matching GitHub Actions run to a terminal success. Record remote SHA, exact test counts, CI URL/duration, browser evidence, and deferred boundaries.
 
@@ -629,7 +629,7 @@ On synthetic data, accepting a proposal creates one formal action and eventually
 ## Acceptance Evidence
 
 - Local gate: frozen install, public-boundary scan, Biome, all workspace type checks, 265 regular tests, every production build, and `git diff --check` exited successfully.
-- PostgreSQL 18: GitHub Actions run `33348187708` passed the migration/tenant checks and the end-to-end Worker smoke. The smoke accepted one proposal idempotently, consumed its Outbox message, scheduled and materialized exactly one due reminder/notification/in-app delivery, marked it read idempotently, completed the action, and proved repeated ticks did not duplicate work. Empty Feishu credentials created no external delivery and did not affect the inbox.
+- PostgreSQL 18: final commit `439732442f7f7a53f589965051749a09324cf188` passed GitHub Actions run `33349159551` in 3 minutes 59 seconds. The migration/tenant checks and end-to-end Worker smoke accepted one proposal idempotently, consumed its Outbox message, scheduled and materialized exactly one due reminder/notification/in-app delivery, marked it read idempotently, completed the action, and proved repeated ticks did not duplicate work. Empty Feishu credentials created no external delivery and did not affect the inbox.
 - Browser: the real demo path confirmed a follow-up fact, generated a new battle analysis, accepted an action, produced one unread notification, kept its count at one across repeated Worker ticks, opened the exact action through an application-relative deep link, and changed unread count from one to zero immediately after marking it read.
 - Responsive/accessibility: desktop acceptance used a 1280px viewport; mobile acceptance used Chromium device metrics at a true 390×844 CSS viewport. Inbox and action pages both reported `scrollWidth === innerWidth === 390`; desktop console warnings/errors were zero.
 - Deferred boundaries remain explicit: advance/overdue/escalation business values, tenant-specific real Feishu credentials, email delivery, reports, management queries, configuration UI, production OIDC, and deployment/recovery are not claimed by V1-D.
