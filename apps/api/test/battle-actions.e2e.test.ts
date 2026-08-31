@@ -60,7 +60,6 @@ describe("battle analysis and confirmed action API", () => {
 
   afterAll(async () => {
     await app.close();
-    await database.close();
   });
 
   test("moves a confirmed fact through analysis, map, proposal acceptance, and action transition", async () => {

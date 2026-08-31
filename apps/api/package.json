@@ -13,7 +13,7 @@
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "test": "pnpm test:e2e",
     "pretest:e2e": "pnpm --filter @battlefield/contracts build && pnpm --filter @battlefield/core build && pnpm --filter @battlefield/database build && pnpm --filter @battlefield/worker build",
-    "test:e2e": "vitest run --dir test",
+    "test:e2e": "node test/run-e2e.mjs",
     "typecheck:dev": "tsc --noEmit -p tsconfig.json"
   },
   "dependencies": {

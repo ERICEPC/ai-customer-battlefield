@@ -51,7 +51,6 @@ describe("persistent follow-up confirmation API", () => {
 
   afterAll(async () => {
     await app.close();
-    await database.close();
   });
 
   test("creates, reads, revises, confirms idempotently, and retrieves the formal record", async () => {

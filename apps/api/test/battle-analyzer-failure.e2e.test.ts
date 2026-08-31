@@ -51,7 +51,6 @@ describe("battle analyzer failure API", () => {
 
   afterAll(async () => {
     await app.close();
-    await database.close();
   });
 
   test("returns a stable sanitized error and records the failed run", async () => {

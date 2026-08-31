@@ -586,11 +586,11 @@ Commit: `feat: add optional Feishu notification adapter`
 - CI starts no real Feishu connection; it validates the adapter through fakes and validates reminder/notification SQL on PostgreSQL 18.
 - Acceptance closes only V1-D and immediately transitions to sales/management home or reports/management queries according to the persistent product plan.
 
-- [ ] **Step 1: Add a real PostgreSQL smoke path**
+- [x] **Step 1: Add a real PostgreSQL smoke path**
 
 The smoke must migrate an empty PostgreSQL 18 database, accept one proposal, run the Outbox handler, assert one due reminder, advance the injected clock, materialize one notification/in-app delivery, retry the same messages, assert counts remain one, mark it read, complete the action, and assert no future reminder remains claimable.
 
-- [ ] **Step 2: Run the complete local gate**
+- [x] **Step 2: Run the complete local gate**
 
 Run:
 
@@ -606,11 +606,11 @@ git diff --check
 
 Expected: every command exits 0; API tests run in an environment allowed to bind a loopback port.
 
-- [ ] **Step 3: Run real browser acceptance**
+- [x] **Step 3: Run real browser acceptance**
 
 Against Nest + PGlite demo and the same in-process worker, prove: confirmed fact → analysis → accepted action → due reminder → one unread inbox notification → safe action deep link → mark read. Repeat worker ticks and prove no duplicate. Verify 1280px and 390px `documentWidth === innerWidth` and zero console warnings/errors.
 
-- [ ] **Step 4: Verify Feishu disabled-mode resilience**
+- [x] **Step 4: Verify Feishu disabled-mode resilience**
 
 Run the same acceptance with empty Feishu credentials. Inbox must still succeed, no Feishu delivery is created, and no user-facing error claims the business action failed.
 
@@ -618,10 +618,18 @@ Run the same acceptance with empty Feishu credentials. Inbox must still succeed,
 
 Run the repository review gate, fix every Critical/Important finding, commit the verified slice, `git push origin main`, and watch the matching GitHub Actions run to a terminal success. Record remote SHA, exact test counts, CI URL/duration, browser evidence, and deferred boundaries.
 
-- [ ] **Step 6: Update living docs and continue**
+- [x] **Step 6: Update living docs and continue**
 
 Mark reminder/notification implementation as delivered; keep advance/overdue/escalation policy values, real Feishu tenant credentials, reports, management queries, configuration UI, production OIDC, and deployment recovery explicit. Do not mark the whole V1 complete.
 
 ## Acceptance Gate
 
 On synthetic data, accepting a proposal creates one formal action and eventually one versioned due reminder. When due, repeated worker execution produces exactly one durable unread notification and one in-app delivery; the recipient can open the action and mark the notification read. Completing/cancelling before due prevents notification creation. A missing or failing Feishu adapter cannot affect business state or inbox availability; configured Feishu attempts are independently retryable/dead-lettered with sanitized diagnostics. All tenant isolation, leases, dedupe keys, status constraints, forced RLS, API contracts, Web accessibility, responsive layouts, and PostgreSQL 18 checks pass.
+
+## Acceptance Evidence
+
+- Local gate: frozen install, public-boundary scan, Biome, all workspace type checks, 265 regular tests, every production build, and `git diff --check` exited successfully.
+- PostgreSQL 18: GitHub Actions run `33348187708` passed the migration/tenant checks and the end-to-end Worker smoke. The smoke accepted one proposal idempotently, consumed its Outbox message, scheduled and materialized exactly one due reminder/notification/in-app delivery, marked it read idempotently, completed the action, and proved repeated ticks did not duplicate work. Empty Feishu credentials created no external delivery and did not affect the inbox.
+- Browser: the real demo path confirmed a follow-up fact, generated a new battle analysis, accepted an action, produced one unread notification, kept its count at one across repeated Worker ticks, opened the exact action through an application-relative deep link, and changed unread count from one to zero immediately after marking it read.
+- Responsive/accessibility: desktop acceptance used a 1280px viewport; mobile acceptance used Chromium device metrics at a true 390×844 CSS viewport. Inbox and action pages both reported `scrollWidth === innerWidth === 390`; desktop console warnings/errors were zero.
+- Deferred boundaries remain explicit: advance/overdue/escalation business values, tenant-specific real Feishu credentials, email delivery, reports, management queries, configuration UI, production OIDC, and deployment/recovery are not claimed by V1-D.

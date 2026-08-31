@@ -47,7 +47,6 @@ describe("business entity directory API", () => {
 
   afterAll(async () => {
     await app.close();
-    await database.close();
   });
 
   it("rejects requests without the development actor", async () => {

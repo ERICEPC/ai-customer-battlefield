@@ -101,7 +101,6 @@ describe("inbox notification API", () => {
   afterAll(async () => {
     await unavailableApp?.close();
     await app?.close();
-    await database?.close();
   });
 
   test("requires the development actor and validates query and identifiers", async () => {

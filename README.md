@@ -38,7 +38,7 @@ pnpm --filter @battlefield/api dev:demo
 pnpm --filter @battlefield/web dev
 ```
 
-Open `http://localhost:3000/` for the follow-up confirmation workbench, `/entities` for the entity directory, `/battle-map` for evidence-backed positioning, or `/actions` for the suggestion decision gate and formal actions. The demo database is recreated on every API restart and must never be used as production storage.
+Open `http://localhost:3000/` for the follow-up confirmation workbench, `/entities` for the entity directory, `/battle-map` for evidence-backed positioning, `/actions` for the suggestion decision gate and formal actions, or `/inbox` for durable in-app notifications. The demo API runs the same reminder Worker in-process with external channels disabled. Its database is recreated on every API restart and must never be used as production storage.
 
 For a PostgreSQL-backed environment, use a dedicated PostgreSQL 17+ database, apply forward migrations explicitly, and then start the normal API:
 
@@ -72,9 +72,12 @@ When a disposable PostgreSQL database whose name ends in `_test` is available:
 ```bash
 DATABASE_URL=postgresql://postgres:postgres@localhost:5432/battlefield_test \
   pnpm --filter @battlefield/database test:postgres
+
+DATABASE_URL=postgresql://postgres:postgres@localhost:5432/battlefield_test \
+  pnpm --filter @battlefield/worker test:postgres
 ```
 
-The integration test refuses to reset a database whose name does not end in `_test`.
+Both integration tests refuse to reset a database whose name does not end in `_test`. The Worker smoke accepts a proposal, consumes the real Outbox, schedules and materializes one due reminder, proves inbox/read/action-completion behavior, and asserts that disabled Feishu creates no delivery row.
 
 ## Documentation
 
