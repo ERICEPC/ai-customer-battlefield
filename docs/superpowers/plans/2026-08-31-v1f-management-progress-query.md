@@ -129,3 +129,14 @@ Evidence kinds are limited to `followup`, `fact`, `stage_change`, `action` and `
 ## Acceptance gate
 
 An authenticated manager can select only an authorized seller, ask for the supported weekly-progress capability, and receive a strict answer whose counts, entity highlights and evidence all come from the current assignment intersection and explicit time interval. A seller can query only their own current responsibility scope. Unauthorized, ended, future, unassigned and cross-tenant data are absent in subjects and answers; missing analysis is visible as a gap. The query is audited without storing raw evidence text, every deep link re-authorizes on landing, desktop/390px Web works, PostgreSQL 18 and the full repository gate pass, and the implementation remains callable as a future Agent Tool without binding the product to a model provider.
+
+## Final acceptance record
+
+- **Status:** V1-F closed. This closes only the controlled management-progress query slice, not the complete V1 product.
+- **Code SHA:** `00cc83ff1017bfbee739ace25650a009df6755af` (`00cc83f`).
+- **Matching CI:** [GitHub Actions run 33365825815](https://github.com/ERICEPC/ai-customer-battlefield/actions/runs/33365825815), successful in 4 minutes 32 seconds.
+- **Repository gate:** frozen install, public-boundary scan of 245 tracked files, Biome, all package typechecks, production builds and diff checks passed; contracts 58/58, core 43/43, database 105/105, worker 13/13, Web 90/90 and API 36/36 passed, totaling 345/345 tests.
+- **PostgreSQL 18 evidence:** migrations, subject/scope and tenant isolation, historical cutoff reconstruction, representative plans, current-authorization replay checks and simultaneous same-key `Promise.all` idempotency passed in the matching CI. The concurrent requests returned the exact same response/query ID and persisted one audit entry.
+- **Browser evidence:** manager and self-scope paths, unified unauthorized 404, evidence deep links and read-only completed-action landing were exercised; desktop and 390×844 layouts had no horizontal overflow or final console errors.
+- **Review:** final two-axis review reported zero Critical or Important Standards findings and zero Critical or Important Spec findings, with `Ready to commit = Yes`.
+- **Deferred boundaries:** arbitrary natural-language/team analytics, personal and team weekly reports, reminder escalation policy, configuration/import management, production authentication/organization administration and deployment remain subsequent V1 milestones.
