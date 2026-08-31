@@ -15,6 +15,7 @@ export type {
   FollowupDraftAgent,
   FollowupDraftCandidate,
 } from "./followup-drafts/followup-draft-agent.js";
+export * from "./management-queries/index.js";
 export * from "./notifications/notification-delivery.js";
 export * from "./reminders/reminder-scheduler.js";
 export * from "./workspace/index.js";

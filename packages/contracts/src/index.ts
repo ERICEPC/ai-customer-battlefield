@@ -95,6 +95,33 @@ export {
 } from "./followup-draft.js";
 export { type HealthResponse, healthResponseSchema } from "./health.js";
 export {
+  type ManagementQueryApiError,
+  type ManagementQueryCapability,
+  type ManagementQueryDataGap,
+  type ManagementQueryEvidence,
+  type ManagementQueryHighlight,
+  type ManagementQueryMetrics,
+  type ManagementQueryRequest,
+  type ManagementQueryResult,
+  type ManagementQueryScopeKind,
+  type ManagementQuerySubject,
+  type ManagementQuerySubjectListQuery,
+  type ManagementQuerySubjectPage,
+  managementQueryApiErrorSchema,
+  managementQueryCapabilitySchema,
+  managementQueryDataGapSchema,
+  managementQueryEvidenceKindSchema,
+  managementQueryEvidenceSchema,
+  managementQueryHighlightSchema,
+  managementQueryMetricsSchema,
+  managementQueryRequestSchema,
+  managementQueryResultSchema,
+  managementQueryScopeKindSchema,
+  managementQuerySubjectListQuerySchema,
+  managementQuerySubjectPageSchema,
+  managementQuerySubjectSchema,
+} from "./management-queries.js";
+export {
   type InboxItem,
   type InboxPage,
   type InboxQuery,
