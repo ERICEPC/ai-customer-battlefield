@@ -1,4 +1,18 @@
 export {
+  type AuthApiError,
+  authApiErrorSchema,
+  type IdentityPerson,
+  type IdentityRole,
+  identityPersonSchema,
+  identityRoleSchema,
+  type LoginRequest,
+  type LoginResponse,
+  loginRequestSchema,
+  loginResponseSchema,
+  type SessionProfile,
+  sessionProfileSchema,
+} from "./auth.js";
+export {
   type BattleAnalysisCandidate,
   type BattleAnalysisRequest,
   type BattleAnalysisResult,
