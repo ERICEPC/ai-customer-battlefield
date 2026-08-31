@@ -69,11 +69,12 @@ describe("follow-up draft provider configuration", () => {
     vi.stubGlobal("fetch", fetch);
     const agent = createUserConfiguredFollowupDraftAgent(
       {
-        resolveCredential: vi.fn().mockResolvedValue({
+        resolveRuntimeSelection: vi.fn().mockResolvedValue({
           apiKey: "personal-api-key",
           model: "glm-5.3-flash",
         }),
       } as never,
+      { resolve: vi.fn().mockResolvedValue(null) },
       {
         NODE_ENV: "development",
         FOLLOWUP_AGENT_PROVIDER: "senseaudio",
@@ -99,5 +100,83 @@ describe("follow-up draft provider configuration", () => {
         }),
       }),
     );
+  });
+
+  it("resolves personal model, tenant prompt, and system key in explicit precedence order", async () => {
+    const fetch = vi.fn().mockResolvedValue(
+      Response.json({
+        id: "request-layered-config",
+        model: "qwen3.8-27b",
+        choices: [
+          {
+            message: {
+              content: JSON.stringify({
+                summary: "客户已确认预算。",
+                followupType: "meeting",
+                facts: [],
+              }),
+            },
+          },
+        ],
+      }),
+    );
+    vi.stubGlobal("fetch", fetch);
+    const agent = createUserConfiguredFollowupDraftAgent(
+      {
+        resolveRuntimeSelection: vi.fn().mockResolvedValue({
+          apiKey: null,
+          model: "qwen3.8-27b",
+        }),
+      } as never,
+      {
+        resolve: vi.fn().mockResolvedValue({
+          configId: "a1000000-0000-4000-8000-000000000001",
+          configKey: "followup_extraction",
+          versionNo: "2",
+          releaseNo: "3",
+          name: "销售跟进拆解 V2",
+          provider: "senseaudio",
+          defaultModelId: "glm-5.3-flash",
+          systemPrompt: "租户已发布的销售跟进拆解提示词。",
+          parameters: { temperature: 0.2, maxTokens: 800 },
+          releasedAt: "2026-09-01T05:00:00.000Z",
+        }),
+      },
+      {
+        NODE_ENV: "development",
+        FOLLOWUP_AGENT_PROVIDER: "senseaudio",
+        SENSEAUDIO_API_KEY: "system-api-key",
+      },
+    );
+
+    await expect(
+      agent.propose({
+        actor: { tenantId: "tenant-demo", userId: "user-demo" },
+        entityId: "50000000-0000-4000-8000-000000000001",
+        rawInput: "客户已确认预算。",
+        occurredAt: "2026-08-31T12:00:00.000Z",
+      }),
+    ).resolves.toMatchObject({
+      agentExecution: {
+        model: "qwen3.8-27b",
+        promptVersion: "followup_extraction-v2-r3",
+      },
+    });
+    const [, init] = fetch.mock.calls[0] as [string, RequestInit];
+    expect(init.headers).toMatchObject({
+      authorization: "Bearer system-api-key",
+    });
+    expect(JSON.parse(String(init.body))).toMatchObject({
+      model: "qwen3.8-27b",
+      temperature: 0.2,
+      max_tokens: 800,
+      messages: [
+        {
+          role: "system",
+          content: "租户已发布的销售跟进拆解提示词。",
+        },
+        { role: "user", content: "客户已确认预算。" },
+      ],
+    });
   });
 });

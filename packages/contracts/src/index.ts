@@ -1,4 +1,23 @@
 export {
+  type AiRuntimeConfigApiError,
+  type AiRuntimeConfigKey,
+  type AiRuntimeConfigVersion,
+  type AiRuntimeConfigVersionListQuery,
+  type AiRuntimeConfigVersionPage,
+  aiRuntimeConfigApiErrorSchema,
+  aiRuntimeConfigKeySchema,
+  aiRuntimeConfigVersionListQuerySchema,
+  aiRuntimeConfigVersionPageSchema,
+  aiRuntimeConfigVersionSchema,
+  aiRuntimeParametersSchema,
+  type CreateAiRuntimeConfigVersionRequest,
+  createAiRuntimeConfigVersionRequestSchema,
+  type ReleaseAiRuntimeConfigVersionRequest,
+  type ReleasedAiRuntimeConfig,
+  releaseAiRuntimeConfigVersionRequestSchema,
+  releasedAiRuntimeConfigSchema,
+} from "./ai-runtime-config.js";
+export {
   type AuditEntry,
   type AuditEntryListQuery,
   type AuditEntryPage,

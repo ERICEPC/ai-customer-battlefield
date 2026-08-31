@@ -4,6 +4,14 @@ export {
   type KyselyActionQueryReaderOptions,
 } from "./action-decisions/kysely-action-query-reader.js";
 export {
+  KyselyAiRuntimeConfigReader,
+  type KyselyAiRuntimeConfigReaderOptions,
+} from "./ai-configuration/kysely-ai-runtime-config-reader.js";
+export {
+  KyselyAiRuntimeConfigStore,
+  type KyselyAiRuntimeConfigStoreOptions,
+} from "./ai-configuration/kysely-ai-runtime-config-store.js";
+export {
   KyselyOutboxStore,
   OutboxClaimLostError,
 } from "./async-work/kysely-outbox-store.js";
@@ -36,6 +44,9 @@ export type {
 export type {
   ActionProposalTable,
   ActionStatusHistoryTable,
+  AiRuntimeConfigReleaseHistoryTable,
+  AiRuntimeConfigReleaseTable,
+  AiRuntimeConfigVersionTable,
   AnalysisRunTable,
   AuditEntryTable,
   BattlefieldDatabase,

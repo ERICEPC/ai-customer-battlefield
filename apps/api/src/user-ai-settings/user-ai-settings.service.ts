@@ -34,6 +34,11 @@ export interface ResolvedUserAiCredential {
   model: ReturnType<typeof senseAudioTextModelIdSchema.parse>;
 }
 
+export interface ResolvedPersonalAiRuntime {
+  apiKey: string | null;
+  model: ReturnType<typeof senseAudioTextModelIdSchema.parse>;
+}
+
 interface SettingsRow {
   model_id: string;
   api_key_ciphertext: string | null;
@@ -150,16 +155,27 @@ export class UserAiSettingsService {
   async resolveCredential(
     actor: UserAiSettingsActor,
   ): Promise<ResolvedUserAiCredential> {
-    const row = await this.#readRow(actor);
-    if (!row?.api_key_ciphertext || !row.api_key_iv || !row.api_key_auth_tag) {
+    const runtime = await this.resolveRuntimeSelection(actor);
+    if (!runtime?.apiKey) {
       throw new UserAiSettingsError(
         "AI_KEY_NOT_CONFIGURED",
         "请先在个人设置中配置 SenseAudio API Key。",
       );
     }
+    return { apiKey: runtime.apiKey, model: runtime.model };
+  }
+
+  async resolveRuntimeSelection(
+    actor: UserAiSettingsActor,
+  ): Promise<ResolvedPersonalAiRuntime | null> {
+    const row = await this.#readRow(actor);
+    if (!row) return null;
     try {
       return {
-        apiKey: decryptApiKey(row, actor, this.#encryptionKey),
+        apiKey:
+          row.api_key_ciphertext && row.api_key_iv && row.api_key_auth_tag
+            ? decryptApiKey(row, actor, this.#encryptionKey)
+            : null,
         model: senseAudioTextModelIdSchema.parse(row.model_id),
       };
     } catch (error) {

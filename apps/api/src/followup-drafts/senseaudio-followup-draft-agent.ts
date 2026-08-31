@@ -5,6 +5,8 @@ const DEFAULT_BASE_URL = "https://api.senseaudio.cn/v1";
 const DEFAULT_MODEL = "senseaudio-s2-flash";
 const DEFAULT_TIMEOUT_MS = 20_000;
 const DEFAULT_PROMPT_VERSION = "followup-extraction-v1";
+const DEFAULT_TEMPERATURE = 0.1;
+const DEFAULT_MAX_TOKENS = 1_200;
 
 export const DEFAULT_FOLLOWUP_EXTRACTION_PROMPT = `你是销售跟进记录拆解助手。只提取用户原文明确表达、可供人工核对的内容，不补写、不猜测。
 只返回一个 JSON 对象，不要使用 Markdown 代码块，也不要附加解释。对象只能包含以下字段：
@@ -21,6 +23,8 @@ interface SenseAudioFollowupDraftAgentOptions {
   model?: string;
   prompt?: string;
   promptVersion?: string;
+  temperature?: number;
+  maxTokens?: number;
   timeoutMs?: number;
   maxAttempts?: number;
   fetch?: Fetch;
@@ -49,6 +53,8 @@ export class SenseAudioFollowupDraftAgent implements FollowupDraftAgent {
   readonly #model: string;
   readonly #prompt: string;
   readonly #promptVersion: string;
+  readonly #temperature: number;
+  readonly #maxTokens: number;
   readonly #timeoutMs: number;
   readonly #maxAttempts: number;
   readonly #fetch: Fetch;
@@ -61,6 +67,8 @@ export class SenseAudioFollowupDraftAgent implements FollowupDraftAgent {
     this.#model = options.model ?? DEFAULT_MODEL;
     this.#prompt = options.prompt ?? DEFAULT_FOLLOWUP_EXTRACTION_PROMPT;
     this.#promptVersion = options.promptVersion ?? DEFAULT_PROMPT_VERSION;
+    this.#temperature = options.temperature ?? DEFAULT_TEMPERATURE;
+    this.#maxTokens = options.maxTokens ?? DEFAULT_MAX_TOKENS;
     this.#timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
     this.#maxAttempts = Math.max(1, Math.min(options.maxAttempts ?? 2, 3));
     this.#fetch = options.fetch ?? globalThis.fetch;
@@ -76,8 +84,8 @@ export class SenseAudioFollowupDraftAgent implements FollowupDraftAgent {
         { role: "user", content: input.rawInput },
       ],
       stream: false,
-      temperature: 0.1,
-      max_tokens: 1_200,
+      temperature: this.#temperature,
+      max_tokens: this.#maxTokens,
       response_format: {
         type: "json_object",
       },

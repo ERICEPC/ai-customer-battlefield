@@ -1,5 +1,7 @@
 import { randomUUID } from "node:crypto";
+import { senseAudioTextModelIdSchema } from "@battlefield/contracts";
 import {
+  type AiRuntimeConfigReader,
   CancelFollowupDraft,
   ConfirmFollowupDraft,
   CreatePersistentFollowupDraft,
@@ -10,7 +12,10 @@ import {
   GetFormalFollowup,
   ReviseFollowupDraft,
 } from "@battlefield/core";
-import { KyselyFollowupConfirmationStore } from "@battlefield/database";
+import {
+  KyselyAiRuntimeConfigReader,
+  KyselyFollowupConfirmationStore,
+} from "@battlefield/database";
 import { type Provider, ServiceUnavailableException } from "@nestjs/common";
 
 import type { ApplicationDatabaseHandle } from "../database/database.module.js";
@@ -19,7 +24,6 @@ import {
   type ApplicationUserAiSettingsService,
   USER_AI_SETTINGS_SERVICE,
 } from "../user-ai-settings/user-ai-settings.providers.js";
-import { UserAiSettingsError } from "../user-ai-settings/user-ai-settings.service.js";
 import { DeterministicFollowupDraftAgent } from "./deterministic-followup-draft-agent.js";
 import {
   SenseAudioFollowupDraftAgent,
@@ -27,6 +31,7 @@ import {
 } from "./senseaudio-followup-draft-agent.js";
 
 export const FOLLOWUP_DRAFT_AGENT = Symbol("FOLLOWUP_DRAFT_AGENT");
+export const AI_RUNTIME_CONFIG_READER = Symbol("AI_RUNTIME_CONFIG_READER");
 export const FOLLOWUP_CONFIRMATION_STORE = Symbol(
   "FOLLOWUP_CONFIRMATION_STORE",
 );
@@ -89,6 +94,7 @@ export function createConfiguredFollowupDraftAgent(
 
 export function createUserConfiguredFollowupDraftAgent(
   settings: ApplicationUserAiSettingsService,
+  runtimeConfigReader: AiRuntimeConfigReader,
   environment: NodeJS.ProcessEnv,
 ): FollowupDraftAgent {
   const fallback = createConfiguredFollowupDraftAgent(environment);
@@ -101,15 +107,36 @@ export function createUserConfiguredFollowupDraftAgent(
   return {
     async propose(input) {
       try {
-        const credential = await settings.resolveCredential(input.actor);
-        return createSenseAudioAgent(environment, credential).propose(input);
+        const [personal, runtime] = await Promise.all([
+          settings?.resolveRuntimeSelection(input.actor) ?? null,
+          runtimeConfigReader.resolve({
+            actor: input.actor,
+            configKey: "followup_extraction",
+          }),
+        ]);
+        const apiKey =
+          personal?.apiKey ?? environment.SENSEAUDIO_API_KEY?.trim();
+        if (!apiKey) return fallback.propose(input);
+        const configuredModel =
+          personal?.model ??
+          runtime?.defaultModelId ??
+          environment.FOLLOWUP_AGENT_MODEL?.trim();
+        const model = configuredModel
+          ? senseAudioTextModelIdSchema.parse(configuredModel)
+          : undefined;
+        return createSenseAudioAgent(environment, {
+          apiKey,
+          ...(model ? { model } : {}),
+          ...(runtime
+            ? {
+                prompt: runtime.systemPrompt,
+                promptVersion: `${runtime.configKey}-v${runtime.versionNo}-r${runtime.releaseNo}`,
+                temperature: runtime.parameters.temperature,
+                maxTokens: runtime.parameters.maxTokens,
+              }
+            : {}),
+        }).propose(input);
       } catch (error) {
-        if (
-          error instanceof UserAiSettingsError &&
-          error.code === "AI_KEY_NOT_CONFIGURED"
-        ) {
-          return fallback.propose(input);
-        }
         if (error instanceof SenseAudioFollowupDraftAgentError) throw error;
         throw new SenseAudioFollowupDraftAgentError(
           "not_configured",
@@ -122,7 +149,14 @@ export function createUserConfiguredFollowupDraftAgent(
 
 function createSenseAudioAgent(
   environment: NodeJS.ProcessEnv,
-  credential: { apiKey: string; model?: string },
+  credential: {
+    apiKey: string;
+    model?: string;
+    prompt?: string;
+    promptVersion?: string;
+    temperature?: number;
+    maxTokens?: number;
+  },
 ): FollowupDraftAgent {
   const timeoutMs = boundedInteger(
     environment.FOLLOWUP_AGENT_TIMEOUT_MS,
@@ -141,12 +175,22 @@ function createSenseAudioAgent(
       ? { baseUrl: environment.SENSEAUDIO_BASE_URL.trim() }
       : {}),
     ...(credential.model?.trim() ? { model: credential.model.trim() } : {}),
-    ...(environment.FOLLOWUP_AGENT_PROMPT?.trim()
-      ? { prompt: environment.FOLLOWUP_AGENT_PROMPT.trim() }
-      : {}),
-    ...(environment.FOLLOWUP_AGENT_PROMPT_VERSION?.trim()
-      ? { promptVersion: environment.FOLLOWUP_AGENT_PROMPT_VERSION.trim() }
-      : {}),
+    ...(credential.prompt?.trim()
+      ? { prompt: credential.prompt.trim() }
+      : environment.FOLLOWUP_AGENT_PROMPT?.trim()
+        ? { prompt: environment.FOLLOWUP_AGENT_PROMPT.trim() }
+        : {}),
+    ...(credential.promptVersion?.trim()
+      ? { promptVersion: credential.promptVersion.trim() }
+      : environment.FOLLOWUP_AGENT_PROMPT_VERSION?.trim()
+        ? { promptVersion: environment.FOLLOWUP_AGENT_PROMPT_VERSION.trim() }
+        : {}),
+    ...(credential.temperature === undefined
+      ? {}
+      : { temperature: credential.temperature }),
+    ...(credential.maxTokens === undefined
+      ? {}
+      : { maxTokens: credential.maxTokens }),
     ...(timeoutMs === undefined ? {} : { timeoutMs }),
     ...(maxAttempts === undefined ? {} : { maxAttempts }),
   });
@@ -164,12 +208,25 @@ function boundedInteger(
 
 export const followupDraftProviders: Provider[] = [
   {
+    provide: AI_RUNTIME_CONFIG_READER,
+    inject: [DATABASE_HANDLE],
+    useFactory: (database: ApplicationDatabaseHandle): AiRuntimeConfigReader =>
+      database
+        ? new KyselyAiRuntimeConfigReader(database.db)
+        : { resolve: async () => null },
+  },
+  {
     provide: FOLLOWUP_DRAFT_AGENT,
-    inject: [USER_AI_SETTINGS_SERVICE],
+    inject: [USER_AI_SETTINGS_SERVICE, AI_RUNTIME_CONFIG_READER],
     useFactory: (
       settings: ApplicationUserAiSettingsService,
+      runtimeConfigReader: AiRuntimeConfigReader,
     ): FollowupDraftAgent =>
-      createUserConfiguredFollowupDraftAgent(settings, process.env),
+      createUserConfiguredFollowupDraftAgent(
+        settings,
+        runtimeConfigReader,
+        process.env,
+      ),
   },
   {
     provide: FOLLOWUP_CONFIRMATION_STORE,

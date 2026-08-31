@@ -122,6 +122,41 @@ export interface UserAiSettingsTable {
   updated_at: Timestamp;
 }
 
+export interface AiRuntimeConfigVersionTable {
+  tenant_id: string;
+  id: Generated<string>;
+  config_key: string;
+  version_no: VersionNumber;
+  name: string;
+  provider: "senseaudio";
+  default_model_id: string;
+  system_prompt: string;
+  parameters: JsonObject;
+  content_fingerprint: string;
+  created_by: string;
+  created_at: Timestamp;
+}
+
+export interface AiRuntimeConfigReleaseTable {
+  tenant_id: string;
+  config_key: string;
+  version_id: string;
+  release_no: VersionNumber;
+  released_by: string;
+  released_at: Timestamp;
+}
+
+export interface AiRuntimeConfigReleaseHistoryTable {
+  tenant_id: string;
+  id: Generated<string>;
+  config_key: string;
+  release_no: VersionNumber;
+  version_id: string;
+  released_by: string;
+  released_at: Timestamp;
+  reason: NullableText;
+}
+
 export interface ChannelAddressTable {
   tenant_id: string;
   id: Generated<string>;
@@ -785,6 +820,9 @@ export interface BattlefieldDatabase {
   "app.user_credentials": UserCredentialTable;
   "app.user_sessions": UserSessionTable;
   "app.user_ai_settings": UserAiSettingsTable;
+  "app.ai_runtime_config_versions": AiRuntimeConfigVersionTable;
+  "app.ai_runtime_config_releases": AiRuntimeConfigReleaseTable;
+  "app.ai_runtime_config_release_history": AiRuntimeConfigReleaseHistoryTable;
   "app.channel_addresses": ChannelAddressTable;
   "app.business_entity_types": BusinessEntityTypeTable;
   "app.business_entities": BusinessEntityTable;

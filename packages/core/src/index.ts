@@ -1,4 +1,5 @@
 export * from "./action-decisions/index.js";
+export * from "./ai-configuration/index.js";
 export * from "./async-work/outbox-processor.js";
 export * from "./audit/index.js";
 export * from "./battle-analysis/index.js";

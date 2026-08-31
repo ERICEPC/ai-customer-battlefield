@@ -122,6 +122,22 @@ describe("UserAiSettingsService", () => {
     );
   });
 
+  it("resolves a personal model independently from an optional personal key", async () => {
+    const service = new UserAiSettingsService({
+      database: database.db,
+      encryptionKey: Buffer.alloc(32, 5),
+    });
+    await service.update(actor, { selectedModel: "qwen3.8-27b" });
+
+    await expect(service.resolveRuntimeSelection(actor)).resolves.toEqual({
+      model: "qwen3.8-27b",
+      apiKey: null,
+    });
+    await expect(service.resolveCredential(actor)).rejects.toMatchObject({
+      code: "AI_KEY_NOT_CONFIGURED",
+    });
+  });
+
   it("treats a successful wrapped provider receipt as connected", async () => {
     const fetch = vi.fn().mockResolvedValue(
       Response.json({
