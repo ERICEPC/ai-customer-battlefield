@@ -5,7 +5,9 @@ import type { BattlefieldDatabase } from "@battlefield/database";
 import { migrateDatabase } from "@battlefield/database";
 import {
   createPgliteDatabase,
+  seedSyntheticAcceptedAction,
   seedSyntheticBusinessEntityDirectory,
+  seedSyntheticInboxNotification,
   seedSyntheticReminderConfiguration,
 } from "@battlefield/database/testing";
 import { createReminderWorker, runWorkerLoop } from "@battlefield/worker";
@@ -28,6 +30,13 @@ await migrateDatabase(database.migrations, migrationDirectory);
 console.info("Synthetic demo migrations applied.");
 await seedSyntheticBusinessEntityDirectory(database);
 await seedSyntheticReminderConfiguration(database);
+await seedSyntheticAcceptedAction(database);
+await seedSyntheticInboxNotification(database, {
+  reminderId: "72000000-0000-4000-8000-000000000071",
+  notificationId: "f0000000-0000-4000-8000-000000000071",
+  recipientUserId: "30000000-0000-4000-8000-000000000001",
+  createdAt: "2026-08-31T00:08:00.000Z",
+});
 console.info("Synthetic demo data seeded.");
 
 const workerController = new AbortController();

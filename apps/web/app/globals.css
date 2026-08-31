@@ -171,6 +171,143 @@ main {
   display: none;
 }
 
+.inbox-workspace {
+  display: grid;
+  gap: 18px;
+}
+
+.inbox-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 18px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--surface);
+}
+
+.inbox-list {
+  display: grid;
+  gap: 12px;
+}
+
+.inbox-card {
+  display: grid;
+  grid-template-columns: 82px minmax(0, 1fr);
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--surface);
+  box-shadow: 0 8px 28px rgba(28, 48, 82, 0.05);
+}
+
+.inbox-card.is-unread {
+  border-color: #bfd3f8;
+  box-shadow: 0 10px 30px rgba(47, 111, 237, 0.09);
+}
+
+.inbox-status-column {
+  display: grid;
+  align-content: start;
+  justify-items: center;
+  gap: 8px;
+  padding: 24px 10px;
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 750;
+  border-right: 1px solid var(--line);
+  background: #f8fafd;
+}
+
+.inbox-unread-dot {
+  width: 9px;
+  height: 9px;
+  border: 2px solid #98a2b3;
+  border-radius: 50%;
+}
+
+.is-unread .inbox-unread-dot {
+  border-color: var(--blue);
+  background: var(--blue);
+  box-shadow: 0 0 0 5px rgba(47, 111, 237, 0.1);
+}
+
+.inbox-card-content {
+  min-width: 0;
+  padding: 22px 24px;
+}
+
+.inbox-card-heading > div {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.inbox-card-heading h2 {
+  margin: 10px 0 0;
+  font-size: 18px;
+  letter-spacing: -0.015em;
+}
+
+.inbox-card-heading time {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.notification-priority {
+  display: inline-flex;
+  padding: 4px 8px;
+  color: #2456ad;
+  font-size: 10px;
+  font-weight: 800;
+  border-radius: 999px;
+  background: var(--blue-soft);
+}
+
+.notification-priority.priority-urgent {
+  color: var(--danger);
+  background: var(--danger-soft);
+}
+
+.notification-priority.priority-low {
+  color: #556987;
+  background: #eef2f7;
+}
+
+.inbox-card-content > p {
+  margin: 12px 0 18px;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.7;
+  overflow-wrap: anywhere;
+}
+
+.inbox-card-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+}
+
+.inbox-card .inbox-card-actions a,
+.inbox-card-actions > span {
+  color: var(--blue);
+  font-size: 12px;
+  font-weight: 750;
+}
+
+.inbox-card-content > [role="alert"] {
+  margin-top: 12px;
+  color: var(--danger);
+  font-size: 12px;
+}
+
+.inbox-pagination {
+  display: flex;
+  justify-content: center;
+  padding: 12px;
+}
+
 .topbar {
   display: flex;
   justify-content: space-between;
@@ -1076,7 +1213,7 @@ button:disabled {
     left: 10px;
     z-index: 30;
     display: grid;
-    grid-template-columns: repeat(4, 1fr);
+    grid-template-columns: repeat(5, 1fr);
     gap: 4px;
     padding: 7px;
     border: 1px solid rgba(255, 255, 255, 0.14);
@@ -1126,6 +1263,33 @@ button:disabled {
   .page-content {
     width: calc(100% - 32px);
     padding: 38px 0 100px;
+  }
+
+  .inbox-toolbar,
+  .inbox-card-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .inbox-toolbar button {
+    width: 100%;
+  }
+
+  .inbox-card {
+    grid-template-columns: 1fr;
+  }
+
+  .inbox-status-column {
+    display: flex;
+    justify-content: flex-start;
+    align-items: center;
+    padding: 13px 18px;
+    border-right: 0;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .inbox-card-content {
+    padding: 18px;
   }
 
   .page-heading {

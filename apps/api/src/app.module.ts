@@ -5,6 +5,7 @@ import { BusinessActionsModule } from "./business-actions/business-actions.modul
 import { BusinessEntitiesModule } from "./business-entities/business-entities.module.js";
 import { FollowupDraftsModule } from "./followup-drafts/followup-drafts.module.js";
 import { HealthController } from "./health/health.controller.js";
+import { NotificationsModule } from "./notifications/notifications.module.js";
 
 @Module({
   imports: [
@@ -12,6 +13,7 @@ import { HealthController } from "./health/health.controller.js";
     FollowupDraftsModule,
     BattleAnalysisModule,
     BusinessActionsModule,
+    NotificationsModule,
   ],
   controllers: [HealthController],
 })

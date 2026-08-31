@@ -461,7 +461,7 @@ Commit: `feat: process action reminder outbox events`
 - Adds `GET /api/v1/inbox?unreadOnly=true&limit=50&cursor=...` and idempotent `POST /api/v1/inbox/:notificationId/read`.
 - Web treats the returned deep link as an application-relative path and never renders stored HTML.
 
-- [ ] **Step 1: Write API E2E tests before controllers exist**
+- [x] **Step 1: Write API E2E tests before controllers exist**
 
 Cover missing actor 401, invalid cursor/limit 400, other recipient 404, unread filter, keyset pagination, stable mark-read response, repeated mark-read equality, tenant isolation, and deep-link/title/body contract validation.
 
@@ -476,25 +476,25 @@ expect(await actorRequest(app)
   .expect(201)).toEqual(read);
 ```
 
-- [ ] **Step 2: Run API tests and verify RED**
+- [x] **Step 2: Run API tests and verify RED**
 
 Run: `pnpm --filter @battlefield/api test -- --run`
 
 Expected: the inbox routes return 404.
 
-- [ ] **Step 3: Implement fail-closed providers and controllers**
+- [x] **Step 3: Implement fail-closed providers and controllers**
 
 Parse route/query input with shared contracts, derive actor only through the existing development-auth seam, map typed not-found/cursor failures to stable errors, and return 503 when database adapters are unavailable. Controllers contain no SQL and no Feishu calls.
 
-- [ ] **Step 4: Write Web tests before UI exists**
+- [x] **Step 4: Write Web tests before UI exists**
 
 Cover loading, empty, error/retry, unread-only filter, cursor append, no duplicate rows, mark read, safe relative deep link, notification time/priority labels, desktop list, 390px card layout, and stale pagination response suppression.
 
-- [ ] **Step 5: Build the notification center**
+- [x] **Step 5: Build the notification center**
 
 The page title is `通知中心`; each row shows unread marker, title, plain-text body, priority, created time, and `查看相关动作`. Mark read optimistically only after the server returns a receipt; on failure restore unread state and expose retry. Add a `通知` item to desktop and mobile navigation.
 
-- [ ] **Step 6: Run API/Web/full checks and commit**
+- [x] **Step 6: Run API/Web/full checks and commit**
 
 Run: `pnpm --filter @battlefield/api test -- --run && pnpm --filter @battlefield/web test -- --run && pnpm lint && pnpm typecheck`
 

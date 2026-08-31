@@ -9,6 +9,7 @@ const navigation = [
   { label: "客户作战地图", href: "/battle-map" },
   { label: "跟进工作台", href: "/" },
   { label: "经营动作", href: "/actions" },
+  { label: "通知中心", href: "/inbox" },
   { label: "周报中心", href: "#" },
 ] as const;
 
@@ -29,6 +30,7 @@ const mobileNavigation: ReadonlyArray<{
     mark: "图",
   },
   { label: "动作", href: "/actions", activeItem: "经营动作", mark: "动" },
+  { label: "通知", href: "/inbox", activeItem: "通知中心", mark: "信" },
 ];
 
 export function AppShell({
