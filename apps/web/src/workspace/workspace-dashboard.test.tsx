@@ -100,6 +100,10 @@ describe("WorkspaceDashboard", () => {
       await screen.findByRole("heading", { name: "我的推进与观察范围" }),
     ).toBeVisible();
     expect(screen.getByText(/同时包含我的直接责任范围/)).toBeVisible();
+    expect(screen.getByRole("link", { name: "查看销售进展" })).toHaveAttribute(
+      "href",
+      "/ask",
+    );
 
     const kpis = screen.getByRole("region", { name: "经营概况" });
     expect(

@@ -129,6 +129,9 @@ export function WorkspaceDashboard({
           <strong>{presentation.boundaryTitle}</strong>
           <p>{presentation.boundaryCopy}</p>
         </div>
+        <Link className="workspace-query-entry" href="/ask">
+          查看销售进展
+        </Link>
       </div>
 
       <KpiGrid kpis={snapshot.kpis} />

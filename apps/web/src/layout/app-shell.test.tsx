@@ -28,6 +28,9 @@ describe("AppShell", () => {
     expect(
       within(desktop).getByRole("link", { name: "通知中心" }),
     ).toHaveAttribute("href", "/inbox");
+    expect(
+      within(desktop).getByRole("link", { name: "管理问数" }),
+    ).toHaveAttribute("href", "/ask");
 
     const mobile = screen.getByRole("navigation", { name: "移动端主导航" });
     expect(within(mobile).getByRole("link", { name: "今日" })).toHaveAttribute(
@@ -49,6 +52,10 @@ describe("AppShell", () => {
     expect(within(mobile).getByRole("link", { name: "通知" })).toHaveAttribute(
       "href",
       "/inbox",
+    );
+    expect(within(mobile).getByRole("link", { name: "问数" })).toHaveAttribute(
+      "href",
+      "/ask",
     );
   });
 

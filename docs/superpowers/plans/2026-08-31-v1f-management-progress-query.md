@@ -104,6 +104,8 @@ Evidence kinds are limited to `followup`, `fact`, `stage_change`, `action` and `
 3. Replace the management-query navigation placeholder with `/ask`; add an entry from management workspace without changing the follow-up creation route.
 4. At 390px keep controls at least 44px high, stack metrics/highlights and prevent horizontal overflow.
 
+**Local evidence:** Client and component suites first failed because `/ask` modules and navigation did not exist. The GREEN page loads every authorized subject page, defaults to an explicit UTC Monday-to-next-Monday interval, validates ranges before submission, renders six deterministic metrics, scoped entity highlights, typed evidence links, result cutoff/query ID and truthful analysis gaps, and handles empty scope, slow loading, retries and stale-response suppression. The desktop and 390×844 synthetic-manager browser flow completed query → evidence → re-authorized read-only action. Final responsive measurements were `innerWidth=390`, `documentElement.scrollWidth=375`, `body.scrollWidth=375`; composer controls were 46px, mobile navigation 55px and evidence links 44px, with no browser console errors on the final localhost flow. Web passes 88/88, typecheck, Biome and production build including static `/ask`.
+
 ## Task 5: Acceptance, living docs, review and direct-main delivery
 
 **Files:**
