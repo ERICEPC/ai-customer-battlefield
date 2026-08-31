@@ -18,10 +18,7 @@ import type {
 } from "@battlefield/contracts";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
-import {
-  type DevelopmentActor,
-  developmentActorConfiguration,
-} from "../config/development-actor";
+import { useOptionalSession } from "../auth/session-provider";
 import {
   acceptActionProposal,
   getActionProposal,
@@ -79,16 +76,34 @@ type RejectAttempt = {
   key: string;
   input: RejectActionProposalRequest;
 };
+type ActionActor = {
+  userId: string;
+  displayName: string;
+};
+
+const isolatedTestActor: ActionActor = {
+  userId: "30000000-0000-4000-8000-000000000001",
+  displayName: "当前用户",
+};
 
 export function ActionWorkspace({
   api = defaultApi,
-  actor = developmentActorConfiguration(),
+  actor,
   initialActionId,
 }: {
   api?: ActionWorkspaceApi;
-  actor?: DevelopmentActor;
+  actor?: ActionActor;
   initialActionId?: string;
 }) {
+  const sessionContext = useOptionalSession();
+  const currentActor =
+    actor ??
+    (sessionContext?.session
+      ? {
+          userId: sessionContext.session.user.id,
+          displayName: sessionContext.session.user.displayName,
+        }
+      : isolatedTestActor);
   const [proposals, setProposals] = useState<ActionProposalRecord[]>([]);
   const [actions, setActions] = useState<BusinessActionRecord[]>([]);
   const [owners, setOwners] = useState<ActionOwnerOption[]>([]);
@@ -422,7 +437,7 @@ export function ActionWorkspace({
                     key={selected.proposalId}
                     proposal={selected}
                     api={api}
-                    actor={actor}
+                    actor={currentActor}
                     owners={owners}
                     hasMoreOwners={ownerCursor !== null}
                     isLoadingMoreOwners={isLoadingMoreOwners}
@@ -524,7 +539,7 @@ function ProposalDecisionCard({
 }: {
   proposal: ActionProposalRecord;
   api: ActionWorkspaceApi;
-  actor: DevelopmentActor;
+  actor: ActionActor;
   owners: ActionOwnerOption[];
   hasMoreOwners: boolean;
   isLoadingMoreOwners: boolean;
@@ -1163,7 +1178,7 @@ function actionsWithTargetFirst(
 }
 
 function initialActiveOwnerId(
-  actor: DevelopmentActor,
+  actor: ActionActor,
   owners: ActionOwnerOption[],
   proposal: ActionProposalRecord,
 ): string {

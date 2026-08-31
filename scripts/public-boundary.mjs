@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -48,12 +48,15 @@ function readTrackedTextEntries() {
     .split("\0")
     .filter(Boolean);
 
-  return trackedFiles.map((path) => {
+  return trackedFiles.flatMap((path) => {
+    if (!existsSync(path)) return [];
     const bytes = readFileSync(path);
-    return {
-      path,
-      content: bytes.includes(0) ? "" : bytes.toString("utf8"),
-    };
+    return [
+      {
+        path,
+        content: bytes.includes(0) ? "" : bytes.toString("utf8"),
+      },
+    ];
   });
 }
 

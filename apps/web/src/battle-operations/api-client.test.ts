@@ -36,7 +36,7 @@ describe("battle operations API client", () => {
     ).resolves.toEqual(page);
     expect(fetchMock).toHaveBeenCalledWith(
       "http://localhost:3001/api/v1/battle-map?isT0=true&dataSufficiency=partial&limit=40",
-      expect.objectContaining({ headers: expect.any(Object) }),
+      expect.objectContaining({ credentials: "include" }),
     );
   });
 
@@ -111,7 +111,7 @@ describe("battle operations API client", () => {
     await expect(getBusinessAction(actionId)).resolves.toEqual(action);
     expect(fetchMock).toHaveBeenCalledWith(
       `http://localhost:3001/api/v1/actions/${actionId}`,
-      expect.objectContaining({ headers: expect.any(Object) }),
+      expect.objectContaining({ credentials: "include" }),
     );
   });
 

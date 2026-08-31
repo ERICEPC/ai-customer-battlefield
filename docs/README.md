@@ -29,12 +29,14 @@
 - [V1-D 提醒与通知实施计划](superpowers/plans/2026-08-31-v1d-reminders-notifications.md)
 - [V1-E 角色工作台实施计划](superpowers/plans/2026-08-31-v1e-role-scoped-workspace.md)
 - [V1-F 受控管理进展问数实施计划](superpowers/plans/2026-08-31-v1f-management-progress-query.md)
+- [双角色业务闭环设计](superpowers/specs/2026-08-31-business-first-demo-core-design.md)
+- [阶段 1：销售与直属领导登录验收](acceptance/2026-08-31-stage-1-two-level-login.md)
 
 ## 当前工程状态
 
 当前已交付从人工确认跟进到证据化管理问数的连续纵向闭环。已具备以下边界：
 
-- Web 与 API 通过 `/api/v1` 版本化契约通信；
+- Web 与 API 通过 `/api/v1` 版本化契约通信，并通过服务端会话识别销售或直属领导；
 - AI 输出固定停留在 `pending_confirmation`，不会直接成为正式经营事实；
 - 核心用例只依赖 Agent、时钟和 ID 端口，不依赖具体框架、模型或数据库；
 - PostgreSQL SQL migration 是 schema 唯一事实源，PGlite 只作为本地/测试 adapter；

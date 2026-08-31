@@ -1,51 +1,163 @@
-import Link from "next/link";
-import type { ReactNode } from "react";
+"use client";
 
-import { developmentActorConfiguration } from "../config/development-actor";
+import Link from "next/link";
+import { type ReactNode, useEffect, useState } from "react";
+
+import { useSession } from "../auth/session-provider";
 
 const navigation = [
-  { label: "经营总览", href: "/workspace" },
-  { label: "经营对象", href: "/entities" },
-  { label: "客户作战地图", href: "/battle-map" },
-  { label: "跟进工作台", href: "/" },
-  { label: "经营动作", href: "/actions" },
-  { label: "通知中心", href: "/inbox" },
-  { label: "管理问数", href: "/ask" },
-  { label: "周报中心", href: "/reports" },
+  {
+    label: "经营总览",
+    href: "/workspace",
+    roles: ["sales", "department_leader"],
+  },
+  {
+    label: "经营对象",
+    href: "/entities",
+    roles: ["sales", "department_leader"],
+  },
+  {
+    label: "客户作战地图",
+    href: "/battle-map",
+    roles: ["sales", "department_leader"],
+  },
+  { label: "跟进工作台", href: "/", roles: ["sales", "department_leader"] },
+  {
+    label: "经营动作",
+    href: "/actions",
+    roles: ["sales", "department_leader"],
+  },
+  { label: "通知中心", href: "/inbox", roles: ["sales", "department_leader"] },
+  { label: "管理问数", href: "/ask", roles: ["department_leader"] },
+  {
+    label: "周报中心",
+    href: "/reports",
+    roles: ["sales", "department_leader"],
+  },
 ] as const;
 
 type NavigationLabel = (typeof navigation)[number]["label"];
+type NavigationRole = (typeof navigation)[number]["roles"][number];
 
 const mobileNavigation: ReadonlyArray<{
   label: string;
   href: string;
   activeItem: NavigationLabel;
   mark: string;
+  roles: readonly NavigationRole[];
 }> = [
-  { label: "今日", href: "/workspace", activeItem: "经营总览", mark: "今" },
-  { label: "跟进", href: "/", activeItem: "跟进工作台", mark: "跟" },
+  {
+    label: "今日",
+    href: "/workspace",
+    activeItem: "经营总览",
+    mark: "今",
+    roles: ["sales", "department_leader"],
+  },
+  {
+    label: "跟进",
+    href: "/",
+    activeItem: "跟进工作台",
+    mark: "跟",
+    roles: ["sales", "department_leader"],
+  },
   {
     label: "地图",
     href: "/battle-map",
     activeItem: "客户作战地图",
     mark: "图",
+    roles: ["sales", "department_leader"],
   },
-  { label: "动作", href: "/actions", activeItem: "经营动作", mark: "动" },
-  { label: "通知", href: "/inbox", activeItem: "通知中心", mark: "信" },
-  { label: "问数", href: "/ask", activeItem: "管理问数", mark: "问" },
-  { label: "周报", href: "/reports", activeItem: "周报中心", mark: "报" },
+  {
+    label: "动作",
+    href: "/actions",
+    activeItem: "经营动作",
+    mark: "动",
+    roles: ["sales", "department_leader"],
+  },
+  {
+    label: "通知",
+    href: "/inbox",
+    activeItem: "通知中心",
+    mark: "信",
+    roles: ["sales", "department_leader"],
+  },
+  {
+    label: "问数",
+    href: "/ask",
+    activeItem: "管理问数",
+    mark: "问",
+    roles: ["department_leader"],
+  },
+  {
+    label: "周报",
+    href: "/reports",
+    activeItem: "周报中心",
+    mark: "报",
+    roles: ["sales", "department_leader"],
+  },
 ];
 
 export function AppShell({
   activeItem,
   breadcrumb,
   children,
+  onLoggedOut,
 }: {
   activeItem: NavigationLabel;
   breadcrumb: string;
   children: ReactNode;
+  onLoggedOut?: () => void;
 }) {
-  const actor = developmentActorConfiguration();
+  const { session, signOut, status } = useSession();
+  const [logoutError, setLogoutError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (status === "anonymous") window.location.assign("/login");
+  }, [status]);
+
+  if (status === "loading") {
+    return <main className="session-state">正在确认登录状态…</main>;
+  }
+  if (!session) {
+    return (
+      <main className="session-state">
+        <p>登录状态已失效。</p>
+        <Link href="/login">返回登录</Link>
+      </main>
+    );
+  }
+  if (session.role === "sales" && activeItem === "管理问数") {
+    return (
+      <main className="session-state">
+        <p>当前身份不能使用管理问数。</p>
+        <Link href="/workspace">返回我的工作台</Link>
+      </main>
+    );
+  }
+
+  const visibleNavigation = navigation.filter((item) =>
+    supportsRole(item.roles, session.role),
+  );
+  const visibleMobileNavigation = mobileNavigation.filter((item) =>
+    supportsRole(item.roles, session.role),
+  );
+  const roleLabel = session.role === "sales" ? "销售身份" : "直属领导";
+  const visibleBreadcrumb =
+    session.role === "department_leader"
+      ? breadcrumb.replace(/^销售工作台/, "管理工作台")
+      : breadcrumb;
+
+  async function handleLogout() {
+    setLogoutError(null);
+    try {
+      await signOut();
+      if (onLoggedOut) onLoggedOut();
+      else window.location.assign("/login");
+    } catch {
+      setLogoutError("退出失败，请检查网络后重试。");
+    }
+  }
+
   return (
     <div className="app-shell">
       <aside className="sidebar">
@@ -64,7 +176,7 @@ export function AppShell({
         </Link>
 
         <nav aria-label="主导航">
-          {navigation.map((item) => {
+          {visibleNavigation.map((item) => {
             const isActive = item.label === activeItem;
             return (
               <Link
@@ -88,17 +200,56 @@ export function AppShell({
 
       <main>
         <header className="topbar">
-          <span className="breadcrumb">{breadcrumb}</span>
-          <div className="user-chip">
-            <span aria-hidden="true">{actor.displayName.slice(0, 1)}</span>
-            {actor.displayName}
-          </div>
+          <span className="breadcrumb">{visibleBreadcrumb}</span>
+          <details className="account-menu">
+            <summary className="user-chip" aria-label="打开账号菜单">
+              <span aria-hidden="true">
+                {session.user.displayName.slice(0, 1)}
+              </span>
+              <span>
+                <strong>{session.user.displayName}</strong>
+                <small>{roleLabel}</small>
+              </span>
+            </summary>
+            <div className="account-popover">
+              <p className="account-role">{roleLabel}</p>
+              <strong>{session.user.displayName}</strong>
+              <span>{session.user.email}</span>
+              <dl>
+                <div>
+                  <dt>所属部门</dt>
+                  <dd>{session.department.name}</dd>
+                </div>
+                {session.role === "sales" ? (
+                  <div>
+                    <dt>直属领导</dt>
+                    <dd>{session.directLeader?.displayName ?? "暂未配置"}</dd>
+                  </div>
+                ) : (
+                  <div>
+                    <dt>团队成员</dt>
+                    <dd>
+                      {session.teamMembers.length > 0
+                        ? session.teamMembers
+                            .map((member) => member.displayName)
+                            .join("、")
+                        : "暂无销售"}
+                    </dd>
+                  </div>
+                )}
+              </dl>
+              {logoutError ? <p role="alert">{logoutError}</p> : null}
+              <button type="button" onClick={() => void handleLogout()}>
+                退出登录
+              </button>
+            </div>
+          </details>
         </header>
         {children}
       </main>
 
       <nav className="mobile-navigation" aria-label="移动端主导航">
-        {mobileNavigation.map((item) => {
+        {visibleMobileNavigation.map((item) => {
           const isActive = item.activeItem === activeItem;
           return (
             <Link
@@ -115,4 +266,11 @@ export function AppShell({
       </nav>
     </div>
   );
+}
+
+function supportsRole(
+  roles: readonly NavigationRole[],
+  role: NavigationRole,
+): boolean {
+  return roles.some((candidate) => candidate === role);
 }

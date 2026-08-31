@@ -32,7 +32,7 @@ describe("notification API client", () => {
     ).resolves.toEqual(page);
     expect(fetchMock).toHaveBeenCalledWith(
       "http://localhost:3001/api/v1/inbox?unreadOnly=true&cursor=next-page&limit=50",
-      expect.objectContaining({ headers: expect.any(Object) }),
+      expect.objectContaining({ credentials: "include" }),
     );
   });
 

@@ -1,7 +1,8 @@
-import type { ResolveSession } from "@battlefield/core";
+import type { IdentityRole, ResolveSession } from "@battlefield/core";
 import {
   type CanActivate,
   type ExecutionContext,
+  ForbiddenException,
   Inject,
   Injectable,
   ServiceUnavailableException,
@@ -9,7 +10,11 @@ import {
 } from "@nestjs/common";
 import { Reflector } from "@nestjs/core";
 
-import { PUBLIC_ROUTE, SESSION_COOKIE_NAME } from "./auth.constants.js";
+import {
+  PUBLIC_ROUTE,
+  REQUIRED_ROLES,
+  SESSION_COOKIE_NAME,
+} from "./auth.constants.js";
 import { RESOLVE_SESSION } from "./auth.providers.js";
 import type { AuthenticatedRequest } from "./authenticated-request.js";
 
@@ -43,7 +48,6 @@ export class SessionAuthGuard implements CanActivate {
       request.auth = identity;
       request.headers["x-tenant-id"] = identity.actor.tenantId;
       request.headers["x-user-id"] = identity.actor.userId;
-      return true;
     } catch (error) {
       if (error instanceof UnauthorizedException) throw error;
       throw new ServiceUnavailableException({
@@ -52,6 +56,19 @@ export class SessionAuthGuard implements CanActivate {
         requestId: crypto.randomUUID(),
       });
     }
+
+    const requiredRoles = this.reflector.getAllAndOverride<IdentityRole[]>(
+      REQUIRED_ROLES,
+      [context.getHandler(), context.getClass()],
+    );
+    const authenticatedRole = request.auth?.session.role;
+    if (
+      requiredRoles?.length &&
+      (!authenticatedRole || !requiredRoles.includes(authenticatedRole))
+    ) {
+      throw roleForbidden();
+    }
+    return true;
   }
 }
 
@@ -88,6 +105,14 @@ function authenticationRequired(): UnauthorizedException {
   return new UnauthorizedException({
     code: "AUTHENTICATION_REQUIRED",
     message: "请先登录后继续。",
+    requestId: crypto.randomUUID(),
+  });
+}
+
+function roleForbidden(): ForbiddenException {
+  return new ForbiddenException({
+    code: "ROLE_FORBIDDEN",
+    message: "当前身份不能使用该功能。",
     requestId: crypto.randomUUID(),
   });
 }

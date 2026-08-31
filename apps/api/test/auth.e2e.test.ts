@@ -95,6 +95,29 @@ describe("authentication API", () => {
     });
   });
 
+  it("reserves management-query endpoints for the department leader", async () => {
+    const sales = request.agent(app.getHttpServer());
+    await sales.post("/api/v1/auth/login").send({
+      tenantSlug: "alpha",
+      email: "sales1@demo.local",
+      password: "Demo@2026",
+    });
+    await sales
+      .get("/api/v1/management-query-subjects")
+      .expect(403)
+      .expect(({ body }) => {
+        expect(body.code).toBe("ROLE_FORBIDDEN");
+      });
+
+    const leader = request.agent(app.getHttpServer());
+    await leader.post("/api/v1/auth/login").send({
+      tenantSlug: "alpha",
+      email: "leader.a@demo.local",
+      password: "Demo@2026",
+    });
+    await leader.get("/api/v1/management-query-subjects").expect(200);
+  });
+
   it("does not let caller-supplied actor headers override the session", async () => {
     const agent = request.agent(app.getHttpServer());
     await agent.post("/api/v1/auth/login").send({

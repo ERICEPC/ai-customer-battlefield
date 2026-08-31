@@ -10,6 +10,7 @@ import type {
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 
+import { useOptionalSession } from "../auth/session-provider";
 import { getWorkspaceSnapshot } from "./api-client";
 
 export interface WorkspaceDashboardApi {
@@ -23,6 +24,7 @@ export function WorkspaceDashboard({
 }: {
   api?: WorkspaceDashboardApi;
 }) {
+  const sessionContext = useOptionalSession();
   const [snapshot, setSnapshot] = useState<WorkspaceSnapshot | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSlowLoading, setIsSlowLoading] = useState(false);
@@ -129,9 +131,11 @@ export function WorkspaceDashboard({
           <strong>{presentation.boundaryTitle}</strong>
           <p>{presentation.boundaryCopy}</p>
         </div>
-        <Link className="workspace-query-entry" href="/ask">
-          查看销售进展
-        </Link>
+        {sessionContext?.session?.role !== "sales" ? (
+          <Link className="workspace-query-entry" href="/ask">
+            查看销售进展
+          </Link>
+        ) : null}
       </div>
 
       <KpiGrid kpis={snapshot.kpis} />

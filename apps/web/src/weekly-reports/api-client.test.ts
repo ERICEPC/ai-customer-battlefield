@@ -96,7 +96,7 @@ describe("weekly-report API client", () => {
     ).resolves.toEqual(page);
     expect(fetchMock).toHaveBeenCalledWith(
       "http://localhost:3001/api/v1/reports?reportType=personal&status=in_review&cursor=opaque-cursor&limit=20",
-      expect.objectContaining({ headers: expect.any(Object) }),
+      expect.objectContaining({ credentials: "include" }),
     );
   });
 

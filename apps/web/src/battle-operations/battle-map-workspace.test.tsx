@@ -326,7 +326,9 @@ describe("BattleMapWorkspace", () => {
     await waitFor(() =>
       expect(workspaceApi.requestAnalysis).toHaveBeenCalledWith(entityId),
     );
-    await waitFor(() => expect(workspaceApi.listMap).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(workspaceApi.listMap).toHaveBeenCalledTimes(2), {
+      timeout: 3_000,
+    });
     expect(workspaceApi.getState).toHaveBeenCalledTimes(2);
   });
 

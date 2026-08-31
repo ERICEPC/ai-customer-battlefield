@@ -44,7 +44,7 @@ afterEach(() => {
 });
 
 describe("follow-up API client", () => {
-  it("uses the versioned create, read, and revise routes with actor headers", async () => {
+  it("uses the versioned create, read, and revise routes with session credentials", async () => {
     const revised = {
       ...pendingDraft,
       candidate: { ...candidate, summary: "客户预算已经确认" },
@@ -69,11 +69,10 @@ describe("follow-up API client", () => {
       "http://localhost:3001/api/v1/followup-drafts",
     );
     expect(fetchMock.mock.calls[0]?.[1]).toMatchObject({
+      credentials: "include",
       method: "POST",
       headers: expect.objectContaining({
         "content-type": "application/json",
-        "x-tenant-id": "10000000-0000-4000-8000-000000000001",
-        "x-user-id": actorId,
       }),
     });
     expect(fetchMock.mock.calls[1]?.[0]).toBe(

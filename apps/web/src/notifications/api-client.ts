@@ -8,6 +8,8 @@ import {
   notificationApiErrorSchema,
 } from "@battlefield/contracts";
 
+import { apiBaseUrl, withSessionCredentials } from "../api/api-configuration";
+
 export class NotificationApiError extends Error {
   constructor(
     public readonly status: number,
@@ -20,40 +22,15 @@ export class NotificationApiError extends Error {
   }
 }
 
-function configuration(): {
-  baseUrl: string;
-  headers: Record<string, string>;
-} {
-  const configuredBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL;
-  if (process.env.NODE_ENV === "production") {
-    if (!configuredBaseUrl) {
-      throw new Error("The production API endpoint is not configured.");
-    }
-    throw new Error("Production authentication is not configured.");
-  }
-  return {
-    baseUrl: configuredBaseUrl ?? "http://localhost:3001",
-    headers: {
-      "x-tenant-id":
-        process.env.NEXT_PUBLIC_DEV_TENANT_ID ??
-        "10000000-0000-4000-8000-000000000001",
-      "x-user-id":
-        process.env.NEXT_PUBLIC_DEV_USER_ID ??
-        "30000000-0000-4000-8000-000000000001",
-    },
-  };
-}
-
 async function apiRequest<T>(
   path: string,
   schema: { parse(input: unknown): T },
   init: RequestInit = {},
 ): Promise<T> {
-  const { baseUrl, headers } = configuration();
-  const response = await fetch(`${baseUrl}/api/v1${path}`, {
-    ...init,
-    headers: { ...headers, ...init.headers },
-  });
+  const response = await fetch(
+    `${apiBaseUrl()}/api/v1${path}`,
+    withSessionCredentials(init),
+  );
   const payload: unknown = await response.json().catch(() => null);
   if (!response.ok) {
     const parsed = notificationApiErrorSchema.safeParse(payload);

@@ -37,7 +37,7 @@ describe("workspace API client", () => {
     await expect(getWorkspaceSnapshot()).resolves.toEqual(snapshot);
     expect(fetchMock).toHaveBeenCalledWith(
       "http://localhost:3001/api/v1/workspace",
-      expect.objectContaining({ headers: expect.any(Object) }),
+      expect.objectContaining({ credentials: "include" }),
     );
   });
 

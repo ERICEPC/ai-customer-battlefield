@@ -68,7 +68,7 @@ describe("management-query API client", () => {
     );
     expect(fetchMock).toHaveBeenCalledWith(
       "http://localhost:3001/api/v1/management-query-subjects?limit=100",
-      expect.objectContaining({ headers: expect.any(Object) }),
+      expect.objectContaining({ credentials: "include" }),
     );
   });
 

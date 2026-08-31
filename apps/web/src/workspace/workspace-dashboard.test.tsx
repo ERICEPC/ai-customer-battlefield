@@ -11,6 +11,7 @@ import {
 } from "@testing-library/react";
 import { afterEach, describe, expect, test, vi } from "vitest";
 
+import { SessionProvider } from "../auth/session-provider";
 import {
   WorkspaceDashboard,
   type WorkspaceDashboardApi,
@@ -92,6 +93,38 @@ afterEach(() => {
 });
 
 describe("WorkspaceDashboard", () => {
+  test("does not offer the leader-only progress query to a sales user", async () => {
+    render(
+      <SessionProvider
+        initialSession={{
+          user: {
+            id: "30000000-0000-4000-8000-000000000001",
+            displayName: "销售1",
+            email: "sales1@demo.local",
+          },
+          role: "sales",
+          department: {
+            id: "31000000-0000-4000-8000-000000000001",
+            name: "商业化一部",
+          },
+          directLeader: {
+            id: "30000000-0000-4000-8000-000000000072",
+            displayName: "领导A",
+          },
+          teamMembers: [],
+          expiresAt: "2026-09-01T08:00:00.000Z",
+        }}
+      >
+        <WorkspaceDashboard api={api()} />
+      </SessionProvider>,
+    );
+
+    await screen.findByRole("heading", { name: "我的推进与观察范围" });
+    expect(
+      screen.queryByRole("link", { name: "查看销售进展" }),
+    ).not.toBeInTheDocument();
+  });
+
   test("renders a mixed responsibility scope with bounded actions and battle changes", async () => {
     render(<WorkspaceDashboard api={api()} />);
 
