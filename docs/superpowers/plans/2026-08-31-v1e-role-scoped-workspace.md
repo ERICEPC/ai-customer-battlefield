@@ -119,15 +119,15 @@ Required tests:
 
 Prefer a small number of explicit aggregate/list queries over one unmaintainable mega-query. Every query must repeat `tenant_id`, use assignment `exists`/deduplicated scope, and run under forced RLS actor context.
 
-- [ ] **Step 4: Inspect query plans for the scope joins**
+- [x] **Step 4: Inspect query plans for the scope joins**
 
 Use PostgreSQL 18 integration or equivalent fixture queries to verify existing assignment/action/current-state indexes are used at V1 scale. Add a forward migration only if an actually observed missing index requires it.
 
-- [ ] **Step 5: Run database tests, real PostgreSQL checks, typecheck and commit**
+- [x] **Step 5: Run database tests, real PostgreSQL checks, typecheck and commit**
 
 Commit: `feat: project role-scoped workspace data`
 
-**Local evidence:** the focused suite first failed because the workspace reader module did not exist. After implementation, its mixed personal/observer, same-tenant unassigned, ended-assignment, cross-tenant, count, bounded-order and invalid-clock cases passed 4/4; the full PGlite database suite passed 86/86 across 14 files, and database typecheck/Biome/diff checks passed. PostgreSQL 18 query-plan evidence remains the remote close condition.
+**Evidence:** the focused suite first failed because the workspace reader module did not exist. After implementation, its mixed personal/observer, same-tenant unassigned, ended-assignment, cross-tenant, count, bounded-order and invalid-clock cases passed 4/4; the full PGlite database suite passed 86/86 across 14 files, and database typecheck/Biome/diff checks passed. Commit `91a62da` passed PostgreSQL 18 and all repository gates in Actions run `33350342971` (3 minutes 22 seconds); representative plans used `entity_assignments_user_current_idx` and `business_actions_owner_due_idx`, so no migration was added.
 
 ---
 
@@ -145,21 +145,23 @@ Commit: `feat: project role-scoped workspace data`
 - Adds `GET /workspace` using only server-derived `ActorScope` and the workspace use case.
 - Returns the strict workspace snapshot; it accepts no client-provided tenant/user/scope override.
 
-- [ ] **Step 1: Write real Nest + PGlite E2E tests and verify 404 RED**
+- [x] **Step 1: Write real Nest + PGlite E2E tests and verify 404 RED**
 
 Prove missing actor headers return 401, development actor returns the strict snapshot, query attempts such as `tenantId`, `userId` or `scope=tenant` return 400, and a second actor cannot infer unassigned or foreign data from counts.
 
-- [ ] **Step 2: Implement fail-closed provider/controller/module**
+- [x] **Step 2: Implement fail-closed provider/controller/module**
 
 Keep database absence as an explicit unavailable provider, preserve production development-header rejection, and parse the outgoing result through the shared schema.
 
-- [ ] **Step 3: Add the file to the isolated API E2E runner and run API GREEN twice**
+- [x] **Step 3: Add the file to the isolated API E2E runner and run API GREEN twice**
 
 Each E2E file remains a fresh process; the suite stays fail-fast and deterministic.
 
-- [ ] **Step 4: Run API typecheck/build/Biome and commit**
+- [x] **Step 4: Run API typecheck/build/Biome and commit**
 
 Commit: `feat: expose role-scoped workspace API`
+
+**Local evidence:** the new real Nest + PGlite suite first returned 404 for all five workspace scenarios. After the module was wired, 5/5 passed; the official fresh-process API runner passed 30/30 twice consecutively. API typecheck, production build, Biome and diff checks passed. Remote CI remains the commit close condition.
 
 ---
 

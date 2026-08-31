@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { workspaceSnapshotSchema } from "./workspace.js";
+import {
+  workspaceApiErrorSchema,
+  workspaceQuerySchema,
+  workspaceSnapshotSchema,
+} from "./workspace.js";
 
 const actorId = "30000000-0000-4000-8000-000000000001";
 const entityId = "50000000-0000-4000-8000-000000000001";
@@ -70,6 +74,24 @@ function validSnapshot() {
 }
 
 describe("workspace snapshot contract", () => {
+  it("accepts no client scope override and defines bounded API errors", () => {
+    expect(workspaceQuerySchema.parse({})).toEqual({});
+    expect(workspaceQuerySchema.safeParse({ scope: "tenant" }).success).toBe(
+      false,
+    );
+    expect(workspaceQuerySchema.safeParse({ tenantId: actorId }).success).toBe(
+      false,
+    );
+    expect(
+      workspaceApiErrorSchema.parse({
+        code: "INVALID_WORKSPACE_QUERY",
+        message: "Invalid workspace query.",
+        requestId: "request-1",
+        issues: [{ path: "scope", reason: "Unknown key." }],
+      }).code,
+    ).toBe("INVALID_WORKSPACE_QUERY");
+  });
+
   it("accepts one bounded, evidence-oriented role-scoped snapshot", () => {
     expect(workspaceSnapshotSchema.parse(validSnapshot())).toEqual(
       validSnapshot(),

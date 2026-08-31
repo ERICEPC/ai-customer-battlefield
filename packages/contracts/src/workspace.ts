@@ -28,6 +28,23 @@ export const workspaceScopeModeSchema = z.enum([
   "mixed",
 ]);
 
+export const workspaceQuerySchema = z.strictObject({});
+
+export const workspaceApiErrorSchema = z.strictObject({
+  code: z.enum(["INVALID_WORKSPACE_QUERY", "WORKSPACE_UNAVAILABLE"]),
+  message: z.string().trim().min(1).max(1_000),
+  requestId: z.string().trim().min(1).max(200),
+  issues: z
+    .array(
+      z.strictObject({
+        path: z.string().trim().min(1).max(200),
+        reason: z.string().trim().min(1).max(500),
+      }),
+    )
+    .max(100)
+    .optional(),
+});
+
 export const workspaceKpisSchema = z.strictObject({
   assignedEntityCount: boundedCountSchema,
   pendingDraftCount: boundedCountSchema,
@@ -249,6 +266,8 @@ export const workspaceSnapshotSchema = z
   });
 
 export type WorkspaceScopeMode = z.infer<typeof workspaceScopeModeSchema>;
+export type WorkspaceQuery = z.infer<typeof workspaceQuerySchema>;
+export type WorkspaceApiError = z.infer<typeof workspaceApiErrorSchema>;
 export type WorkspaceKpis = z.infer<typeof workspaceKpisSchema>;
 export type WorkspacePriorityAction = z.infer<
   typeof workspacePriorityActionSchema

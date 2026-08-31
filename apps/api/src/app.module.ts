@@ -6,6 +6,7 @@ import { BusinessEntitiesModule } from "./business-entities/business-entities.mo
 import { FollowupDraftsModule } from "./followup-drafts/followup-drafts.module.js";
 import { HealthController } from "./health/health.controller.js";
 import { NotificationsModule } from "./notifications/notifications.module.js";
+import { WorkspaceModule } from "./workspace/workspace.module.js";
 
 @Module({
   imports: [
@@ -14,6 +15,7 @@ import { NotificationsModule } from "./notifications/notifications.module.js";
     BattleAnalysisModule,
     BusinessActionsModule,
     NotificationsModule,
+    WorkspaceModule,
   ],
   controllers: [HealthController],
 })

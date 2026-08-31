@@ -7,6 +7,7 @@ const testFiles = [
   "test/battle-analyzer-failure.e2e.test.ts",
   "test/battle-actions.e2e.test.ts",
   "test/notifications.e2e.test.ts",
+  "test/workspace.e2e.test.ts",
 ];
 
 for (const testFile of testFiles) {
