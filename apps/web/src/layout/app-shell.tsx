@@ -55,12 +55,14 @@ const requiredCapabilitiesByItem: Partial<
   Record<ActiveItem, readonly ManagementCapability[]>
 > = {
   管理问数: ["management_query.execute"],
-  系统管理: [
-    "ai_runtime_config.manage",
-    "audit.read",
-    "worker_operations.manage",
-  ],
 };
+
+const systemManagementCapabilities: readonly ManagementCapability[] = [
+  "access_control.manage",
+  "ai_runtime_config.manage",
+  "audit.read",
+  "worker_operations.manage",
+];
 
 const mobileNavigation: ReadonlyArray<{
   label: string;
@@ -149,12 +151,7 @@ export function AppShell({
       </main>
     );
   }
-  if (
-    !supportsCapabilities(
-      session.capabilities,
-      requiredCapabilitiesByItem[activeItem],
-    )
-  ) {
+  if (!supportsItem(session.capabilities, activeItem)) {
     return (
       <main className="session-state">
         <p>
@@ -170,18 +167,12 @@ export function AppShell({
   const visibleNavigation = navigation.filter(
     (item) =>
       supportsRole(item.roles, session.role) &&
-      supportsCapabilities(
-        session.capabilities,
-        requiredCapabilitiesByItem[item.label],
-      ),
+      supportsItem(session.capabilities, item.label),
   );
   const visibleMobileNavigation = mobileNavigation.filter(
     (item) =>
       supportsRole(item.roles, session.role) &&
-      supportsCapabilities(
-        session.capabilities,
-        requiredCapabilitiesByItem[item.activeItem],
-      ),
+      supportsItem(session.capabilities, item.activeItem),
   );
   const roleLabel = session.role === "sales" ? "销售身份" : "直属领导";
   const visibleBreadcrumb =
@@ -285,10 +276,7 @@ export function AppShell({
                 <Link className="account-settings-link" href="/settings">
                   个人设置
                 </Link>
-                {supportsCapabilities(
-                  session.capabilities,
-                  requiredCapabilitiesByItem.系统管理,
-                ) ? (
+                {supportsItem(session.capabilities, "系统管理") ? (
                   <Link className="account-settings-link" href="/admin">
                     系统管理
                   </Link>
@@ -338,4 +326,16 @@ function supportsCapabilities(
   return (
     !required || required.every((capability) => granted.includes(capability))
   );
+}
+
+function supportsItem(
+  granted: readonly ManagementCapability[],
+  item: ActiveItem,
+): boolean {
+  if (item === "系统管理") {
+    return systemManagementCapabilities.some((capability) =>
+      granted.includes(capability),
+    );
+  }
+  return supportsCapabilities(granted, requiredCapabilitiesByItem[item]);
 }

@@ -264,14 +264,10 @@ describe("AppShell", () => {
     ).not.toBeInTheDocument();
   });
 
-  it("allows a sales-labelled account when the tenant grants the capability", () => {
+  it("allows a sales-labelled account when the tenant grants one system capability", () => {
     const delegatedSales: SessionProfile = {
       ...salesSession,
-      capabilities: [
-        "ai_runtime_config.manage",
-        "audit.read",
-        "worker_operations.manage",
-      ],
+      capabilities: ["worker_operations.manage"],
     };
     render(
       <SessionProvider initialSession={delegatedSales}>

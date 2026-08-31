@@ -124,4 +124,5 @@
 - [x] Render the card above Agent runtime configuration and explain that function grants do not widen customer or opportunity responsibility scope.
 - [x] Keep save disabled until the desired set changes and a reason is entered; send a fresh idempotency key for each deliberate save.
 - [x] Load and render the card only when the signed-in session has `access_control.manage`, so independently delegated runtime operators can still use the rest of system management.
+- [x] Allow entry when an account has any system-management capability, then load only its granted access-control, Agent runtime, audit, or Worker sections; do not require unrelated capabilities as a bundle.
 - [x] Verify the real leader view without mutating real grants; run the two focused Web specs and Web typecheck.

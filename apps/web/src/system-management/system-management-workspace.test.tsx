@@ -225,6 +225,40 @@ describe("SystemManagementWorkspace", () => {
     expect(managementApi.getAccessControl).not.toHaveBeenCalled();
   });
 
+  test("loads only the sections granted to a delegated operator", async () => {
+    const managementApi = api();
+    const workerOperator: SessionProfile = {
+      user: {
+        id: "30000000-0000-4000-8000-000000000074",
+        displayName: "Worker 值班员",
+        email: "worker-operator@demo.local",
+      },
+      role: "sales",
+      capabilities: ["worker_operations.manage"],
+      department: {
+        id: "20000000-0000-4000-8000-000000000001",
+        name: "商业化一部",
+      },
+      directLeader: null,
+      teamMembers: [],
+      expiresAt: "2026-09-01T08:00:00.000Z",
+    };
+    render(
+      <SessionProvider initialSession={workerOperator}>
+        <SystemManagementWorkspace api={managementApi} />
+      </SessionProvider>,
+    );
+
+    expect(await screen.findByText("Worker 运行正常")).toBeVisible();
+    expect(screen.getByText("Worker 与失败队列")).toBeVisible();
+    expect(screen.queryByText("角色与功能权限")).not.toBeInTheDocument();
+    expect(screen.queryByText("跟进拆解配置")).not.toBeInTheDocument();
+    expect(screen.queryByText("最近操作留痕")).not.toBeInTheDocument();
+    expect(managementApi.getAccessControl).not.toHaveBeenCalled();
+    expect(managementApi.listVersions).not.toHaveBeenCalled();
+    expect(managementApi.listAudits).not.toHaveBeenCalled();
+  });
+
   test("creates an immutable version before allowing a separate release", async () => {
     const managementApi = api();
     render(<SystemManagementWorkspace api={managementApi} />);

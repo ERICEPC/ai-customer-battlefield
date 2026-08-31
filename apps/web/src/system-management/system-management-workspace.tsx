@@ -103,9 +103,14 @@ export function SystemManagementWorkspace({
   api?: SystemManagementWorkspaceApi;
 }) {
   const sessionContext = useOptionalSession();
+  const sessionCapabilities = sessionContext?.session?.capabilities;
   const canManageAccess =
-    sessionContext?.session?.capabilities.includes("access_control.manage") ??
-    true;
+    sessionCapabilities?.includes("access_control.manage") ?? true;
+  const canManageRuntime =
+    sessionCapabilities?.includes("ai_runtime_config.manage") ?? true;
+  const canReadAudits = sessionCapabilities?.includes("audit.read") ?? true;
+  const canManageWorker =
+    sessionCapabilities?.includes("worker_operations.manage") ?? true;
   const [versions, setVersions] = useState<AiRuntimeConfigVersionPage | null>(
     null,
   );
@@ -146,6 +151,11 @@ export function SystemManagementWorkspace({
   >({});
 
   useEffect(() => {
+    if (!canManageRuntime) {
+      setVersions(null);
+      clearLoadError(setLoadErrors, "runtime");
+      return;
+    }
     let active = true;
     const requestToken = reloadTokens.runtime;
     setVersions(null);
@@ -176,7 +186,7 @@ export function SystemManagementWorkspace({
     return () => {
       active = false;
     };
-  }, [api, reloadTokens.runtime]);
+  }, [api, canManageRuntime, reloadTokens.runtime]);
 
   useEffect(() => {
     if (!canManageAccess) {
@@ -207,6 +217,11 @@ export function SystemManagementWorkspace({
   }, [api, canManageAccess, reloadTokens.access]);
 
   useEffect(() => {
+    if (!canManageWorker) {
+      setHealth(null);
+      clearLoadError(setLoadErrors, "health");
+      return;
+    }
     let active = true;
     const requestToken = reloadTokens.health;
     setHealth(null);
@@ -226,9 +241,14 @@ export function SystemManagementWorkspace({
     return () => {
       active = false;
     };
-  }, [api, reloadTokens.health]);
+  }, [api, canManageWorker, reloadTokens.health]);
 
   useEffect(() => {
+    if (!canManageWorker) {
+      setFailures(null);
+      clearLoadError(setLoadErrors, "failures");
+      return;
+    }
     let active = true;
     const requestToken = reloadTokens.failures;
     setFailures(null);
@@ -248,9 +268,14 @@ export function SystemManagementWorkspace({
     return () => {
       active = false;
     };
-  }, [api, reloadTokens.failures]);
+  }, [api, canManageWorker, reloadTokens.failures]);
 
   useEffect(() => {
+    if (!canReadAudits) {
+      setAudits(null);
+      clearLoadError(setLoadErrors, "audits");
+      return;
+    }
     let active = true;
     const requestToken = reloadTokens.audits;
     setAudits(null);
@@ -270,7 +295,7 @@ export function SystemManagementWorkspace({
     return () => {
       active = false;
     };
-  }, [api, reloadTokens.audits]);
+  }, [api, canReadAudits, reloadTokens.audits]);
 
   const currentVersion = useMemo(
     () =>
@@ -290,14 +315,13 @@ export function SystemManagementWorkspace({
   );
 
   async function refreshOperations(): Promise<void> {
-    const [loadedHealth, loadedFailures, loadedAudits] = await Promise.all([
+    const [loadedHealth, loadedFailures] = await Promise.all([
       api.getHealth(),
       api.listFailures(),
-      api.listAudits(),
     ]);
     setHealth(loadedHealth);
     setFailures(loadedFailures);
-    setAudits(loadedAudits);
+    if (canReadAudits) setAudits(await api.listAudits());
   }
 
   function retrySection(section: ManagementLoadSection) {
@@ -327,7 +351,7 @@ export function SystemManagementWorkspace({
       setVersions(next);
       setReleaseVersionId(created.versionId);
       setMessage(`版本 ${created.versionNo} 已创建，尚未影响线上 Agent。`);
-      setAudits(await api.listAudits());
+      if (canReadAudits) setAudits(await api.listAudits());
     } catch (cause) {
       setError(errorMessage(cause));
     } finally {
@@ -353,7 +377,7 @@ export function SystemManagementWorkspace({
         releaseReason,
       );
       setVersions(await api.listVersions());
-      setAudits(await api.listAudits());
+      if (canReadAudits) setAudits(await api.listAudits());
       setReleaseReason("");
       setMessage(
         `${releaseIsRollback ? "回滚" : "发布"}完成：版本 ${released.versionNo}，发布序号 ${released.releaseNo}。`,
@@ -437,11 +461,13 @@ export function SystemManagementWorkspace({
           ? `${displayName}的功能权限已更新。`
           : `${displayName}的功能权限没有变化。`,
       );
-      try {
-        setAudits(await api.listAudits());
-      } catch {
-        // The change itself succeeded. A simultaneous audit-capability revoke
-        // may make this optional refresh unavailable on the same screen.
+      if (canReadAudits) {
+        try {
+          setAudits(await api.listAudits());
+        } catch {
+          // The change itself succeeded. A simultaneous audit-capability revoke
+          // may make this optional refresh unavailable on the same screen.
+        }
       }
     } catch (cause) {
       setError(errorMessage(cause));
@@ -458,34 +484,36 @@ export function SystemManagementWorkspace({
           <h1>系统管理</h1>
           <p>管理 Agent 运行版本，查看异步链路健康，并追溯关键操作。</p>
         </div>
-        {health ? (
-          <div className={`worker-state worker-${health.worker.state}`}>
-            <span aria-hidden="true" />
-            <div>
-              <strong>{workerStateLabel(health.worker.state)}</strong>
-              <p>
-                {health.worker.lastSuccessAt
-                  ? `最近成功 ${formatDateTime(health.worker.lastSuccessAt)}`
-                  : "尚无成功心跳"}
-              </p>
+        {canManageWorker ? (
+          health ? (
+            <div className={`worker-state worker-${health.worker.state}`}>
+              <span aria-hidden="true" />
+              <div>
+                <strong>{workerStateLabel(health.worker.state)}</strong>
+                <p>
+                  {health.worker.lastSuccessAt
+                    ? `最近成功 ${formatDateTime(health.worker.lastSuccessAt)}`
+                    : "尚无成功心跳"}
+                </p>
+              </div>
             </div>
-          </div>
-        ) : (
-          <div
-            className={`worker-state ${loadErrors.health ? "worker-degraded" : "worker-loading"}`}
-            role="status"
-          >
-            <span aria-hidden="true" />
-            <div>
-              <strong>
-                {loadErrors.health ? "Worker 状态未读取" : "正在读取 Worker"}
-              </strong>
-              <p>
-                {loadErrors.health ? "可在下方单独重试" : "其他区域可先使用"}
-              </p>
+          ) : (
+            <div
+              className={`worker-state ${loadErrors.health ? "worker-degraded" : "worker-loading"}`}
+              role="status"
+            >
+              <span aria-hidden="true" />
+              <div>
+                <strong>
+                  {loadErrors.health ? "Worker 状态未读取" : "正在读取 Worker"}
+                </strong>
+                <p>
+                  {loadErrors.health ? "可在下方单独重试" : "其他区域可先使用"}
+                </p>
+              </div>
             </div>
-          </div>
-        )}
+          )
+        ) : null}
       </section>
 
       {message ? <p className="admin-message">{message}</p> : null}
@@ -607,339 +635,350 @@ export function SystemManagementWorkspace({
         </section>
       ) : null}
 
-      <section className="admin-section" aria-labelledby="runtime-title">
-        <div className="admin-section-heading">
-          <div>
-            <span>AGENT RUNTIME</span>
-            <h2 id="runtime-title">跟进拆解配置</h2>
+      {canManageRuntime ? (
+        <section className="admin-section" aria-labelledby="runtime-title">
+          <div className="admin-section-heading">
+            <div>
+              <span>AGENT RUNTIME</span>
+              <h2 id="runtime-title">跟进拆解配置</h2>
+            </div>
+            <p>创建版本不会立即生效；只有发布后 Agent 才会读取。</p>
           </div>
-          <p>创建版本不会立即生效；只有发布后 Agent 才会读取。</p>
-        </div>
 
-        {versions ? (
-          <>
-            <div className="runtime-version-grid">
-              {versions.items.map((version) => (
-                <article
-                  className={
-                    version.versionId === versions.currentVersionId
-                      ? "runtime-version current"
-                      : "runtime-version"
-                  }
-                  key={version.versionId}
+          {versions ? (
+            <>
+              <div className="runtime-version-grid">
+                {versions.items.map((version) => (
+                  <article
+                    className={
+                      version.versionId === versions.currentVersionId
+                        ? "runtime-version current"
+                        : "runtime-version"
+                    }
+                    key={version.versionId}
+                  >
+                    <div>
+                      <span>V{version.versionNo}</span>
+                      {version.versionId === versions.currentVersionId ? (
+                        <strong>当前发布</strong>
+                      ) : null}
+                    </div>
+                    <h3>{version.name}</h3>
+                    <p>{version.defaultModelId}</p>
+                    <dl>
+                      <div>
+                        <dt>温度</dt>
+                        <dd>{version.parameters.temperature}</dd>
+                      </div>
+                      <div>
+                        <dt>最大 Tokens</dt>
+                        <dd>{version.parameters.maxTokens}</dd>
+                      </div>
+                      <div>
+                        <dt>创建时间</dt>
+                        <dd>{formatDateTime(version.createdAt)}</dd>
+                      </div>
+                    </dl>
+                    <details>
+                      <summary>查看 Prompt</summary>
+                      <pre>{version.systemPrompt}</pre>
+                    </details>
+                  </article>
+                ))}
+              </div>
+
+              <div className="admin-form-grid">
+                <form
+                  className="admin-card admin-release"
+                  onSubmit={releaseVersion}
                 >
                   <div>
-                    <span>V{version.versionNo}</span>
-                    {version.versionId === versions.currentVersionId ? (
-                      <strong>当前发布</strong>
-                    ) : null}
+                    <span>发布控制</span>
+                    <h3>切换当前版本</h3>
                   </div>
-                  <h3>{version.name}</h3>
-                  <p>{version.defaultModelId}</p>
+                  <label>
+                    待发布版本
+                    <select
+                      aria-label="待发布版本"
+                      value={releaseVersionId}
+                      onChange={(event) =>
+                        setReleaseVersionId(event.target.value)
+                      }
+                    >
+                      {versions.items.map((version) => (
+                        <option
+                          value={version.versionId}
+                          key={version.versionId}
+                        >
+                          V{version.versionNo} · {version.name}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label>
+                    发布或回滚原因
+                    <input
+                      aria-label="发布或回滚原因"
+                      value={releaseReason}
+                      onChange={(event) => setReleaseReason(event.target.value)}
+                      placeholder="例如：严格契约已完成验收"
+                    />
+                  </label>
+                  <button
+                    className="primary-button"
+                    type="submit"
+                    disabled={
+                      isReleasing ||
+                      !releaseReason.trim() ||
+                      releaseVersionId === versions.currentVersionId
+                    }
+                  >
+                    {releaseVersionId === versions.currentVersionId
+                      ? "当前已发布"
+                      : isReleasing
+                        ? "正在切换…"
+                        : releaseIsRollback
+                          ? "回滚到此版本"
+                          : "发布此版本"}
+                  </button>
+                </form>
+
+                <form
+                  className="admin-card admin-create"
+                  onSubmit={createVersion}
+                >
+                  <div>
+                    <span>新建版本</span>
+                    <h3>编辑但暂不生效</h3>
+                  </div>
+                  <label>
+                    版本名称
+                    <input
+                      aria-label="版本名称"
+                      value={name}
+                      onChange={(event) => setName(event.target.value)}
+                    />
+                  </label>
+                  <label>
+                    租户默认模型
+                    <select
+                      aria-label="租户默认模型"
+                      value={model}
+                      onChange={(event) =>
+                        setModel(event.target.value as SenseAudioTextModelId)
+                      }
+                    >
+                      {senseAudioTextModelIds.map((modelId) => (
+                        <option value={modelId} key={modelId}>
+                          {modelId}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="admin-prompt-field">
+                    System Prompt
+                    <textarea
+                      aria-label="System Prompt"
+                      value={systemPrompt}
+                      onChange={(event) => setSystemPrompt(event.target.value)}
+                      rows={8}
+                    />
+                  </label>
+                  <div className="admin-parameter-grid">
+                    <label>
+                      Temperature
+                      <input
+                        aria-label="Temperature"
+                        type="number"
+                        min="0"
+                        max="2"
+                        step="0.1"
+                        value={temperature}
+                        onChange={(event) => setTemperature(event.target.value)}
+                      />
+                    </label>
+                    <label>
+                      Max Tokens
+                      <input
+                        aria-label="Max Tokens"
+                        type="number"
+                        min="1"
+                        max="8000"
+                        value={maxTokens}
+                        onChange={(event) => setMaxTokens(event.target.value)}
+                      />
+                    </label>
+                  </div>
+                  <button
+                    className="secondary-button"
+                    type="submit"
+                    disabled={
+                      isCreating || !name.trim() || !systemPrompt.trim()
+                    }
+                  >
+                    {isCreating ? "正在创建…" : "创建不可变版本"}
+                  </button>
+                </form>
+              </div>
+            </>
+          ) : (
+            <ManagementSectionState
+              label="Agent 运行配置"
+              error={loadErrors.runtime}
+              onRetry={() => retrySection("runtime")}
+            />
+          )}
+        </section>
+      ) : null}
+
+      {canManageWorker ? (
+        <section className="admin-section" aria-labelledby="worker-title">
+          <div className="admin-section-heading">
+            <div>
+              <span>ASYNC OPERATIONS</span>
+              <h2 id="worker-title">Worker 与失败队列</h2>
+            </div>
+            <p>人工重放会保留原始失败证据，并重新进入自动重试流程。</p>
+          </div>
+          {health ? (
+            <div className="queue-health-grid">
+              {health.queues.map((queue) => (
+                <article key={queue.kind}>
+                  <span>{queueLabel(queue.kind)}</span>
+                  <strong>{queue.readyCount}</strong>
+                  <p>待处理</p>
                   <dl>
                     <div>
-                      <dt>温度</dt>
-                      <dd>{version.parameters.temperature}</dd>
+                      <dt>处理中</dt>
+                      <dd>{queue.processingCount}</dd>
                     </div>
                     <div>
-                      <dt>最大 Tokens</dt>
-                      <dd>{version.parameters.maxTokens}</dd>
+                      <dt>失败</dt>
+                      <dd>{queue.failedCount}</dd>
                     </div>
                     <div>
-                      <dt>创建时间</dt>
-                      <dd>{formatDateTime(version.createdAt)}</dd>
+                      <dt>死信</dt>
+                      <dd>{queue.deadLetteredCount}</dd>
                     </div>
                   </dl>
-                  <details>
-                    <summary>查看 Prompt</summary>
-                    <pre>{version.systemPrompt}</pre>
-                  </details>
                 </article>
               ))}
             </div>
+          ) : (
+            <ManagementSectionState
+              label="Worker 运行状态"
+              error={loadErrors.health}
+              onRetry={() => retrySection("health")}
+            />
+          )}
 
-            <div className="admin-form-grid">
-              <form
-                className="admin-card admin-release"
-                onSubmit={releaseVersion}
-              >
-                <div>
-                  <span>发布控制</span>
-                  <h3>切换当前版本</h3>
-                </div>
-                <label>
-                  待发布版本
-                  <select
-                    aria-label="待发布版本"
-                    value={releaseVersionId}
-                    onChange={(event) =>
-                      setReleaseVersionId(event.target.value)
-                    }
-                  >
-                    {versions.items.map((version) => (
-                      <option value={version.versionId} key={version.versionId}>
-                        V{version.versionNo} · {version.name}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <label>
-                  发布或回滚原因
-                  <input
-                    aria-label="发布或回滚原因"
-                    value={releaseReason}
-                    onChange={(event) => setReleaseReason(event.target.value)}
-                    placeholder="例如：严格契约已完成验收"
-                  />
-                </label>
-                <button
-                  className="primary-button"
-                  type="submit"
-                  disabled={
-                    isReleasing ||
-                    !releaseReason.trim() ||
-                    releaseVersionId === versions.currentVersionId
-                  }
-                >
-                  {releaseVersionId === versions.currentVersionId
-                    ? "当前已发布"
-                    : isReleasing
-                      ? "正在切换…"
-                      : releaseIsRollback
-                        ? "回滚到此版本"
-                        : "发布此版本"}
-                </button>
-              </form>
-
-              <form
-                className="admin-card admin-create"
-                onSubmit={createVersion}
-              >
-                <div>
-                  <span>新建版本</span>
-                  <h3>编辑但暂不生效</h3>
-                </div>
-                <label>
-                  版本名称
-                  <input
-                    aria-label="版本名称"
-                    value={name}
-                    onChange={(event) => setName(event.target.value)}
-                  />
-                </label>
-                <label>
-                  租户默认模型
-                  <select
-                    aria-label="租户默认模型"
-                    value={model}
-                    onChange={(event) =>
-                      setModel(event.target.value as SenseAudioTextModelId)
-                    }
-                  >
-                    {senseAudioTextModelIds.map((modelId) => (
-                      <option value={modelId} key={modelId}>
-                        {modelId}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <label className="admin-prompt-field">
-                  System Prompt
-                  <textarea
-                    aria-label="System Prompt"
-                    value={systemPrompt}
-                    onChange={(event) => setSystemPrompt(event.target.value)}
-                    rows={8}
-                  />
-                </label>
-                <div className="admin-parameter-grid">
-                  <label>
-                    Temperature
-                    <input
-                      aria-label="Temperature"
-                      type="number"
-                      min="0"
-                      max="2"
-                      step="0.1"
-                      value={temperature}
-                      onChange={(event) => setTemperature(event.target.value)}
-                    />
-                  </label>
-                  <label>
-                    Max Tokens
-                    <input
-                      aria-label="Max Tokens"
-                      type="number"
-                      min="1"
-                      max="8000"
-                      value={maxTokens}
-                      onChange={(event) => setMaxTokens(event.target.value)}
-                    />
-                  </label>
-                </div>
-                <button
-                  className="secondary-button"
-                  type="submit"
-                  disabled={isCreating || !name.trim() || !systemPrompt.trim()}
-                >
-                  {isCreating ? "正在创建…" : "创建不可变版本"}
-                </button>
-              </form>
+          {!failures ? (
+            <ManagementSectionState
+              label="失败任务"
+              error={loadErrors.failures}
+              onRetry={() => retrySection("failures")}
+            />
+          ) : failures.items.length === 0 ? (
+            <div className="admin-empty">
+              <strong>当前没有失败或死信</strong>
+              <p>三类异步队列均无需人工处理。</p>
             </div>
-          </>
-        ) : (
-          <ManagementSectionState
-            label="Agent 运行配置"
-            error={loadErrors.runtime}
-            onRetry={() => retrySection("runtime")}
-          />
-        )}
-      </section>
-
-      <section className="admin-section" aria-labelledby="worker-title">
-        <div className="admin-section-heading">
-          <div>
-            <span>ASYNC OPERATIONS</span>
-            <h2 id="worker-title">Worker 与失败队列</h2>
-          </div>
-          <p>人工重放会保留原始失败证据，并重新进入自动重试流程。</p>
-        </div>
-        {health ? (
-          <div className="queue-health-grid">
-            {health.queues.map((queue) => (
-              <article key={queue.kind}>
-                <span>{queueLabel(queue.kind)}</span>
-                <strong>{queue.readyCount}</strong>
-                <p>待处理</p>
-                <dl>
-                  <div>
-                    <dt>处理中</dt>
-                    <dd>{queue.processingCount}</dd>
+          ) : (
+            <div className="failure-list">
+              {failures.items.map((failure) => (
+                <article key={`${failure.kind}:${failure.workItemId}`}>
+                  <div className="failure-heading">
+                    <span>{queueLabel(failure.kind)}</span>
+                    <strong>{failure.category}</strong>
+                    <em>
+                      {failure.status === "dead_lettered" ? "死信" : "失败"}
+                    </em>
                   </div>
-                  <div>
-                    <dt>失败</dt>
-                    <dd>{queue.failedCount}</dd>
+                  <p>{failure.lastErrorMessage}</p>
+                  <dl>
+                    <div>
+                      <dt>错误码</dt>
+                      <dd>{failure.lastErrorCode}</dd>
+                    </div>
+                    <div>
+                      <dt>尝试次数</dt>
+                      <dd>{failure.attemptCount}</dd>
+                    </div>
+                    <div>
+                      <dt>创建时间</dt>
+                      <dd>{formatDateTime(failure.createdAt)}</dd>
+                    </div>
+                  </dl>
+                  <div className="failure-replay">
+                    <input
+                      aria-label={`重放原因 ${failure.category}`}
+                      value={replayReasons[failure.workItemId] ?? ""}
+                      onChange={(event) =>
+                        setReplayReasons((current) => ({
+                          ...current,
+                          [failure.workItemId]: event.target.value,
+                        }))
+                      }
+                      placeholder="填写确认修复后的重放原因"
+                    />
+                    <button
+                      type="button"
+                      disabled={
+                        replayingId !== null ||
+                        !(replayReasons[failure.workItemId] ?? "").trim()
+                      }
+                      onClick={() => void replay(failure)}
+                    >
+                      {replayingId === failure.workItemId
+                        ? "正在重放…"
+                        : "重新进入队列"}
+                    </button>
                   </div>
-                  <div>
-                    <dt>死信</dt>
-                    <dd>{queue.deadLetteredCount}</dd>
-                  </div>
-                </dl>
-              </article>
-            ))}
-          </div>
-        ) : (
-          <ManagementSectionState
-            label="Worker 运行状态"
-            error={loadErrors.health}
-            onRetry={() => retrySection("health")}
-          />
-        )}
-
-        {!failures ? (
-          <ManagementSectionState
-            label="失败任务"
-            error={loadErrors.failures}
-            onRetry={() => retrySection("failures")}
-          />
-        ) : failures.items.length === 0 ? (
-          <div className="admin-empty">
-            <strong>当前没有失败或死信</strong>
-            <p>三类异步队列均无需人工处理。</p>
-          </div>
-        ) : (
-          <div className="failure-list">
-            {failures.items.map((failure) => (
-              <article key={`${failure.kind}:${failure.workItemId}`}>
-                <div className="failure-heading">
-                  <span>{queueLabel(failure.kind)}</span>
-                  <strong>{failure.category}</strong>
-                  <em>
-                    {failure.status === "dead_lettered" ? "死信" : "失败"}
-                  </em>
-                </div>
-                <p>{failure.lastErrorMessage}</p>
-                <dl>
-                  <div>
-                    <dt>错误码</dt>
-                    <dd>{failure.lastErrorCode}</dd>
-                  </div>
-                  <div>
-                    <dt>尝试次数</dt>
-                    <dd>{failure.attemptCount}</dd>
-                  </div>
-                  <div>
-                    <dt>创建时间</dt>
-                    <dd>{formatDateTime(failure.createdAt)}</dd>
-                  </div>
-                </dl>
-                <div className="failure-replay">
-                  <input
-                    aria-label={`重放原因 ${failure.category}`}
-                    value={replayReasons[failure.workItemId] ?? ""}
-                    onChange={(event) =>
-                      setReplayReasons((current) => ({
-                        ...current,
-                        [failure.workItemId]: event.target.value,
-                      }))
-                    }
-                    placeholder="填写确认修复后的重放原因"
-                  />
-                  <button
-                    type="button"
-                    disabled={
-                      replayingId !== null ||
-                      !(replayReasons[failure.workItemId] ?? "").trim()
-                    }
-                    onClick={() => void replay(failure)}
-                  >
-                    {replayingId === failure.workItemId
-                      ? "正在重放…"
-                      : "重新进入队列"}
-                  </button>
-                </div>
-              </article>
-            ))}
-          </div>
-        )}
-      </section>
-
-      <section className="admin-section" aria-labelledby="audit-title">
-        <div className="admin-section-heading">
-          <div>
-            <span>AUDIT TRAIL</span>
-            <h2 id="audit-title">最近操作留痕</h2>
-          </div>
-          <p>仅展示当前管理范围内的审计元数据，不暴露业务快照。</p>
-        </div>
-        {audits ? (
-          <div className="admin-audit-list">
-            {audits.items.length === 0 ? (
-              <p>暂无可见审计记录。</p>
-            ) : (
-              audits.items.map((entry) => (
-                <article key={entry.entryId}>
-                  <span>{entry.action}</span>
-                  <strong>{entry.actor.displayName}</strong>
-                  <p>
-                    {entry.aggregateType} · {entry.aggregateId.slice(0, 8)}
-                  </p>
-                  <time dateTime={entry.occurredAt}>
-                    {formatDateTime(entry.occurredAt)}
-                  </time>
-                  {entry.reason ? <em>{entry.reason}</em> : null}
                 </article>
-              ))
-            )}
+              ))}
+            </div>
+          )}
+        </section>
+      ) : null}
+
+      {canReadAudits ? (
+        <section className="admin-section" aria-labelledby="audit-title">
+          <div className="admin-section-heading">
+            <div>
+              <span>AUDIT TRAIL</span>
+              <h2 id="audit-title">最近操作留痕</h2>
+            </div>
+            <p>仅展示当前管理范围内的审计元数据，不暴露业务快照。</p>
           </div>
-        ) : (
-          <ManagementSectionState
-            label="最近审计记录"
-            error={loadErrors.audits}
-            onRetry={() => retrySection("audits")}
-          />
-        )}
-      </section>
+          {audits ? (
+            <div className="admin-audit-list">
+              {audits.items.length === 0 ? (
+                <p>暂无可见审计记录。</p>
+              ) : (
+                audits.items.map((entry) => (
+                  <article key={entry.entryId}>
+                    <span>{entry.action}</span>
+                    <strong>{entry.actor.displayName}</strong>
+                    <p>
+                      {entry.aggregateType} · {entry.aggregateId.slice(0, 8)}
+                    </p>
+                    <time dateTime={entry.occurredAt}>
+                      {formatDateTime(entry.occurredAt)}
+                    </time>
+                    {entry.reason ? <em>{entry.reason}</em> : null}
+                  </article>
+                ))
+              )}
+            </div>
+          ) : (
+            <ManagementSectionState
+              label="最近审计记录"
+              error={loadErrors.audits}
+              onRetry={() => retrySection("audits")}
+            />
+          )}
+        </section>
+      ) : null}
     </div>
   );
 }
