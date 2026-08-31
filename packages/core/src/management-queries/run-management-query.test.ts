@@ -4,6 +4,7 @@ import type {
   ManagementQueryResult,
 } from "./management-query-repository.js";
 import {
+  InvalidManagementQueryClockError,
   InvalidManagementQueryPeriodError,
   InvalidManagementQuerySubjectLimitError,
   ListManagementQuerySubjects,
@@ -15,6 +16,17 @@ const actor = {
   userId: "30000000-0000-4000-8000-000000000072",
 };
 const subjectUserId = "30000000-0000-4000-8000-000000000001";
+
+class RecordingClock {
+  calls = 0;
+
+  constructor(private readonly value: Date) {}
+
+  now(): Date {
+    this.calls += 1;
+    return this.value;
+  }
+}
 
 const result: ManagementQueryResult = {
   queryId: "90000000-0000-4000-8000-000000000081",
@@ -48,7 +60,8 @@ function repository(): ManagementQueryRepository {
 describe("RunManagementQuery", () => {
   it("delegates the strict capability and actor scope without a model runtime", async () => {
     const repo = repository();
-    const useCase = new RunManagementQuery({ repository: repo });
+    const clock = new RecordingClock(new Date("2026-08-31T04:00:00.000Z"));
+    const useCase = new RunManagementQuery({ repository: repo, clock });
 
     await expect(
       useCase.execute({
@@ -64,7 +77,10 @@ describe("RunManagementQuery", () => {
       subjectUserId,
       periodStart: "2026-08-24T00:00:00.000Z",
       periodEnd: "2026-08-31T23:59:59.999Z",
+      queryNow: "2026-08-31T04:00:00.000Z",
+      dataCutoffAt: "2026-08-31T04:00:00.000Z",
     });
+    expect(clock.calls).toBe(1);
   });
 
   it("rejects reversed, zero and over-31-day ranges before repository access", async () => {
@@ -75,7 +91,8 @@ describe("RunManagementQuery", () => {
     ];
     for (const [periodStart, periodEnd] of invalidPeriods) {
       const repo = repository();
-      const useCase = new RunManagementQuery({ repository: repo });
+      const clock = new RecordingClock(new Date("2026-08-31T04:00:00.000Z"));
+      const useCase = new RunManagementQuery({ repository: repo, clock });
       await expect(
         useCase.execute({
           actor,
@@ -86,7 +103,27 @@ describe("RunManagementQuery", () => {
         }),
       ).rejects.toBeInstanceOf(InvalidManagementQueryPeriodError);
       expect(repo.runSalesWeeklyProgress).not.toHaveBeenCalled();
+      expect(clock.calls).toBe(0);
     }
+  });
+
+  it("rejects an invalid server clock before repository access", async () => {
+    const repo = repository();
+    const useCase = new RunManagementQuery({
+      repository: repo,
+      clock: new RecordingClock(new Date(Number.NaN)),
+    });
+
+    await expect(
+      useCase.execute({
+        actor,
+        capability: "sales_weekly_progress",
+        subjectUserId,
+        periodStart: "2026-08-24T00:00:00.000Z",
+        periodEnd: "2026-08-31T23:59:59.999Z",
+      }),
+    ).rejects.toBeInstanceOf(InvalidManagementQueryClockError);
+    expect(repo.runSalesWeeklyProgress).not.toHaveBeenCalled();
   });
 });
 

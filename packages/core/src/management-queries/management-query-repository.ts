@@ -68,6 +68,8 @@ export interface ManagementQueryRepository {
     subjectUserId: string;
     periodStart: string;
     periodEnd: string;
+    queryNow: string;
+    dataCutoffAt: string;
   }): Promise<ManagementQueryResult>;
 }
 
@@ -75,5 +77,12 @@ export class ManagementQuerySubjectNotFoundError extends Error {
   constructor(options?: ErrorOptions) {
     super("The management-query subject was not found.", options);
     this.name = "ManagementQuerySubjectNotFoundError";
+  }
+}
+
+export class InvalidManagementQueryCursorError extends Error {
+  constructor(options?: ErrorOptions) {
+    super("The management-query subject cursor is invalid.", options);
+    this.name = "InvalidManagementQueryCursorError";
   }
 }

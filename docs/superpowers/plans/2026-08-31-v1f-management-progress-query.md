@@ -49,7 +49,7 @@ Evidence kinds are limited to `followup`, `fact`, `stage_change`, `action` and `
 3. Implement the smallest schemas, records, repository port and use case needed to turn both suites GREEN.
 4. Run contracts/core focused tests, typecheck, Biome and diff checks.
 
-**Local evidence:** RED suites first failed because the management-query contracts and use cases did not exist. The GREEN implementation now accepts only `sales_weekly_progress`, rejects non-positive or over-31-day periods, bounds strict subject/result/evidence collections, prevents external evidence links, delegates actor scope without any model runtime, and exposes a bounded subject-list use case so HTTP will not depend directly on the database adapter. Contracts pass 57/57 and core passes 42/42 with package typechecks, Biome and diff checks green.
+**Local evidence:** RED suites first failed because the management-query contracts and use cases did not exist. The GREEN implementation now accepts only `sales_weekly_progress`, rejects non-positive or over-31-day periods, captures the server clock exactly once, bounds strict subject/result/evidence collections, prevents external evidence links, delegates actor scope without any model runtime, and exposes a bounded subject-list use case so HTTP will not depend directly on the database adapter. Contracts pass 57/57 and core passes 43/43 with package typechecks, Biome and diff checks green.
 
 ## Task 2: Implement assignment-scoped PostgreSQL projection and audit
 
@@ -66,6 +66,8 @@ Evidence kinds are limited to `followup`, `fact`, `stage_change`, `action` and `
 4. Prove ended, future, unassigned and cross-tenant rows disappear from subjects, metrics, highlights and gaps.
 5. Implement one tenant transaction with an explicit server timestamp and repeated active-assignment predicates. Use parameterized Kysely/SQL only.
 6. Inspect representative PostgreSQL 18 plans in CI; add an index only if existing assignment/entity/action/timeline indexes do not support the bounded query.
+
+**Local evidence:** The RED database suite first failed because no management-query adapter existed. The GREEN adapter resolves self and observed-portfolio subjects from active assignment intersections, applies the same scope to every entity row, attributes action metrics to the formal owner, reconstructs open/overdue action state at the exact data cutoff, returns typed evidence and explicit missing-analysis gaps, and writes only aggregate audit metadata. Future, ended, unassigned and cross-tenant subjects share the same not-found behavior and produce no denial audit. The focused scenario passes 5/5 and the complete database package passes 99/99 with typecheck, Biome, public-boundary and diff checks green. PostgreSQL 18 plan/compatibility evidence remains part of Task 5 CI acceptance.
 
 ## Task 3: Expose strict REST endpoints
 

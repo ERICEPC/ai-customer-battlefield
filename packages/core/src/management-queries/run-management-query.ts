@@ -1,3 +1,4 @@
+import type { Clock } from "../followup-drafts/create-followup-draft.js";
 import type { ActorScope } from "../followup-drafts/followup-draft-agent.js";
 import type {
   ManagementQueryRepository,
@@ -19,6 +20,7 @@ export class RunManagementQuery {
   constructor(
     private readonly dependencies: {
       repository: ManagementQueryRepository;
+      clock: Clock;
     },
   ) {}
 
@@ -36,11 +38,23 @@ export class RunManagementQuery {
     ) {
       throw new InvalidManagementQueryPeriodError();
     }
+    const now = this.dependencies.clock.now();
+    const nowTimestamp = now.getTime();
+    if (!Number.isFinite(nowTimestamp)) {
+      throw new InvalidManagementQueryClockError();
+    }
+    if (nowTimestamp < start) {
+      throw new InvalidManagementQueryPeriodError();
+    }
+    const queryNow = now.toISOString();
+    const dataCutoffAt = new Date(Math.min(end, nowTimestamp)).toISOString();
     return this.dependencies.repository.runSalesWeeklyProgress({
       actor: input.actor,
       subjectUserId: input.subjectUserId,
       periodStart: input.periodStart,
       periodEnd: input.periodEnd,
+      queryNow,
+      dataCutoffAt,
     });
   }
 }
@@ -52,6 +66,13 @@ export class InvalidManagementQueryPeriodError extends Error {
       options,
     );
     this.name = "InvalidManagementQueryPeriodError";
+  }
+}
+
+export class InvalidManagementQueryClockError extends Error {
+  constructor(options?: ErrorOptions) {
+    super("The management-query server clock is invalid.", options);
+    this.name = "InvalidManagementQueryClockError";
   }
 }
 
