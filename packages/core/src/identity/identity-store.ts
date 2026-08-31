@@ -1,3 +1,5 @@
+import type { ManagementCapability } from "../authorization/management-capability.js";
+
 export type IdentityRole = "sales" | "department_leader";
 
 export interface IdentityPerson {
@@ -8,6 +10,7 @@ export interface IdentityPerson {
 export interface IdentityProfile {
   user: IdentityPerson & { email: string };
   role: IdentityRole;
+  capabilities: ManagementCapability[];
   department: { id: string; name: string };
   directLeader: IdentityPerson | null;
   teamMembers: IdentityPerson[];

@@ -1,5 +1,6 @@
 "use client";
 
+import type { ManagementCapability } from "@battlefield/contracts";
 import Link from "next/link";
 import { type ReactNode, useEffect, useState } from "react";
 
@@ -29,18 +30,37 @@ const navigation = [
     roles: ["sales", "department_leader"],
   },
   { label: "通知中心", href: "/inbox", roles: ["sales", "department_leader"] },
-  { label: "管理问数", href: "/ask", roles: ["department_leader"] },
+  {
+    label: "管理问数",
+    href: "/ask",
+    roles: ["sales", "department_leader"],
+  },
   {
     label: "周报中心",
     href: "/reports",
     roles: ["sales", "department_leader"],
   },
-  { label: "系统管理", href: "/admin", roles: ["department_leader"] },
+  {
+    label: "系统管理",
+    href: "/admin",
+    roles: ["sales", "department_leader"],
+  },
 ] as const;
 
 type NavigationLabel = (typeof navigation)[number]["label"];
 type ActiveItem = NavigationLabel | "个人设置";
 type NavigationRole = (typeof navigation)[number]["roles"][number];
+
+const requiredCapabilitiesByItem: Partial<
+  Record<ActiveItem, readonly ManagementCapability[]>
+> = {
+  管理问数: ["management_query.execute"],
+  系统管理: [
+    "ai_runtime_config.manage",
+    "audit.read",
+    "worker_operations.manage",
+  ],
+};
 
 const mobileNavigation: ReadonlyArray<{
   label: string;
@@ -89,7 +109,7 @@ const mobileNavigation: ReadonlyArray<{
     href: "/ask",
     activeItem: "管理问数",
     mark: "问",
-    roles: ["department_leader"],
+    roles: ["sales", "department_leader"],
   },
   {
     label: "周报",
@@ -130,22 +150,38 @@ export function AppShell({
     );
   }
   if (
-    session.role === "sales" &&
-    (activeItem === "管理问数" || activeItem === "系统管理")
+    !supportsCapabilities(
+      session.capabilities,
+      requiredCapabilitiesByItem[activeItem],
+    )
   ) {
     return (
       <main className="session-state">
-        <p>当前身份不能使用{activeItem}。</p>
+        <p>
+          {session.role === "sales"
+            ? `当前身份不能使用${activeItem}。`
+            : `当前账号未获得${activeItem}能力。`}
+        </p>
         <Link href="/workspace">返回我的工作台</Link>
       </main>
     );
   }
 
-  const visibleNavigation = navigation.filter((item) =>
-    supportsRole(item.roles, session.role),
+  const visibleNavigation = navigation.filter(
+    (item) =>
+      supportsRole(item.roles, session.role) &&
+      supportsCapabilities(
+        session.capabilities,
+        requiredCapabilitiesByItem[item.label],
+      ),
   );
-  const visibleMobileNavigation = mobileNavigation.filter((item) =>
-    supportsRole(item.roles, session.role),
+  const visibleMobileNavigation = mobileNavigation.filter(
+    (item) =>
+      supportsRole(item.roles, session.role) &&
+      supportsCapabilities(
+        session.capabilities,
+        requiredCapabilitiesByItem[item.activeItem],
+      ),
   );
   const roleLabel = session.role === "sales" ? "销售身份" : "直属领导";
   const visibleBreadcrumb =
@@ -249,7 +285,10 @@ export function AppShell({
                 <Link className="account-settings-link" href="/settings">
                   个人设置
                 </Link>
-                {session.role === "department_leader" ? (
+                {supportsCapabilities(
+                  session.capabilities,
+                  requiredCapabilitiesByItem.系统管理,
+                ) ? (
                   <Link className="account-settings-link" href="/admin">
                     系统管理
                   </Link>
@@ -290,4 +329,13 @@ function supportsRole(
   role: NavigationRole,
 ): boolean {
   return roles.some((candidate) => candidate === role);
+}
+
+function supportsCapabilities(
+  granted: readonly ManagementCapability[],
+  required: readonly ManagementCapability[] | undefined,
+): boolean {
+  return (
+    !required || required.every((capability) => granted.includes(capability))
+  );
 }

@@ -39,7 +39,7 @@ import {
   ServiceUnavailableException,
 } from "@nestjs/common";
 
-import { RequireRoles } from "../auth/auth.constants.js";
+import { RequireCapabilities } from "../auth/auth.constants.js";
 import { developmentActor } from "../followup-drafts/followup-http.js";
 import {
   GET_WORKER_OPERATIONS_HEALTH,
@@ -51,7 +51,7 @@ import {
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
-@RequireRoles("department_leader")
+@RequireCapabilities("worker_operations.manage")
 @Controller("worker-operations")
 export class WorkerOperationsController {
   constructor(

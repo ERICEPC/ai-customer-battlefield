@@ -45,6 +45,7 @@ describe("synthetic two-level identity", () => {
     expect(sales.session).toMatchObject({
       user: { displayName: "销售1", email: SYNTHETIC_SALES_EMAIL },
       role: "sales",
+      capabilities: [],
       department: { name: "商业化一部" },
       directLeader: { displayName: "领导A" },
       teamMembers: [],
@@ -52,6 +53,13 @@ describe("synthetic two-level identity", () => {
     expect(leader.session).toMatchObject({
       user: { displayName: "领导A", email: SYNTHETIC_LEADER_EMAIL },
       role: "department_leader",
+      capabilities: [
+        "access_control.manage",
+        "ai_runtime_config.manage",
+        "audit.read",
+        "management_query.execute",
+        "worker_operations.manage",
+      ],
       department: { name: "商业化一部" },
       directLeader: null,
       teamMembers: [{ displayName: "销售1" }],

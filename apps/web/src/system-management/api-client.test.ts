@@ -117,8 +117,8 @@ describe("system-management API client", () => {
       vi.fn().mockResolvedValue(
         response(
           {
-            code: "WORKER_OPERATIONS_FORBIDDEN",
-            message: "当前身份不能管理 Worker。",
+            code: "CAPABILITY_FORBIDDEN",
+            message: "当前账号未获得该管理能力。",
             requestId: "request-worker-1",
           },
           403,
@@ -132,7 +132,7 @@ describe("system-management API client", () => {
     expect(error).toBeInstanceOf(SystemManagementApiError);
     expect(error).toMatchObject({
       status: 403,
-      code: "WORKER_OPERATIONS_FORBIDDEN",
+      code: "CAPABILITY_FORBIDDEN",
       requestId: "request-worker-1",
     });
   });

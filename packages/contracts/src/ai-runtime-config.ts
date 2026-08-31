@@ -64,6 +64,7 @@ export const aiRuntimeConfigApiErrorSchema = z.strictObject({
     "INVALID_AI_RUNTIME_CONFIG_REQUEST",
     "AI_RUNTIME_CONFIG_VERSION_NOT_FOUND",
     "AI_RUNTIME_CONFIG_FORBIDDEN",
+    "CAPABILITY_FORBIDDEN",
     "AI_RUNTIME_CONFIG_UNAVAILABLE",
   ]),
   message: z.string().trim().min(1).max(1_000),

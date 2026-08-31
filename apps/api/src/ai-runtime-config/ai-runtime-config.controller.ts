@@ -33,14 +33,14 @@ import {
   ServiceUnavailableException,
 } from "@nestjs/common";
 
-import { RequireRoles } from "../auth/auth.constants.js";
+import { RequireCapabilities } from "../auth/auth.constants.js";
 import { developmentActor } from "../followup-drafts/followup-http.js";
 import {
   AI_RUNTIME_CONFIG_MANAGER,
   AiRuntimeConfigUnavailableError,
 } from "./ai-runtime-config.providers.js";
 
-@RequireRoles("department_leader")
+@RequireCapabilities("ai_runtime_config.manage")
 @Controller("ai-runtime-configs")
 export class AiRuntimeConfigController {
   constructor(

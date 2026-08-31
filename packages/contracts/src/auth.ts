@@ -2,6 +2,14 @@ import { z } from "zod";
 
 export const identityRoleSchema = z.enum(["sales", "department_leader"]);
 
+export const managementCapabilitySchema = z.enum([
+  "access_control.manage",
+  "ai_runtime_config.manage",
+  "audit.read",
+  "management_query.execute",
+  "worker_operations.manage",
+]);
+
 export const loginRequestSchema = z.strictObject({
   tenantSlug: z
     .string()
@@ -20,6 +28,10 @@ export const identityPersonSchema = z.strictObject({
 export const sessionProfileSchema = z.strictObject({
   user: identityPersonSchema.extend({ email: z.email().max(320) }),
   role: identityRoleSchema,
+  capabilities: z
+    .array(managementCapabilitySchema)
+    .max(20)
+    .refine((items) => new Set(items).size === items.length),
   department: z.strictObject({
     id: z.uuid(),
     name: z.string().trim().min(1).max(200),
@@ -45,6 +57,7 @@ export const authApiErrorSchema = z.strictObject({
 });
 
 export type IdentityRole = z.infer<typeof identityRoleSchema>;
+export type ManagementCapability = z.infer<typeof managementCapabilitySchema>;
 export type IdentityPerson = z.infer<typeof identityPersonSchema>;
 export type LoginRequest = z.infer<typeof loginRequestSchema>;
 export type SessionProfile = z.infer<typeof sessionProfileSchema>;

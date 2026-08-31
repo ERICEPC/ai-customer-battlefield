@@ -90,6 +90,7 @@ export const workerOperationsApiErrorSchema = z.strictObject({
     "ASYNC_WORK_ITEM_NOT_REPLAYABLE",
     "ASYNC_WORK_REPLAY_CONFLICT",
     "WORKER_OPERATIONS_FORBIDDEN",
+    "CAPABILITY_FORBIDDEN",
     "WORKER_OPERATIONS_UNAVAILABLE",
   ]),
   message: z.string().trim().min(1).max(1_000),

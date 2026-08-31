@@ -1,4 +1,4 @@
-import type { IdentityRole, ResolveSession } from "@battlefield/core";
+import type { ManagementCapability, ResolveSession } from "@battlefield/core";
 import {
   type CanActivate,
   type ExecutionContext,
@@ -12,7 +12,7 @@ import { Reflector } from "@nestjs/core";
 
 import {
   PUBLIC_ROUTE,
-  REQUIRED_ROLES,
+  REQUIRED_CAPABILITIES,
   SESSION_COOKIE_NAME,
 } from "./auth.constants.js";
 import { RESOLVE_SESSION } from "./auth.providers.js";
@@ -57,16 +57,17 @@ export class SessionAuthGuard implements CanActivate {
       });
     }
 
-    const requiredRoles = this.reflector.getAllAndOverride<IdentityRole[]>(
-      REQUIRED_ROLES,
-      [context.getHandler(), context.getClass()],
-    );
-    const authenticatedRole = request.auth?.session.role;
+    const requiredCapabilities = this.reflector.getAllAndOverride<
+      ManagementCapability[]
+    >(REQUIRED_CAPABILITIES, [context.getHandler(), context.getClass()]);
+    const grantedCapabilities = request.auth?.session.capabilities ?? [];
     if (
-      requiredRoles?.length &&
-      (!authenticatedRole || !requiredRoles.includes(authenticatedRole))
+      requiredCapabilities?.length &&
+      !requiredCapabilities.every((capability) =>
+        grantedCapabilities.includes(capability),
+      )
     ) {
-      throw roleForbidden();
+      throw capabilityForbidden();
     }
     return true;
   }
@@ -109,10 +110,10 @@ function authenticationRequired(): UnauthorizedException {
   });
 }
 
-function roleForbidden(): ForbiddenException {
+function capabilityForbidden(): ForbiddenException {
   return new ForbiddenException({
-    code: "ROLE_FORBIDDEN",
-    message: "当前身份不能使用该功能。",
+    code: "CAPABILITY_FORBIDDEN",
+    message: "当前账号未获得该管理能力。",
     requestId: crypto.randomUUID(),
   });
 }

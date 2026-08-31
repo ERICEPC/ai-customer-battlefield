@@ -38,6 +38,8 @@ export {
   type LoginResponse,
   loginRequestSchema,
   loginResponseSchema,
+  type ManagementCapability,
+  managementCapabilitySchema,
   type SessionProfile,
   sessionProfileSchema,
 } from "./auth.js";

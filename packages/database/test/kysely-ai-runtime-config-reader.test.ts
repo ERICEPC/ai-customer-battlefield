@@ -1,4 +1,5 @@
 import { fileURLToPath } from "node:url";
+import { AiRuntimeConfigAccessDeniedError } from "@battlefield/core";
 import { afterEach, beforeEach, describe, expect, test } from "vitest";
 
 import { KyselyAiRuntimeConfigReader } from "../src/ai-configuration/kysely-ai-runtime-config-reader.js";
@@ -202,6 +203,52 @@ describe("KyselyAiRuntimeConfigReader", () => {
       "ai_runtime_config.version_created",
       "ai_runtime_config.version_created",
     ]);
+  });
+
+  test("authorizes configuration by capability instead of a fixed role", async () => {
+    const store = new KyselyAiRuntimeConfigStore(database.db, {
+      requestIdFactory: () => REQUEST_ID,
+    });
+    await withTenantTransaction(
+      database.db,
+      { ...managerActor, requestId: REQUEST_ID },
+      async (transaction) => {
+        await transaction
+          .insertInto("app.role_capability_grants")
+          .values({
+            tenant_id: actor.tenantId,
+            role_code: "sales",
+            capability_code: "ai_runtime_config.manage",
+            granted_by: managerActor.userId,
+            reason: "临时授权测试",
+          })
+          .executeTakeFirstOrThrow();
+        await transaction
+          .deleteFrom("app.role_capability_grants")
+          .where("tenant_id", "=", managerActor.tenantId)
+          .where("role_code", "=", "department_leader")
+          .where("capability_code", "=", "ai_runtime_config.manage")
+          .executeTakeFirstOrThrow();
+      },
+    );
+
+    await expect(
+      store.createVersion({
+        actor,
+        configKey: CONFIG_KEY,
+        name: "销售角色能力测试",
+        defaultModelId: "senseaudio-s2-flash",
+        systemPrompt: "只返回严格 JSON。",
+        parameters: { temperature: 0.1, maxTokens: 1200 },
+      }),
+    ).resolves.toMatchObject({ versionNo: "1" });
+    await expect(
+      store.listVersions({
+        actor: managerActor,
+        configKey: CONFIG_KEY,
+        limit: 20,
+      }),
+    ).rejects.toBeInstanceOf(AiRuntimeConfigAccessDeniedError);
   });
 });
 

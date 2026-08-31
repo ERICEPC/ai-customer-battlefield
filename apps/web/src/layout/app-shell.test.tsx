@@ -1,5 +1,6 @@
 import "@testing-library/jest-dom/vitest";
 
+import type { SessionProfile } from "@battlefield/contracts";
 import {
   cleanup,
   fireEvent,
@@ -16,13 +17,14 @@ const department = {
   id: "31000000-0000-4000-8000-000000000001",
   name: "商业化一部",
 };
-const salesSession = {
+const salesSession: SessionProfile = {
   user: {
     id: "30000000-0000-4000-8000-000000000001",
     displayName: "销售1",
     email: "sales1@demo.local",
   },
   role: "sales" as const,
+  capabilities: [],
   department,
   directLeader: {
     id: "30000000-0000-4000-8000-000000000072",
@@ -31,13 +33,20 @@ const salesSession = {
   teamMembers: [],
   expiresAt: "2026-09-01T08:00:00.000Z",
 };
-const leaderSession = {
+const leaderSession: SessionProfile = {
   user: {
     id: "30000000-0000-4000-8000-000000000072",
     displayName: "领导A",
     email: "leader.a@demo.local",
   },
   role: "department_leader" as const,
+  capabilities: [
+    "access_control.manage",
+    "ai_runtime_config.manage",
+    "audit.read",
+    "management_query.execute",
+    "worker_operations.manage",
+  ],
   department,
   directLeader: null,
   teamMembers: [
@@ -219,5 +228,65 @@ describe("AppShell", () => {
     expect(
       screen.queryByText("不应渲染的系统管理内容"),
     ).not.toBeInTheDocument();
+  });
+
+  it("uses capabilities instead of the leader role label for management access", () => {
+    const leaderWithoutSystemCapabilities: SessionProfile = {
+      ...leaderSession,
+      capabilities: ["management_query.execute"],
+    };
+    const { rerender } = render(
+      <SessionProvider initialSession={leaderWithoutSystemCapabilities}>
+        <AppShell activeItem="管理问数" breadcrumb="管理工作台 / 管理问数">
+          <p>问数内容</p>
+        </AppShell>
+      </SessionProvider>,
+    );
+
+    const navigation = screen.getByRole("navigation", { name: "主导航" });
+    expect(
+      within(navigation).getByRole("link", { name: "管理问数" }),
+    ).toBeVisible();
+    expect(
+      within(navigation).queryByRole("link", { name: "系统管理" }),
+    ).not.toBeInTheDocument();
+
+    rerender(
+      <SessionProvider initialSession={leaderWithoutSystemCapabilities}>
+        <AppShell activeItem="系统管理" breadcrumb="管理工作台 / 系统管理">
+          <p>不应渲染的系统管理内容</p>
+        </AppShell>
+      </SessionProvider>,
+    );
+    expect(screen.getByText("当前账号未获得系统管理能力。")).toBeVisible();
+    expect(
+      screen.queryByText("不应渲染的系统管理内容"),
+    ).not.toBeInTheDocument();
+  });
+
+  it("allows a sales-labelled account when the tenant grants the capability", () => {
+    const delegatedSales: SessionProfile = {
+      ...salesSession,
+      capabilities: [
+        "ai_runtime_config.manage",
+        "audit.read",
+        "worker_operations.manage",
+      ],
+    };
+    render(
+      <SessionProvider initialSession={delegatedSales}>
+        <AppShell activeItem="系统管理" breadcrumb="管理工作台 / 系统管理">
+          <p>已授权系统管理内容</p>
+        </AppShell>
+      </SessionProvider>,
+    );
+
+    expect(screen.getByText("已授权系统管理内容")).toBeVisible();
+    expect(
+      within(screen.getByRole("navigation", { name: "主导航" })).getByRole(
+        "link",
+        { name: "系统管理" },
+      ),
+    ).toBeVisible();
   });
 });

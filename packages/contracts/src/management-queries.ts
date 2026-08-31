@@ -161,6 +161,7 @@ export const managementQueryApiErrorSchema = z.strictObject({
     "MANAGEMENT_QUERY_SUBJECT_NOT_FOUND",
     "MANAGEMENT_QUERY_IDEMPOTENCY_CONFLICT",
     "MANAGEMENT_QUERY_RESULT_LIMIT_EXCEEDED",
+    "CAPABILITY_FORBIDDEN",
     "MANAGEMENT_QUERY_UNAVAILABLE",
   ]),
   message: z.string().trim().min(1).max(1_000),

@@ -104,6 +104,7 @@ describe("WorkspaceDashboard", () => {
             email: "sales1@demo.local",
           },
           role: "sales",
+          capabilities: [],
           department: {
             id: "31000000-0000-4000-8000-000000000001",
             name: "商业化一部",
@@ -154,6 +155,13 @@ describe("WorkspaceDashboard", () => {
             email: "leader.a@demo.local",
           },
           role: "department_leader",
+          capabilities: [
+            "access_control.manage",
+            "ai_runtime_config.manage",
+            "audit.read",
+            "management_query.execute",
+            "worker_operations.manage",
+          ],
           department: {
             id: "31000000-0000-4000-8000-000000000001",
             name: "商业化一部",
@@ -191,6 +199,7 @@ describe("WorkspaceDashboard", () => {
             email: "sales1@demo.local",
           },
           role: "sales",
+          capabilities: [],
           department: {
             id: "31000000-0000-4000-8000-000000000001",
             name: "商业化一部",

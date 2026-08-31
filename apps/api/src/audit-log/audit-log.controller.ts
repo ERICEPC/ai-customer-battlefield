@@ -19,14 +19,14 @@ import {
   ServiceUnavailableException,
 } from "@nestjs/common";
 
-import { RequireRoles } from "../auth/auth.constants.js";
+import { RequireCapabilities } from "../auth/auth.constants.js";
 import { developmentActor } from "../followup-drafts/followup-http.js";
 import {
   AuditLogUnavailableError,
   LIST_AUDIT_ENTRIES,
 } from "./audit-log.providers.js";
 
-@RequireRoles("department_leader")
+@RequireCapabilities("audit.read")
 @Controller("audit-entries")
 export class AuditLogController {
   constructor(

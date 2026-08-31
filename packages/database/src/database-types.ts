@@ -1,3 +1,4 @@
+import type { ManagementCapability } from "@battlefield/core";
 import type { ColumnType, Generated } from "kysely";
 
 type Timestamp = ColumnType<Date, Date | string | undefined, Date | string>;
@@ -83,6 +84,22 @@ export interface UserMembershipTable {
   role_code: string;
   valid_from: Timestamp;
   valid_to: NullableTimestamp;
+  created_at: Timestamp;
+}
+
+export interface ManagementCapabilityTable {
+  code: ManagementCapability;
+  name: string;
+  description: string;
+  created_at: Timestamp;
+}
+
+export interface RoleCapabilityGrantTable {
+  tenant_id: string;
+  role_code: string;
+  capability_code: ManagementCapability;
+  granted_by: string | null;
+  reason: string;
   created_at: Timestamp;
 }
 
@@ -850,6 +867,8 @@ export interface BattlefieldDatabase {
   "app.org_units": OrgUnitTable;
   "app.users": UserTable;
   "app.user_memberships": UserMembershipTable;
+  "app.management_capabilities": ManagementCapabilityTable;
+  "app.role_capability_grants": RoleCapabilityGrantTable;
   "app.user_credentials": UserCredentialTable;
   "app.user_sessions": UserSessionTable;
   "app.user_ai_settings": UserAiSettingsTable;

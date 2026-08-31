@@ -12,6 +12,7 @@ describe("authentication contracts", () => {
         email: "sales1@demo.local",
       },
       role: "sales",
+      capabilities: [],
       department: { id: randomUUID(), name: "商业化一部" },
       directLeader: { id: randomUUID(), displayName: "领导A" },
       teamMembers: [],
@@ -19,6 +20,7 @@ describe("authentication contracts", () => {
     });
 
     expect(profile.role).toBe("sales");
+    expect(profile.capabilities).toEqual([]);
     expect(profile.directLeader?.displayName).toBe("领导A");
   });
 
@@ -30,6 +32,13 @@ describe("authentication contracts", () => {
         email: "leader.a@demo.local",
       },
       role: "department_leader",
+      capabilities: [
+        "access_control.manage",
+        "ai_runtime_config.manage",
+        "audit.read",
+        "management_query.execute",
+        "worker_operations.manage",
+      ],
       department: { id: randomUUID(), name: "商业化一部" },
       directLeader: null,
       teamMembers: [{ id: randomUUID(), displayName: "销售1" }],
@@ -39,6 +48,7 @@ describe("authentication contracts", () => {
     expect(profile.teamMembers.map((member) => member.displayName)).toEqual([
       "销售1",
     ]);
+    expect(profile.capabilities).toHaveLength(5);
   });
 
   it("rejects roles outside the first two-level identity model", () => {
@@ -50,6 +60,7 @@ describe("authentication contracts", () => {
           email: "region@demo.local",
         },
         role: "regional_manager",
+        capabilities: [],
         department: { id: randomUUID(), name: "华东区" },
         directLeader: null,
         teamMembers: [],

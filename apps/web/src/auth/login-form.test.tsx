@@ -40,6 +40,7 @@ describe("LoginForm", () => {
         email: "sales1@demo.local",
       },
       role: "sales" as const,
+      capabilities: [],
       department: {
         id: "31000000-0000-4000-8000-000000000001",
         name: "商业化一部",

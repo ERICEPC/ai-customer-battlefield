@@ -19,6 +19,7 @@ export {
   KyselyAuditLogReader,
   type KyselyAuditLogReaderOptions,
 } from "./audit/kysely-audit-log-reader.js";
+export { actorHasManagementCapability } from "./authorization/management-capabilities.js";
 export {
   KyselyBattleAnalysisStore,
   type KyselyBattleAnalysisStoreOptions,
@@ -72,6 +73,7 @@ export type {
   FollowupParticipantTable,
   FollowupTable,
   IdempotencyRecordTable,
+  ManagementCapabilityTable,
   NotificationDeliveryTable,
   NotificationEventTable,
   NotificationTemplateVersionTable,
@@ -83,6 +85,7 @@ export type {
   ReminderInstanceTable,
   ReminderPolicyNode,
   ReminderPolicyVersionTable,
+  RoleCapabilityGrantTable,
   SourceEvidenceTable,
   SourceInputTable,
   TenantTable,

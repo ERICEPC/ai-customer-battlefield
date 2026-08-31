@@ -223,9 +223,41 @@ describe("KyselyWorkerOperationsRepository", () => {
     });
   });
 
-  test("requires a current leader membership even inside the database adapter", async () => {
+  test("requires the Worker capability even inside the database adapter", async () => {
     await expect(
       repository.listFailures({ actor: workerActor, limit: 20 }),
+    ).rejects.toBeInstanceOf(WorkerOperationsAccessDeniedError);
+  });
+
+  test("authorizes Worker operations by capability instead of a fixed role", async () => {
+    await withTenantTransaction(
+      database.db,
+      { ...managerActor, requestId: REQUEST_ID },
+      async (transaction) => {
+        await transaction
+          .insertInto("app.role_capability_grants")
+          .values({
+            tenant_id: workerActor.tenantId,
+            role_code: "sales",
+            capability_code: "worker_operations.manage",
+            granted_by: managerActor.userId,
+            reason: "临时授权测试",
+          })
+          .executeTakeFirstOrThrow();
+        await transaction
+          .deleteFrom("app.role_capability_grants")
+          .where("tenant_id", "=", managerActor.tenantId)
+          .where("role_code", "=", "department_leader")
+          .where("capability_code", "=", "worker_operations.manage")
+          .executeTakeFirstOrThrow();
+      },
+    );
+
+    await expect(
+      repository.listFailures({ actor: workerActor, limit: 20 }),
+    ).resolves.toMatchObject({ items: [{ workItemId: OUTBOX_ID }] });
+    await expect(
+      repository.listFailures({ actor: managerActor, limit: 20 }),
     ).rejects.toBeInstanceOf(WorkerOperationsAccessDeniedError);
   });
 });

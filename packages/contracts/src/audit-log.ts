@@ -52,7 +52,11 @@ export const auditEntryPageSchema = z.strictObject({
 });
 
 export const auditLogApiErrorSchema = z.strictObject({
-  code: z.enum(["INVALID_AUDIT_LOG_QUERY", "AUDIT_LOG_UNAVAILABLE"]),
+  code: z.enum([
+    "INVALID_AUDIT_LOG_QUERY",
+    "CAPABILITY_FORBIDDEN",
+    "AUDIT_LOG_UNAVAILABLE",
+  ]),
   message: z.string().trim().min(1).max(1_000),
   requestId: z.string().trim().min(1).max(200),
   issues: z

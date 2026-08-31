@@ -67,6 +67,7 @@ describe("authentication API", () => {
     expect(login.body.session).toMatchObject({
       user: { displayName: "销售1", email: "sales1@demo.local" },
       role: "sales",
+      capabilities: [],
       department: { name: "商业化一部" },
       directLeader: { displayName: "领导A" },
       teamMembers: [],
@@ -89,13 +90,20 @@ describe("authentication API", () => {
     expect(login.body.session).toMatchObject({
       user: { displayName: "领导A" },
       role: "department_leader",
+      capabilities: [
+        "access_control.manage",
+        "ai_runtime_config.manage",
+        "audit.read",
+        "management_query.execute",
+        "worker_operations.manage",
+      ],
       department: { name: "商业化一部" },
       directLeader: null,
       teamMembers: [{ displayName: "销售1" }],
     });
   });
 
-  it("reserves management and audit endpoints for the department leader", async () => {
+  it("reserves management and audit endpoints for granted capabilities", async () => {
     const sales = request.agent(app.getHttpServer());
     await sales.post("/api/v1/auth/login").send({
       tenantSlug: "alpha",
@@ -106,7 +114,7 @@ describe("authentication API", () => {
       .get("/api/v1/management-query-subjects")
       .expect(403)
       .expect(({ body }) => {
-        expect(body.code).toBe("ROLE_FORBIDDEN");
+        expect(body.code).toBe("CAPABILITY_FORBIDDEN");
       });
     await sales.get("/api/v1/audit-entries").expect(403);
     await sales
@@ -126,6 +134,45 @@ describe("authentication API", () => {
       .get("/api/v1/ai-runtime-configs/followup_extraction/versions")
       .expect(200);
     await leader.get("/api/v1/worker-operations/health").expect(200);
+  });
+
+  it("revokes one capability for the next request without changing the role", async () => {
+    const leader = request.agent(app.getHttpServer());
+    await leader.post("/api/v1/auth/login").send({
+      tenantSlug: "alpha",
+      email: "leader.a@demo.local",
+      password: "Demo@2026",
+    });
+    await leader.get("/api/v1/worker-operations/health").expect(200);
+
+    await withTenantTransaction(
+      database.db,
+      {
+        tenantId: SYNTHETIC_TENANT_ID,
+        userId: SYNTHETIC_MANAGER_USER_ID,
+        requestId: REQUEST_ID,
+      },
+      (transaction) =>
+        transaction
+          .deleteFrom("app.role_capability_grants")
+          .where("tenant_id", "=", SYNTHETIC_TENANT_ID)
+          .where("role_code", "=", "department_leader")
+          .where("capability_code", "=", "worker_operations.manage")
+          .executeTakeFirstOrThrow(),
+    );
+
+    const session = await leader.get("/api/v1/auth/session").expect(200);
+    expect(session.body.role).toBe("department_leader");
+    expect(session.body.capabilities).not.toContain("worker_operations.manage");
+    await leader
+      .get("/api/v1/worker-operations/health")
+      .expect(403)
+      .expect(({ body }) => {
+        expect(body.code).toBe("CAPABILITY_FORBIDDEN");
+      });
+    await leader
+      .get("/api/v1/ai-runtime-configs/followup_extraction/versions")
+      .expect(200);
   });
 
   it("does not let caller-supplied actor headers override the session", async () => {

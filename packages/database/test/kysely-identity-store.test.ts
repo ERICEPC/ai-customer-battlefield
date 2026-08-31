@@ -20,6 +20,7 @@ const ENDED_SALES_ID = "30000000-0000-4000-8000-000000000073";
 const DEPARTMENT_ID = "31000000-0000-4000-8000-000000000001";
 const REQUEST_ID = "90000000-0000-4000-8000-000000000081";
 const SESSION_ID = "81000000-0000-4000-8000-000000000001";
+const LEADER_SESSION_ID = "81000000-0000-4000-8000-000000000002";
 const TOKEN_HASH = "a".repeat(64);
 
 describe("KyselyIdentityStore", () => {
@@ -55,6 +56,7 @@ describe("KyselyIdentityStore", () => {
           email: "sales1@demo.local",
         },
         role: "sales",
+        capabilities: [],
         department: { id: DEPARTMENT_ID, name: "商业化一部" },
         directLeader: { id: LEADER_ID, displayName: "领导A" },
         teamMembers: [],
@@ -71,6 +73,13 @@ describe("KyselyIdentityStore", () => {
 
     expect(account?.profile).toMatchObject({
       role: "department_leader",
+      capabilities: [
+        "access_control.manage",
+        "ai_runtime_config.manage",
+        "audit.read",
+        "management_query.execute",
+        "worker_operations.manage",
+      ],
       directLeader: null,
       teamMembers: [{ id: SALES_ID, displayName: "销售1" }],
     });
@@ -119,6 +128,47 @@ describe("KyselyIdentityStore", () => {
         now: "2026-08-31T11:00:00.000Z",
       }),
     ).resolves.toBeNull();
+  });
+
+  test("refreshes an existing leader session after a capability is revoked", async () => {
+    await store.createSession({
+      actor: { tenantId: TENANT_ID, userId: LEADER_ID },
+      sessionId: LEADER_SESSION_ID,
+      tokenHash: "b".repeat(64),
+      expiresAt: "2026-09-01T08:00:00.000Z",
+      createdAt: "2026-08-31T08:00:00.000Z",
+    });
+
+    const before = await store.resolveSession({
+      tenantId: TENANT_ID,
+      tokenHash: "b".repeat(64),
+      now: "2026-08-31T09:00:00.000Z",
+    });
+    expect(before?.profile.capabilities).toContain("worker_operations.manage");
+
+    await withTenantTransaction(
+      database.db,
+      { tenantId: TENANT_ID, userId: LEADER_ID, requestId: REQUEST_ID },
+      (transaction) =>
+        transaction
+          .deleteFrom("app.role_capability_grants")
+          .where("tenant_id", "=", TENANT_ID)
+          .where("role_code", "=", "department_leader")
+          .where("capability_code", "=", "worker_operations.manage")
+          .executeTakeFirstOrThrow(),
+    );
+
+    const after = await store.resolveSession({
+      tenantId: TENANT_ID,
+      tokenHash: "b".repeat(64),
+      now: "2026-08-31T09:01:00.000Z",
+    });
+    expect(after?.profile.capabilities).toEqual([
+      "access_control.manage",
+      "ai_runtime_config.manage",
+      "audit.read",
+      "management_query.execute",
+    ]);
   });
 });
 

@@ -253,6 +253,11 @@ async function loadProfile(
   tenantId: string,
   account: AccountRow,
 ): Promise<IdentityProfile | null> {
+  const capabilities = await currentRoleCapabilities(
+    transaction,
+    tenantId,
+    account.role_code,
+  );
   if (account.role_code === "sales") {
     const leaders = await currentDepartmentPeople(
       transaction,
@@ -263,6 +268,7 @@ async function loadProfile(
     if (leaders.length !== 1) return null;
     return baseProfile(account, {
       role: "sales",
+      capabilities,
       directLeader: leaders[0] ?? null,
       teamMembers: [],
     });
@@ -276,6 +282,7 @@ async function loadProfile(
     );
     return baseProfile(account, {
       role: "department_leader",
+      capabilities,
       directLeader: null,
       teamMembers,
     });
@@ -285,7 +292,10 @@ async function loadProfile(
 
 function baseProfile(
   account: AccountRow,
-  relationship: Pick<IdentityProfile, "role" | "directLeader" | "teamMembers">,
+  relationship: Pick<
+    IdentityProfile,
+    "role" | "capabilities" | "directLeader" | "teamMembers"
+  >,
 ): IdentityProfile {
   return {
     user: {
@@ -299,6 +309,21 @@ function baseProfile(
     },
     ...relationship,
   };
+}
+
+async function currentRoleCapabilities(
+  transaction: Transaction<BattlefieldDatabase>,
+  tenantId: string,
+  roleCode: string,
+): Promise<IdentityProfile["capabilities"]> {
+  const rows = await transaction
+    .selectFrom("app.role_capability_grants")
+    .select("capability_code")
+    .where("tenant_id", "=", tenantId)
+    .where("role_code", "=", roleCode)
+    .orderBy("capability_code")
+    .execute();
+  return rows.map((row) => row.capability_code);
 }
 
 async function currentDepartmentPeople(

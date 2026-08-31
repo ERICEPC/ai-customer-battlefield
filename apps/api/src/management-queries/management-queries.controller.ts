@@ -33,7 +33,7 @@ import {
   ServiceUnavailableException,
   UnprocessableEntityException,
 } from "@nestjs/common";
-import { RequireRoles } from "../auth/auth.constants.js";
+import { RequireCapabilities } from "../auth/auth.constants.js";
 import { developmentActor } from "../followup-drafts/followup-http.js";
 import {
   LIST_MANAGEMENT_QUERY_SUBJECTS,
@@ -41,7 +41,7 @@ import {
   RUN_MANAGEMENT_QUERY,
 } from "./management-queries.providers.js";
 
-@RequireRoles("department_leader")
+@RequireCapabilities("management_query.execute")
 @Controller()
 export class ManagementQueriesController {
   constructor(

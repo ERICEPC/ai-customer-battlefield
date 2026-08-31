@@ -11,6 +11,7 @@ import {
 import { type Kysely, sql, type Transaction } from "kysely";
 
 import { appendAuditEntry } from "../audit/append-audit-entry.js";
+import { actorHasManagementCapability } from "../authorization/management-capabilities.js";
 import type { BattlefieldDatabase } from "../database-types.js";
 import { withTenantTransaction } from "../tenant-session.js";
 import {
@@ -280,21 +281,15 @@ async function assertConfigurator(
   transaction: DatabaseTransaction,
   actor: { tenantId: string; userId: string },
 ): Promise<void> {
-  const membership = await transaction
-    .selectFrom("app.user_memberships")
-    .select("id")
-    .where("tenant_id", "=", actor.tenantId)
-    .where("user_id", "=", actor.userId)
-    .where("role_code", "=", "department_leader")
-    .where("valid_from", "<=", sql<Date>`current_timestamp`)
-    .where((expression) =>
-      expression.or([
-        expression("valid_to", "is", null),
-        expression("valid_to", ">", sql<Date>`current_timestamp`),
-      ]),
-    )
-    .executeTakeFirst();
-  if (!membership) throw new AiRuntimeConfigAccessDeniedError();
+  if (
+    !(await actorHasManagementCapability(
+      transaction,
+      actor,
+      "ai_runtime_config.manage",
+    ))
+  ) {
+    throw new AiRuntimeConfigAccessDeniedError();
+  }
 }
 
 async function lockConfig(
