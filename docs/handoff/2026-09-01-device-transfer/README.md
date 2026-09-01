@@ -6,7 +6,9 @@
 
 工作分支：`main`
 
-交接基线：`51fc19e492a97e6f5903d0c2e1d2b80247e57447`
+功能基线：`51fc19e492a97e6f5903d0c2e1d2b80247e57447`
+
+交接文档首次提交：`b9157d4`（使用该提交或其后续 `main`）
 
 ## 1. 当前目标与产品边界
 
@@ -116,7 +118,7 @@ git pull --ff-only origin main
 git rev-parse HEAD
 ```
 
-期望基线至少为 `51fc19e` 或其后续提交。
+期望至少包含功能基线 `51fc19e` 和交接文档提交 `b9157d4`，或使用其后续 `main`。
 
 ### 5.2 安装运行时
 
@@ -247,7 +249,7 @@ curl -fsS http://127.0.0.1:3001/api/v1/health/live
 
 ## 9. 工作区与停止状态
 
-- `main` 与 `origin/main` 都停在 `51fc19e`；
+- `main` 与 `origin/main` 均已包含功能基线 `51fc19e` 和交接文档首次提交 `b9157d4`；
 - 本轮功能代码和交接包之外没有应提交的 Agent 改动；
 - 旧设备 `apps/web/next-env.d.ts` 有 Next.js 自动生成的 dev 类型路径变化，始终未纳入提交；新设备不需要手工搬运，启动 Next.js 后会按环境再生成；
 - 本轮启动的 Worker 已优雅停止；

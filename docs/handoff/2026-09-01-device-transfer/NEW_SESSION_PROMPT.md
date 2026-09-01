@@ -15,7 +15,7 @@
 1. 读取仓库根目录 `AGENTS.md`（若存在）和全局 memory bootstrap；
 2. 完整读取 `docs/handoff/2026-09-01-device-transfer/README.md`；
 3. 检查 `git status --short`、`git log -8 --oneline`、当前分支和 `origin/main`；
-4. 确认 `main` 至少包含交接基线 `51fc19e492a97e6f5903d0c2e1d2b80247e57447`；
+4. 确认 `main` 至少包含功能基线 `51fc19e492a97e6f5903d0c2e1d2b80247e57447` 和交接文档提交 `b9157d4`；
 5. 不要把 `.env.local`、`.env.migrate.local`、SSH 私钥、SenseAudio Key、数据库口令或客户数据写入公开仓库或输出；这些由我通过私有方式提供/转移；
 6. 所有更改直接提交并推送 `main`，不建功能分支；
 7. 小步快跑，只跑受影响测试；数据库、权限、跨模块或封板时再扩大验证；
@@ -25,7 +25,7 @@
 
 当前停止点：
 
-- `main/origin/main` 基线为 `51fc19e`；
+- 功能基线为 `51fc19e`，交接文档首次提交为 `b9157d4`，使用包含二者的最新 `main`；
 - migrations 已到 `0017_worker_execution_lease`，正式 PostgreSQL 16 已应用；
 - 已完成真实登录、销售/直属领导两层身份、个人模型设置与加密 Key、19 模型选择、真实 AI 草稿、人工确认、正式事实、原始表格、自动地图、铃铛/消息抽屉、领导通知、管理问询、周报、动作提醒、管理权限、AI 配置、作战规则、审计查询和 Worker 运维；
 - 最近完成 Worker 单实例执行租约、作战分析运行回执、跟进自动化处理凭证、审计 request ID 自动继承和 PostgreSQL pool 断线监听；
