@@ -6,6 +6,7 @@ import {
   type AiRuntimeConfigVersionPage,
   type AsyncWorkFailurePage,
   type AsyncWorkFailureRecord,
+  type AuditEntry,
   type AuditEntryListQuery,
   type AuditEntryPage,
   type CreateAiRuntimeConfigVersionRequest,
@@ -16,6 +17,7 @@ import {
   senseAudioTextModelIds,
   type WorkerOperationsHealth,
 } from "@battlefield/contracts";
+import Link from "next/link";
 import {
   type Dispatch,
   type FormEvent,
@@ -1104,19 +1106,37 @@ export function SystemManagementWorkspace({
                 {audits.items.length === 0 ? (
                   <p>当前筛选条件下暂无可见审计记录。</p>
                 ) : (
-                  audits.items.map((entry) => (
-                    <article key={entry.entryId}>
-                      <span>{entry.action}</span>
-                      <strong>{entry.actor.displayName}</strong>
-                      <p>
-                        {entry.aggregateType} · {entry.aggregateId.slice(0, 8)}
-                      </p>
-                      <time dateTime={entry.occurredAt}>
-                        {formatDateTime(entry.occurredAt)}
-                      </time>
-                      {entry.reason ? <em>{entry.reason}</em> : null}
-                    </article>
-                  ))
+                  audits.items.map((entry) => {
+                    const href = auditEntryHref(entry);
+                    return (
+                      <article key={entry.entryId}>
+                        <span>{entry.action}</span>
+                        <strong>{entry.actor.displayName}</strong>
+                        <p>
+                          {href ? (
+                            <Link
+                              className="audit-deep-link"
+                              href={href}
+                              aria-label={`打开对应记录 ${entry.aggregateType}`}
+                            >
+                              {entry.aggregateType} ·{" "}
+                              {entry.aggregateId.slice(0, 8)}
+                              <small>打开记录</small>
+                            </Link>
+                          ) : (
+                            <>
+                              {entry.aggregateType} ·{" "}
+                              {entry.aggregateId.slice(0, 8)}
+                            </>
+                          )}
+                        </p>
+                        <time dateTime={entry.occurredAt}>
+                          {formatDateTime(entry.occurredAt)}
+                        </time>
+                        {entry.reason ? <em>{entry.reason}</em> : null}
+                      </article>
+                    );
+                  })
                 )}
               </div>
               {audits.nextCursor ? (
@@ -1206,6 +1226,18 @@ function formatDateTime(value: string): string {
 
 function localDateTimeToIso(value: string): string {
   return new Date(value).toISOString();
+}
+
+function auditEntryHref(entry: AuditEntry): string | null {
+  const id = encodeURIComponent(entry.aggregateId);
+  return (
+    {
+      followup: `/followups/${id}`,
+      business_action: `/actions?actionId=${id}`,
+      business_entity: `/battle-map?entityId=${id}`,
+      battle_state_version: `/battle-map?stateVersion=${id}`,
+    }[entry.aggregateType] ?? null
+  );
 }
 
 function errorMessage(error: unknown): string {

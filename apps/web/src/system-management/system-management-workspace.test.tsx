@@ -295,6 +295,8 @@ describe("SystemManagementWorkspace", () => {
             ...firstAudit,
             entryId: "a2000000-0000-4000-8000-000000000001",
             action: "followup.viewed",
+            aggregateType: "followup",
+            aggregateId: "2c80878a-0000-4000-8000-000000000001",
           },
         ],
         nextCursor: null,
@@ -306,6 +308,12 @@ describe("SystemManagementWorkspace", () => {
     );
 
     expect(await screen.findByText("followup.viewed")).toBeVisible();
+    expect(
+      screen.getByRole("link", { name: "打开对应记录 followup" }),
+    ).toHaveAttribute(
+      "href",
+      "/followups/2c80878a-0000-4000-8000-000000000001",
+    );
     expect(managementApi.listAudits).toHaveBeenLastCalledWith({
       limit: 20,
       cursor: "older-page",

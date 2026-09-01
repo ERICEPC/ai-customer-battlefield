@@ -142,4 +142,5 @@
 - [x] Add desktop/mobile audit filters without exposing before/after business snapshots.
 - [x] Preserve current filters while loading older entries from the server cursor and while refreshing after a privileged mutation.
 - [x] Keep the audit section behind `audit.read`; other delegated operators do not call the audit endpoint.
+- [x] Add re-authorized business deep links only for aggregate types with truthful existing destinations: follow-up, formal action, business entity, and battle-state version.
 - [x] Verify the real leader page layout and run focused client/workspace tests plus Web typecheck.
