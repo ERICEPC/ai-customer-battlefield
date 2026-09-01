@@ -22,16 +22,16 @@
 
 ### Task 2: PostgreSQL rule repository and capability
 
-- [ ] Add `business_rules.manage` to the closed capability vocabulary and repair default leader grants for existing tenants.
-- [ ] Add immutable version/current release/release history tables, new-tenant seeding, forced RLS, constraints, fingerprints, and indexes.
-- [ ] Implement a transactional resolver/manager with advisory locking, deduplication, publish/rollback, audit, and strict persisted JSON validation.
-- [ ] Prove tenant isolation, authorization, immutability, release history, and runtime resolution with focused database tests.
+- [x] Add `business_rules.manage` to the closed capability vocabulary and repair default leader grants for existing tenants.
+- [x] Add immutable version/current release/release history tables, new-tenant seeding, forced RLS, constraints, fingerprints, and indexes.
+- [x] Implement a transactional resolver/manager with advisory locking, deduplication, publish/rollback, audit, and strict persisted JSON validation.
+- [x] Prove tenant isolation, authorization, immutability, release history, and runtime resolution with focused database tests.
 
 ### Task 3: Shared API and Worker runtime wiring
 
-- [ ] Inject the PostgreSQL resolver into API analysis and Worker follow-up automation.
-- [ ] Remove both hardcoded rule-version strings.
-- [ ] Prove the two entry points resolve and record the same tenant release.
+- [x] Inject the PostgreSQL resolver into API analysis and Worker follow-up automation.
+- [x] Remove both hardcoded rule-version strings.
+- [x] Prove the two entry points resolve and record the same tenant release.
 
 ### Task 4: Rule-management API and visible UI
 
@@ -42,7 +42,7 @@
 
 ### Task 5: Real cutover and handoff
 
-- [ ] Apply migrations to the real PostgreSQL 16 database and verify one default release per existing tenant.
+- [x] Apply migrations to the real PostgreSQL 16 database and verify one default release per existing tenant.
 - [ ] Run one real confirmed-follow-up automation and one manual analysis; verify matching receipts and visible map/list labels.
 - [ ] Run affected typechecks, focused tests, public-boundary/staged-diff checks.
 - [ ] Commit and push each safe vertical slice to `main`; update persistent progress files and publish visible acceptance steps.

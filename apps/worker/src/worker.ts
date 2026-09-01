@@ -3,7 +3,6 @@ import {
   CancelActionReminders,
   DeterministicBattleAnalyzer,
   DispatchDueReminders,
-  defaultBattleRuleSet,
   MaterializePublishedWeeklyReportNotification,
   type NotificationChannel,
   NotificationDelivery,
@@ -15,12 +14,12 @@ import {
   PublishedWeeklyReportNotFoundError,
   RequestBattleAnalysis,
   ScheduleActionReminders,
-  StaticBattleRuleResolver,
   type WorkerHeartbeatReporter,
 } from "@battlefield/core";
 import {
   type BattlefieldDatabase,
   KyselyBattleAnalysisStore,
+  KyselyBattleRuleStore,
   KyselyConfirmedFactSnapshotReader,
   KyselyNotificationStore,
   KyselyOutboxStore,
@@ -316,10 +315,7 @@ export function createReminderWorker(input: {
       store: new KyselyBattleAnalysisStore(input.database),
       idGenerator: { next: randomUUID },
       clock,
-      ruleResolver: new StaticBattleRuleResolver({
-        ruleVersion: "deterministic-battle-rules-v1",
-        rules: defaultBattleRuleSet,
-      }),
+      ruleResolver: new KyselyBattleRuleStore(input.database),
     }),
     notificationStore,
   });

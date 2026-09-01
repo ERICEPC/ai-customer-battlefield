@@ -34,6 +34,11 @@ export {
   type KyselyBattleQueryReaderOptions,
 } from "./battle-analysis/kysely-battle-query-reader.js";
 export {
+  decodeBattleRuleSet,
+  KyselyBattleRuleStore,
+  type KyselyBattleRuleStoreOptions,
+} from "./battle-rules/kysely-battle-rule-store.js";
+export {
   KyselyBusinessEntityReader,
   type KyselyBusinessEntityReaderOptions,
 } from "./business-entities/kysely-business-entity-reader.js";
@@ -56,6 +61,9 @@ export type {
   AsyncWorkReplayHistoryTable,
   AuditEntryTable,
   BattlefieldDatabase,
+  BattleRuleReleaseHistoryTable,
+  BattleRuleReleaseTable,
+  BattleRuleVersionTable,
   BattleStateCurrentTable,
   BattleStateEvidenceLinkTable,
   BattleStateVersionTable,

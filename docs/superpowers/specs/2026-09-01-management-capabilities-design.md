@@ -7,9 +7,9 @@ Replace fixed `department_leader` checks for governance functions with tenant-sc
 ## Decisions
 
 - A **management capability** grants entry to one governance function. It never grants visibility into customer evidence by itself.
-- V1 capability codes are `management_query.execute`, `audit.read`, `ai_runtime_config.manage`, `worker_operations.manage`, and `access_control.manage`.
+- Current capability codes are `management_query.execute`, `audit.read`, `ai_runtime_config.manage`, `business_rules.manage`, `worker_operations.manage`, and `access_control.manage`.
 - `app.management_capabilities` is the fixed catalog. `app.role_capability_grants` is the tenant-owned current grant projection keyed by tenant, role, and capability.
-- Existing and newly provisioned tenants receive all five capabilities for `department_leader`; `sales` receives none. This preserves current browser behavior.
+- Existing and newly provisioned tenants receive all six capabilities for `department_leader`; `sales` receives none. This preserves current browser behavior while making battle-rule publishing independently delegable.
 - Existing-tenant repair enumerates active tenants through `app_auth.tenant_login_directory`. It temporarily removes `FORCE RLS` only from the newly owned grant table inside the migration transaction, inserts defaults idempotently, and restores `FORCE RLS` before commit.
 - Session resolution reads current grants on every authenticated request, so revocation does not wait for cookie expiry.
 - Nest controllers declare capabilities through `RequireCapabilities`. The guard uses the resolved session, never client headers. Test-only actor headers keep their existing isolated bypass.

@@ -46,10 +46,88 @@ export interface BattleRuleResolver {
   resolve(input: { actor: ActorScope }): Promise<ResolvedBattleRule>;
 }
 
+export interface BattleRuleVersionRecord {
+  versionId: string;
+  versionNo: string;
+  name: string;
+  rules: BattleRuleSet;
+  contentFingerprint: string;
+  createdBy: string | null;
+  createdAt: string;
+}
+
+export interface BattleRuleVersionPage {
+  items: BattleRuleVersionRecord[];
+  currentVersionId: string;
+  currentReleaseNo: string;
+  nextCursor: string | null;
+}
+
+export interface ReleasedBattleRule extends ResolvedBattleRule {
+  versionId: string;
+  versionNo: string;
+  releaseNo: string;
+  name: string;
+  releasedAt: string;
+}
+
+export interface BattleRuleManager {
+  listVersions(input: {
+    actor: ActorScope;
+    limit: number;
+    cursor?: string;
+  }): Promise<BattleRuleVersionPage>;
+  createVersion(input: {
+    actor: ActorScope;
+    name: string;
+    rules: BattleRuleSet;
+  }): Promise<BattleRuleVersionRecord>;
+  releaseVersion(input: {
+    actor: ActorScope;
+    versionId: string;
+    reason: string;
+  }): Promise<ReleasedBattleRule>;
+}
+
 export class InvalidBattleRuleSetError extends Error {
   constructor() {
     super("Battle rule set is invalid.");
     this.name = "InvalidBattleRuleSetError";
+  }
+}
+
+export class BattleRuleAccessDeniedError extends Error {
+  constructor() {
+    super("Current actor cannot manage tenant battle rules.");
+    this.name = "BattleRuleAccessDeniedError";
+  }
+}
+
+export class BattleRuleVersionNotFoundError extends Error {
+  constructor() {
+    super("Battle rule version was not found.");
+    this.name = "BattleRuleVersionNotFoundError";
+  }
+}
+
+export class BattleRuleReleaseNotFoundError extends Error {
+  constructor() {
+    super("No released battle rule is available for the tenant.");
+    this.name = "BattleRuleReleaseNotFoundError";
+  }
+}
+
+export class InvalidBattleRuleManagementInputError extends Error {
+  constructor() {
+    super("Battle rule management input is invalid.");
+    this.name = "InvalidBattleRuleManagementInputError";
+  }
+}
+
+export class InvalidBattleRuleCursorError extends Error {
+  constructor(options?: ErrorOptions) {
+    super("Battle rule cursor is invalid.", options);
+    this.name = "InvalidBattleRuleCursorError";
   }
 }
 

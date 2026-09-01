@@ -36,6 +36,7 @@ describe("authentication contracts", () => {
         "access_control.manage",
         "ai_runtime_config.manage",
         "audit.read",
+        "business_rules.manage",
         "management_query.execute",
         "worker_operations.manage",
       ],
@@ -48,7 +49,7 @@ describe("authentication contracts", () => {
     expect(profile.teamMembers.map((member) => member.displayName)).toEqual([
       "销售1",
     ]);
-    expect(profile.capabilities).toHaveLength(5);
+    expect(profile.capabilities).toHaveLength(6);
   });
 
   it("rejects roles outside the first two-level identity model", () => {

@@ -174,6 +174,35 @@ export interface AiRuntimeConfigReleaseHistoryTable {
   reason: NullableText;
 }
 
+export interface BattleRuleVersionTable {
+  tenant_id: string;
+  id: Generated<string>;
+  version_no: VersionNumber;
+  name: string;
+  rules: JsonObject;
+  content_fingerprint: string;
+  created_by: string | null;
+  created_at: Timestamp;
+}
+
+export interface BattleRuleReleaseTable {
+  tenant_id: string;
+  version_id: string;
+  release_no: VersionNumber;
+  released_by: string | null;
+  released_at: Timestamp;
+}
+
+export interface BattleRuleReleaseHistoryTable {
+  tenant_id: string;
+  id: Generated<string>;
+  release_no: VersionNumber;
+  version_id: string;
+  released_by: string | null;
+  released_at: Timestamp;
+  reason: string;
+}
+
 export interface WorkerHeartbeatTable {
   tenant_id: string;
   worker_key: string;
@@ -875,6 +904,9 @@ export interface BattlefieldDatabase {
   "app.ai_runtime_config_versions": AiRuntimeConfigVersionTable;
   "app.ai_runtime_config_releases": AiRuntimeConfigReleaseTable;
   "app.ai_runtime_config_release_history": AiRuntimeConfigReleaseHistoryTable;
+  "app.battle_rule_versions": BattleRuleVersionTable;
+  "app.battle_rule_releases": BattleRuleReleaseTable;
+  "app.battle_rule_release_history": BattleRuleReleaseHistoryTable;
   "app.worker_heartbeats": WorkerHeartbeatTable;
   "app.async_work_replay_history": AsyncWorkReplayHistoryTable;
   "app.channel_addresses": ChannelAddressTable;

@@ -14,6 +14,7 @@ import {
 import {
   KyselyBattleAnalysisStore,
   KyselyBattleQueryReader,
+  KyselyBattleRuleStore,
   KyselyConfirmedFactSnapshotReader,
 } from "@battlefield/database";
 import { type Provider, ServiceUnavailableException } from "@nestjs/common";
@@ -92,11 +93,14 @@ export const battleAnalysisProviders: Provider[] = [
   },
   {
     provide: BATTLE_RULE_RESOLVER,
-    useFactory: (): BattleRuleResolver =>
-      new StaticBattleRuleResolver({
-        ruleVersion: "deterministic-battle-rules-v1",
-        rules: defaultBattleRuleSet,
-      }),
+    inject: [DATABASE_HANDLE],
+    useFactory: (database: ApplicationDatabaseHandle): BattleRuleResolver =>
+      database
+        ? new KyselyBattleRuleStore(database.db)
+        : new StaticBattleRuleResolver({
+            ruleVersion: "deterministic-battle-rules-v1",
+            rules: defaultBattleRuleSet,
+          }),
   },
   {
     provide: REQUEST_BATTLE_ANALYSIS,

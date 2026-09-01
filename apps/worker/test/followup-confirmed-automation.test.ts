@@ -111,6 +111,20 @@ describe("confirmed follow-up automation", () => {
       versionNo: 1,
       summary: "已基于 2 条正式事实生成可回放的确定性分析。",
     });
+    const analysisRun = await withTenantTransaction(
+      database.db,
+      { ...actor, requestId: "90000000-0000-4000-8000-000000000095" },
+      (transaction) =>
+        transaction
+          .selectFrom("app.analysis_runs")
+          .select(["rule_version", "analyzer_config_version"])
+          .where("entity_id", "=", SYNTHETIC_ENTITY_ID)
+          .executeTakeFirstOrThrow(),
+    );
+    expect(analysisRun).toEqual({
+      rule_version: "battle-rules-v1-r1",
+      analyzer_config_version: "deterministic-v1",
+    });
 
     const leaderInbox = await new KyselyNotificationStore(
       database.db,
