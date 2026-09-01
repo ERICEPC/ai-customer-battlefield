@@ -17,6 +17,7 @@ const validItem = {
     id: "20000000-0000-4000-8000-000000000001",
     name: "年度平台项目",
     stageCode: "proposal",
+    stageLabel: "方案与报价",
     stageProgress: "30.00",
   },
   latestFollowup: {

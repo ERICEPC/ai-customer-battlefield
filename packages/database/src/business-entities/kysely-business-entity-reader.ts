@@ -24,6 +24,7 @@ interface DirectoryRow {
   opportunity_id: string | null;
   opportunity_name: string | null;
   stage_code: string | null;
+  stage_label: string | null;
   stage_progress: number | string | null;
   latest_followup_id: string | null;
   latest_followup_summary: string | null;
@@ -98,6 +99,18 @@ export class KyselyBusinessEntityReader implements BusinessEntityReader {
               primary_opportunity.id::text as opportunity_id,
               primary_opportunity.name as opportunity_name,
               primary_opportunity.stage_code,
+              coalesce(
+                (
+                  select rule_version.rules -> 'stageLabels' ->> primary_opportunity.stage_code
+                  from app.battle_rule_releases as rule_release
+                  inner join app.battle_rule_versions as rule_version
+                    on rule_version.tenant_id = rule_release.tenant_id
+                    and rule_version.id = rule_release.version_id
+                  where rule_release.tenant_id = entity.tenant_id
+                  limit 1
+                ),
+                primary_opportunity.stage_code
+              ) as stage_label,
               primary_opportunity.stage_progress,
               latest_followup.id::text as latest_followup_id,
               latest_followup.summary as latest_followup_summary,
@@ -195,11 +208,13 @@ function mapDirectoryRow(row: DirectoryRow): BusinessEntityListItem {
     row.opportunity_id &&
     row.opportunity_name &&
     row.stage_code &&
+    row.stage_label &&
     row.stage_progress !== null
       ? {
           id: row.opportunity_id,
           name: row.opportunity_name,
           stageCode: row.stage_code,
+          stageLabel: row.stage_label,
           stageProgress: String(row.stage_progress),
         }
       : null;

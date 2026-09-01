@@ -22,6 +22,7 @@ const primaryOpportunitySchema = z.strictObject({
   id: z.uuid(),
   name: z.string().trim().min(1).max(500),
   stageCode: z.string().trim().min(1).max(100),
+  stageLabel: z.string().trim().min(1).max(200),
   stageProgress: stageProgressSchema,
 });
 

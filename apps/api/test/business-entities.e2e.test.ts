@@ -83,6 +83,7 @@ describe("business entity directory API", () => {
       primaryOpportunity: {
         name: "alpha-primary-opportunity",
         stageCode: "proposal",
+        stageLabel: "方案与报价",
         stageProgress: "30.00",
       },
     });

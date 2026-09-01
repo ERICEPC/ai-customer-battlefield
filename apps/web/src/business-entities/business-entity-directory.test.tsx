@@ -64,7 +64,7 @@ describe("BusinessEntityDirectory", () => {
     const auroraRow = await findEntityRow(aurora.id);
     expect(within(auroraRow).getByText("销售甲")).toBeVisible();
     expect(within(auroraRow).getByText("年度平台项目")).toBeVisible();
-    expect(within(auroraRow).getByText("proposal · 30.00%")).toBeVisible();
+    expect(within(auroraRow).getByText("方案与报价 · 30.00%")).toBeVisible();
     expect(within(auroraRow).getByText("T0")).toBeVisible();
     expect(
       within(auroraRow).getByRole("link", {
@@ -216,6 +216,7 @@ function createItem(input: {
           id: input.id.replace(/^1/, "2"),
           name: input.opportunity,
           stageCode: "proposal",
+          stageLabel: "方案与报价",
           stageProgress: "30.00",
         }
       : null,

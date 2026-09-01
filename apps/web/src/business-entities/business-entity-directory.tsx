@@ -230,7 +230,7 @@ function BusinessEntityRow({ item }: { item: BusinessEntityListItem }) {
       <td data-label="阶段">
         {item.primaryOpportunity ? (
           <span className="stage-pill">
-            {item.primaryOpportunity.stageCode} ·{" "}
+            {item.primaryOpportunity.stageLabel} ·{" "}
             {item.primaryOpportunity.stageProgress}%
           </span>
         ) : (
