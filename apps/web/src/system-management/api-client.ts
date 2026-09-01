@@ -18,14 +18,24 @@ import {
   auditEntryListQuerySchema,
   auditEntryPageSchema,
   auditLogApiErrorSchema,
+  type BattleRuleVersion,
+  type BattleRuleVersionPage,
+  battleRuleApiErrorSchema,
+  battleRuleVersionPageSchema,
+  battleRuleVersionSchema,
   type CreateAiRuntimeConfigVersionRequest,
+  type CreateBattleRuleVersionRequest,
   createAiRuntimeConfigVersionRequestSchema,
+  createBattleRuleVersionRequestSchema,
   idempotencyKeySchema,
   type ManagementCapability,
   type ReleasedAiRuntimeConfig,
+  type ReleasedBattleRule,
   type RoleCapabilityUpdate,
   releaseAiRuntimeConfigVersionRequestSchema,
+  releaseBattleRuleVersionRequestSchema,
   releasedAiRuntimeConfigSchema,
+  releasedBattleRuleSchema,
   replaceRoleCapabilitiesRequestSchema,
   replayAsyncWorkItemRequestSchema,
   roleCapabilityUpdateSchema,
@@ -88,6 +98,38 @@ export function releaseAiRuntimeConfigVersion(
       body: JSON.stringify(body),
     },
   );
+}
+
+export function listBattleRuleVersions(): Promise<BattleRuleVersionPage> {
+  return request(
+    "/battle-rules/versions?limit=100",
+    battleRuleVersionPageSchema,
+  );
+}
+
+export function createBattleRuleVersion(
+  input: CreateBattleRuleVersionRequest,
+): Promise<BattleRuleVersion> {
+  return request("/battle-rules/versions", battleRuleVersionSchema, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(createBattleRuleVersionRequestSchema.parse(input)),
+  });
+}
+
+export function releaseBattleRuleVersion(
+  versionId: string,
+  reason: string,
+): Promise<ReleasedBattleRule> {
+  const body = releaseBattleRuleVersionRequestSchema.parse({
+    versionId,
+    reason,
+  });
+  return request("/battle-rules/releases", releasedBattleRuleSchema, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(body),
+  });
 }
 
 export function getWorkerOperationsHealth(): Promise<WorkerOperationsHealth> {
@@ -201,6 +243,7 @@ function decodeError(
   for (const schema of [
     accessControlApiErrorSchema,
     aiRuntimeConfigApiErrorSchema,
+    battleRuleApiErrorSchema,
     workerOperationsApiErrorSchema,
     auditLogApiErrorSchema,
   ]) {

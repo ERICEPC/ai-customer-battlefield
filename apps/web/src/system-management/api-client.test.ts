@@ -2,15 +2,20 @@ import type {
   AccessControlSnapshot,
   AiRuntimeConfigVersionPage,
   AsyncWorkReplayResponse,
+  BattleRuleSet,
+  BattleRuleVersionPage,
 } from "@battlefield/contracts";
 import { afterEach, describe, expect, test, vi } from "vitest";
 
 import {
   createAiRuntimeConfigVersion,
+  createBattleRuleVersion,
   getAccessControlSnapshot,
   listAiRuntimeConfigVersions,
+  listBattleRuleVersions,
   listRecentAuditEntries,
   releaseAiRuntimeConfigVersion,
+  releaseBattleRuleVersion,
   replaceRoleCapabilities,
   replayAsyncWorkItem,
   SystemManagementApiError,
@@ -39,6 +44,29 @@ const accessControl: AccessControlSnapshot = {
       capabilities: [],
     },
   ],
+};
+const battleRules: BattleRuleSet = {
+  minimumFactCount: 1,
+  relationshipScore: { base: 60, perFact: 5, maximum: 90 },
+  potentialScore: { base: 70, perFact: 5, maximum: 95 },
+  insufficientResult: {
+    riskLevel: "medium",
+    dataGap: "缺少正式事实",
+    summary: "事实不足。",
+  },
+  sufficientResult: {
+    quadrantCode: "high_relationship_high_potential",
+    riskLevel: "low",
+    signalDimension: "potential",
+    signalStrength: 70,
+    summaryTemplate: "已基于 {factCount} 条事实生成分析。",
+  },
+  actionProposal: {
+    title: "确认下一步动作",
+    description: "与客户确认负责人和时间。",
+    priority: "high",
+  },
+  stageLabels: { solution_validation: "方案验证" },
 };
 
 afterEach(() => vi.unstubAllGlobals());
@@ -127,6 +155,59 @@ describe("system-management API client", () => {
         credentials: "include",
         headers: expect.objectContaining({
           "Idempotency-Key": "worker-replay-1",
+        }),
+      }),
+    );
+  });
+
+  test("uses strict battle-rule version and release endpoints", async () => {
+    const page: BattleRuleVersionPage = {
+      items: [],
+      currentVersionId: VERSION_ID,
+      currentReleaseNo: "1",
+      nextCursor: null,
+    };
+    const version = {
+      versionId: VERSION_ID,
+      versionNo: "2",
+      name: "重点客户规则",
+      rules: battleRules,
+      contentFingerprint: "b".repeat(64),
+      createdBy: null,
+      createdAt: "2026-09-01T07:00:00.000Z",
+    };
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(response(page))
+      .mockResolvedValueOnce(response(version))
+      .mockResolvedValueOnce(
+        response({
+          versionId: VERSION_ID,
+          versionNo: "2",
+          releaseNo: "2",
+          ruleVersion: "battle-rules-v2-r2",
+          name: version.name,
+          rules: battleRules,
+          releasedAt: "2026-09-01T07:10:00.000Z",
+        }),
+      );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await listBattleRuleVersions();
+    await createBattleRuleVersion({ name: version.name, rules: battleRules });
+    await releaseBattleRuleVersion(VERSION_ID, "业务规则已验收");
+
+    expect(fetchMock.mock.calls.map((call) => call[0])).toEqual([
+      "http://localhost:3001/api/v1/battle-rules/versions?limit=100",
+      "http://localhost:3001/api/v1/battle-rules/versions",
+      "http://localhost:3001/api/v1/battle-rules/releases",
+    ]);
+    expect(fetchMock.mock.calls[2]?.[1]).toEqual(
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({
+          versionId: VERSION_ID,
+          reason: "业务规则已验收",
         }),
       }),
     );

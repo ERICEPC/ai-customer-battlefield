@@ -4,6 +4,7 @@ import { AiRuntimeConfigModule } from "./ai-runtime-config/ai-runtime-config.mod
 import { AuditLogModule } from "./audit-log/audit-log.module.js";
 import { AuthModule } from "./auth/auth.module.js";
 import { BattleAnalysisModule } from "./battle-analysis/battle-analysis.module.js";
+import { BattleRulesModule } from "./battle-rules/battle-rules.module.js";
 import { BusinessActionsModule } from "./business-actions/business-actions.module.js";
 import { BusinessEntitiesModule } from "./business-entities/business-entities.module.js";
 import { FollowupDraftsModule } from "./followup-drafts/followup-drafts.module.js";
@@ -24,6 +25,7 @@ import { WorkspaceModule } from "./workspace/workspace.module.js";
     BusinessEntitiesModule,
     FollowupDraftsModule,
     BattleAnalysisModule,
+    BattleRulesModule,
     BusinessActionsModule,
     NotificationsModule,
     UserAiSettingsModule,

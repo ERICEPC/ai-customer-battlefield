@@ -40,6 +40,7 @@ import {
   replaceRoleCapabilities,
   replayAsyncWorkItem,
 } from "./api-client";
+import { BattleRuleManagementSection } from "./battle-rule-management-section";
 
 export interface SystemManagementWorkspaceApi {
   getAccessControl(): Promise<AccessControlSnapshot>;
@@ -113,6 +114,8 @@ export function SystemManagementWorkspace({
     sessionCapabilities?.includes("access_control.manage") ?? true;
   const canManageRuntime =
     sessionCapabilities?.includes("ai_runtime_config.manage") ?? true;
+  const canManageBattleRules =
+    sessionCapabilities?.includes("business_rules.manage") ?? false;
   const canReadAudits = sessionCapabilities?.includes("audit.read") ?? true;
   const canManageWorker =
     sessionCapabilities?.includes("worker_operations.manage") ?? true;
@@ -553,7 +556,7 @@ export function SystemManagementWorkspace({
         <div>
           <p className="eyebrow">SYSTEM MANAGEMENT</p>
           <h1>系统管理</h1>
-          <p>管理 Agent 运行版本，查看异步链路健康，并追溯关键操作。</p>
+          <p>管理 Agent 与作战规则版本，查看异步链路健康，并追溯关键操作。</p>
         </div>
         {canManageWorker ? (
           health ? (
@@ -901,6 +904,8 @@ export function SystemManagementWorkspace({
           )}
         </section>
       ) : null}
+
+      {canManageBattleRules ? <BattleRuleManagementSection /> : null}
 
       {canManageWorker ? (
         <section className="admin-section" aria-labelledby="worker-title">

@@ -88,6 +88,24 @@ export {
   battleStateRecordSchema,
 } from "./battle-analysis.js";
 export {
+  type BattleRuleApiError,
+  type BattleRuleSet,
+  type BattleRuleVersion,
+  type BattleRuleVersionPage,
+  battleRuleApiErrorSchema,
+  battleRuleSetSchema,
+  battleRuleVersionListQuerySchema,
+  battleRuleVersionPageSchema,
+  battleRuleVersionSchema,
+  battleScoreRuleSchema,
+  type CreateBattleRuleVersionRequest,
+  createBattleRuleVersionRequestSchema,
+  type ReleaseBattleRuleVersionRequest,
+  type ReleasedBattleRule,
+  releaseBattleRuleVersionRequestSchema,
+  releasedBattleRuleSchema,
+} from "./battle-rules.js";
+export {
   type AcceptActionProposalRequest,
   type ActionDecisionResponse,
   type ActionOwnerListQuery,

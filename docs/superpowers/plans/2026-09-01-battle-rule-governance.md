@@ -35,8 +35,8 @@
 
 ### Task 4: Rule-management API and visible UI
 
-- [ ] Add strict contracts and capability-protected list/create/release endpoints.
-- [ ] Add the independently loaded “作战规则” card with current release, bounded editor, version list, mandatory reason, publish, and rollback.
+- [x] Add strict contracts and capability-protected list/create/release endpoints.
+- [x] Add the independently loaded “作战规则” card with current release, bounded editor, version list, mandatory reason, publish, and rollback.
 - [ ] Serve and display stage labels from the released rule projection.
 - [ ] Verify the real leader browser experience and permission-limited account behavior.
 

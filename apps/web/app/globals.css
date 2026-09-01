@@ -6705,6 +6705,113 @@ section.workspace-attention a:hover {
   background: rgba(12, 33, 62, 0.05);
 }
 
+.battle-rule-release-summary {
+  display: flex;
+  gap: 20px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 15px 17px;
+  color: #234f91;
+  border: 1px solid #bfd2f8;
+  border-radius: 13px;
+  background: #f2f7ff;
+}
+
+.battle-rule-release-summary div,
+.battle-rule-release-summary span,
+.battle-rule-release-summary strong {
+  display: block;
+}
+
+.battle-rule-release-summary span {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+}
+
+.battle-rule-release-summary strong {
+  margin-top: 4px;
+  font-size: 21px;
+}
+
+.battle-rule-release-summary p {
+  max-width: 620px;
+  margin: 0;
+  color: #486487;
+  font-size: 12px;
+  line-height: 1.6;
+  text-align: right;
+}
+
+.battle-rule-version-grid .runtime-version > p {
+  font-family: inherit;
+  line-height: 1.6;
+}
+
+.battle-rule-stage-list {
+  display: grid;
+  gap: 6px;
+  margin-top: 12px;
+}
+
+.battle-rule-stage-list p {
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+  margin: 0;
+  padding: 7px 9px;
+  border-radius: 8px;
+  background: rgba(12, 33, 62, 0.04);
+}
+
+.battle-rule-stage-list code {
+  color: #667085;
+  font-size: 10px;
+  overflow-wrap: anywhere;
+}
+
+.battle-rule-stage-list span {
+  color: #25344d;
+  font-size: 11px;
+  font-weight: 750;
+  white-space: nowrap;
+}
+
+.battle-rule-action-copy {
+  display: grid;
+  gap: 5px;
+  margin: 12px 0 0;
+  color: #536078;
+  font-size: 11px;
+  line-height: 1.6;
+}
+
+.battle-rule-action-copy strong {
+  color: #25344d;
+}
+
+.battle-rule-form-grid {
+  grid-template-columns: minmax(260px, 0.65fr) minmax(420px, 1.35fr);
+}
+
+.battle-score-editor {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  min-width: 0;
+  margin: 0;
+  padding: 14px;
+  border: 1px solid #dfe5ee;
+  border-radius: 12px;
+}
+
+.battle-score-editor legend {
+  padding: 0 6px;
+  color: #344054;
+  font-size: 12px;
+  font-weight: 800;
+}
+
 .admin-form-grid {
   display: grid;
   grid-template-columns: minmax(260px, 0.75fr) minmax(340px, 1.25fr);
@@ -7071,11 +7178,21 @@ section.workspace-attention a:hover {
     flex-direction: column;
   }
 
+  .battle-rule-release-summary {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .battle-rule-release-summary p {
+    text-align: left;
+  }
+
   .access-scope-note p {
     text-align: left;
   }
 
   .runtime-version-grid,
+  .battle-score-editor,
   .admin-parameter-grid,
   .failure-list dl,
   .failure-replay,
