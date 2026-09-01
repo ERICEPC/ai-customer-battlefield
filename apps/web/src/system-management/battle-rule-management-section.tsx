@@ -214,7 +214,7 @@ export function BattleRuleManagementSection({
         <>
           <div className="battle-rule-release-summary">
             <div>
-              <span>当前运行回执</span>
+              <span>当前发布</span>
               <strong>
                 V{currentVersion?.versionNo ?? "-"} / R{page.currentReleaseNo}
               </strong>

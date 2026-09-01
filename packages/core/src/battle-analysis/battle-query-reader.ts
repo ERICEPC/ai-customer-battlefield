@@ -20,6 +20,11 @@ export interface BattleStateRecord {
   dataGaps: string[];
   summary: string;
   analysisRunId: string;
+  analysisReceipt: {
+    trigger: "followup_confirmed" | "manual";
+    ruleVersion: string;
+    analyzerConfigVersion: string;
+  };
   effectiveAt: string;
   evidenceFactIds: string[];
 }

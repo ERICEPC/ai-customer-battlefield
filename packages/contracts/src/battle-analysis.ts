@@ -150,6 +150,11 @@ export const battleStateRecordSchema = z
     dataGaps: z.array(z.string().trim().min(1).max(500)).max(100),
     summary: z.string().trim().min(1).max(5_000),
     analysisRunId: z.uuid(),
+    analysisReceipt: z.strictObject({
+      trigger: z.enum(["followup_confirmed", "manual"]),
+      ruleVersion: z.string().trim().min(1).max(200),
+      analyzerConfigVersion: z.string().trim().min(1).max(200),
+    }),
     effectiveAt: z.iso.datetime(),
     evidenceFactIds: z.array(z.uuid()).max(500),
   })

@@ -28,6 +28,9 @@ interface StateRow {
   data_gaps: unknown;
   summary: string;
   analysis_run_id: string;
+  trigger_event_id: string | null;
+  rule_version: string | null;
+  analyzer_config_version: string | null;
   effective_at: Date | string;
 }
 
@@ -105,8 +108,15 @@ export class KyselyBattleQueryReader implements BattleQueryReader {
             state.data_gaps,
             state.summary,
             state.analysis_run_id::text as analysis_run_id,
+            run.trigger_event_id::text as trigger_event_id,
+            run.rule_version,
+            run.analyzer_config_version,
             state.effective_at
           from app.battle_state_versions as state
+          inner join app.analysis_runs as run
+            on run.tenant_id = state.tenant_id
+            and run.id = state.analysis_run_id
+            and run.entity_id = state.entity_id
           where state.tenant_id = ${input.actor.tenantId}::uuid
             and state.entity_id = ${input.entityId}::uuid
           ${versionFilter}
@@ -240,6 +250,9 @@ export class KyselyBattleQueryReader implements BattleQueryReader {
             state.data_gaps,
             state.summary,
             state.analysis_run_id::text as analysis_run_id,
+            run.trigger_event_id::text as trigger_event_id,
+            run.rule_version,
+            run.analyzer_config_version,
             state.effective_at,
             coalesce(evidence.fact_ids, '[]'::jsonb) as evidence_fact_ids
           from app.business_entities as entity
@@ -270,6 +283,10 @@ export class KyselyBattleQueryReader implements BattleQueryReader {
           left join app.battle_state_versions as state
             on state.tenant_id = current_state.tenant_id
             and state.id = current_state.battle_state_version_id
+          left join app.analysis_runs as run
+            on run.tenant_id = state.tenant_id
+            and run.id = state.analysis_run_id
+            and run.entity_id = state.entity_id
           left join lateral (
             select jsonb_agg(link.fact_id::text order by link.fact_id) as fact_ids
             from app.battle_state_evidence_links as link
@@ -353,6 +370,9 @@ function entityVisibilityFilter(actor: ActorScope) {
 }
 
 function mapState(row: StateRow, evidenceFactIds: string[]): BattleStateRecord {
+  if (!row.rule_version || !row.analyzer_config_version) {
+    throw new Error("Battle analysis receipt is missing.");
+  }
   return {
     battleStateVersionId: row.state_id,
     entityId: row.entity_id,
@@ -369,6 +389,11 @@ function mapState(row: StateRow, evidenceFactIds: string[]): BattleStateRecord {
     dataGaps: decodeStringArray(row.data_gaps),
     summary: row.summary,
     analysisRunId: row.analysis_run_id,
+    analysisReceipt: {
+      trigger: row.trigger_event_id === null ? "manual" : "followup_confirmed",
+      ruleVersion: row.rule_version,
+      analyzerConfigVersion: row.analyzer_config_version,
+    },
     effectiveAt: toIsoString(row.effective_at),
     evidenceFactIds,
   };

@@ -3,6 +3,7 @@ import { FollowupNotFoundError } from "@battlefield/core";
 import {
   type BattlefieldDatabase,
   type DatabaseHandle,
+  KyselyBattleQueryReader,
   KyselyFollowupConfirmationStore,
   KyselyNotificationStore,
   migrateDatabase,
@@ -124,6 +125,14 @@ describe("confirmed follow-up automation", () => {
     expect(analysisRun).toEqual({
       rule_version: "battle-rules-v1-r1",
       analyzer_config_version: "deterministic-v1",
+    });
+    const visibleState = await new KyselyBattleQueryReader(
+      database.db,
+    ).getCurrent({ actor, entityId: SYNTHETIC_ENTITY_ID });
+    expect(visibleState.state.analysisReceipt).toEqual({
+      trigger: "followup_confirmed",
+      ruleVersion: "battle-rules-v1-r1",
+      analyzerConfigVersion: "deterministic-v1",
     });
 
     const leaderInbox = await new KyselyNotificationStore(

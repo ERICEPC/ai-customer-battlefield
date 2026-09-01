@@ -162,6 +162,11 @@ describe("battle analysis contracts", () => {
       dataGaps: [],
       summary: "关系稳定，潜力较高。",
       analysisRunId: runId,
+      analysisReceipt: {
+        trigger: "manual",
+        ruleVersion: "battle-rules-v1-r1",
+        analyzerConfigVersion: "deterministic-v1",
+      },
       effectiveAt: "2026-08-31T03:00:02.000Z",
       evidenceFactIds: [factId],
     };
@@ -220,6 +225,11 @@ describe("battle analysis contracts", () => {
           dataGaps: [],
           summary: "关系稳定，潜力较高。",
           analysisRunId: runId,
+          analysisReceipt: {
+            trigger: "followup_confirmed",
+            ruleVersion: "battle-rules-v1-r1",
+            analyzerConfigVersion: "deterministic-v1",
+          },
           effectiveAt: "2026-08-31T03:00:02.000Z",
           evidenceFactIds: [factId],
         },

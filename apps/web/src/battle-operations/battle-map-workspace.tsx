@@ -546,6 +546,31 @@ function BattleExplanation({
               <dd>{formatDateTime(state.effectiveAt)}</dd>
             </div>
           </dl>
+          <div className="evidence-block analysis-receipt-block">
+            <h3>运行回执</h3>
+            <dl className="score-grid">
+              <div>
+                <dt>触发方式</dt>
+                <dd>
+                  {state.analysisReceipt.trigger === "followup_confirmed"
+                    ? "跟进确认后自动分析"
+                    : "手动重新分析"}
+                </dd>
+              </div>
+              <div>
+                <dt>作战规则</dt>
+                <dd>{state.analysisReceipt.ruleVersion}</dd>
+              </div>
+              <div>
+                <dt>分析器</dt>
+                <dd>{state.analysisReceipt.analyzerConfigVersion}</dd>
+              </div>
+              <div>
+                <dt>运行编号</dt>
+                <dd>{state.analysisRunId}</dd>
+              </div>
+            </dl>
+          </div>
           {state.dataGaps.length ? (
             <div className="evidence-block data-gaps-block">
               <h3>数据缺口</h3>

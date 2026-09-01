@@ -278,6 +278,11 @@ describe("Kysely action decision persistence", () => {
       actor,
       entityId: SYNTHETIC_ENTITY_ID,
     });
+    expect(current.state.analysisReceipt).toEqual({
+      trigger: "manual",
+      ruleVersion: "battle-rules-v1",
+      analyzerConfigVersion: "deterministic-v1",
+    });
 
     await expect(
       battleReader.getVersion({

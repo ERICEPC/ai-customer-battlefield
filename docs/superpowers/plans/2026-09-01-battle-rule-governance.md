@@ -43,6 +43,6 @@
 ### Task 5: Real cutover and handoff
 
 - [x] Apply migrations to the real PostgreSQL 16 database and verify one default release per existing tenant.
-- [ ] Run one real confirmed-follow-up automation and one manual analysis; verify matching receipts and visible map/list labels.
+- [x] Run one real confirmed-follow-up automation and one manual analysis; verify matching receipts and visible map/list labels.
 - [ ] Run affected typechecks, focused tests, public-boundary/staged-diff checks.
 - [ ] Commit and push each safe vertical slice to `main`; update persistent progress files and publish visible acceptance steps.

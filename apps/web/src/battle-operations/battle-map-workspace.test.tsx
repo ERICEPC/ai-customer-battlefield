@@ -40,6 +40,11 @@ const mappedState = {
   dataGaps: [],
   summary: "预算已确认，关系与潜力均较强。",
   analysisRunId: "a0000000-0000-4000-8000-000000000001",
+  analysisReceipt: {
+    trigger: "followup_confirmed",
+    ruleVersion: "battle-rules-v1-r1",
+    analyzerConfigVersion: "deterministic-v1",
+  },
   effectiveAt: "2026-08-31T05:00:00.000Z",
   evidenceFactIds: [factId],
 } satisfies BattleStateRecord;
@@ -119,6 +124,12 @@ describe("BattleMapWorkspace", () => {
     ).toBeGreaterThan(1);
     expect(screen.getByRole("heading", { name: "T0 战略对象" })).toBeVisible();
     expect(screen.getByText("预算已确认，关系与潜力均较强。")).toBeVisible();
+    expect(screen.getByText("跟进确认后自动分析")).toBeVisible();
+    expect(screen.getByText("battle-rules-v1-r1")).toBeVisible();
+    expect(screen.getByText("deterministic-v1")).toBeVisible();
+    expect(
+      screen.getByText("a0000000-0000-4000-8000-000000000001"),
+    ).toBeVisible();
     expect(await screen.findByText("预算已确认")).toBeVisible();
     expect(await screen.findByText("已确认预算。")).toBeVisible();
 
