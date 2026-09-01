@@ -20,12 +20,17 @@ function createDatabaseFromEnvironment(): ApplicationDatabaseHandle {
   if (databaseUrl) {
     return createPostgresDatabase<BattlefieldDatabase>(databaseUrl, {
       applicationName: "ai-customer-battlefield-api",
+      onPoolError: reportPoolError,
     });
   }
   if (process.env.NODE_ENV === "production") {
     throw new Error("DATABASE_URL is required in production.");
   }
   return null;
+}
+
+function reportPoolError(error: Error): void {
+  console.error(`[database] PostgreSQL idle client error: ${error.message}`);
 }
 
 @Injectable()

@@ -15,6 +15,7 @@ const database = createPostgresDatabase<BattlefieldDatabase>(
   {
     applicationName: "battlefield-reminder-worker",
     maxConnections: 4,
+    onPoolError: reportPoolError,
   },
 );
 const controller = new AbortController();
@@ -58,4 +59,8 @@ try {
   });
 } finally {
   await database.close();
+}
+
+function reportPoolError(error: Error): void {
+  console.error(`[worker] PostgreSQL idle client error: ${error.message}`);
 }

@@ -13,6 +13,7 @@ export interface PostgresDatabaseOptions {
   connectionTimeoutMillis?: number;
   idleTimeoutMillis?: number;
   maxConnections?: number;
+  onPoolError?: (error: Error) => void;
 }
 
 export function createPostgresDatabase<Database>(
@@ -25,6 +26,9 @@ export function createPostgresDatabase<Database>(
     connectionTimeoutMillis: options.connectionTimeoutMillis ?? 5_000,
     idleTimeoutMillis: options.idleTimeoutMillis ?? 30_000,
     max: options.maxConnections ?? 10,
+  });
+  pool.on("error", (error) => {
+    options.onPoolError?.(error);
   });
   const db = new Kysely<Database>({
     dialect: new PostgresDialect({ pool }),
