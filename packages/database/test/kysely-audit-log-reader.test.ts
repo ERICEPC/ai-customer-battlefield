@@ -67,7 +67,6 @@ describe("KyselyAuditLogReader", () => {
           aggregateId: visibleFollowupId,
           action: "followup.viewed",
           occurredAt: "2026-09-01T03:00:00.000Z",
-          requestId: "visible-followup-read",
         });
         await appendAuditEntry(transaction, {
           tenantId: SYNTHETIC_TENANT_ID,
@@ -106,6 +105,7 @@ describe("KyselyAuditLogReader", () => {
         aggregateId: visibleFollowupId,
         action: "followup.viewed",
         actor: expect.objectContaining({ userId: SYNTHETIC_USER_ID }),
+        requestId: SEED_REQUEST_ID,
         occurredAt: "2026-09-01T03:00:00.000Z",
       }),
     ]);

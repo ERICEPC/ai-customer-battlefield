@@ -27,7 +27,12 @@ export async function appendAuditEntry(
       aggregate_id: input.aggregateId,
       action: input.action,
       actor_user_id: input.actorUserId,
-      request_id: input.requestId ?? null,
+      request_id:
+        input.requestId === undefined
+          ? sql<
+              string | null
+            >`nullif(current_setting('app.request_id', true), '')`
+          : input.requestId,
       before_payload: input.beforePayload
         ? jsonObject(input.beforePayload)
         : null,
