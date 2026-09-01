@@ -220,6 +220,15 @@ export interface WorkerHeartbeatTable {
   updated_at: Timestamp;
 }
 
+export interface WorkerExecutionLeaseTable {
+  tenant_id: string;
+  worker_key: string;
+  instance_id: string;
+  acquired_at: Timestamp;
+  renewed_at: Timestamp;
+  lease_expires_at: Timestamp;
+}
+
 export interface AsyncWorkReplayHistoryTable {
   tenant_id: string;
   id: Generated<string>;
@@ -908,6 +917,7 @@ export interface BattlefieldDatabase {
   "app.battle_rule_releases": BattleRuleReleaseTable;
   "app.battle_rule_release_history": BattleRuleReleaseHistoryTable;
   "app.worker_heartbeats": WorkerHeartbeatTable;
+  "app.worker_execution_leases": WorkerExecutionLeaseTable;
   "app.async_work_replay_history": AsyncWorkReplayHistoryTable;
   "app.channel_addresses": ChannelAddressTable;
   "app.business_entity_types": BusinessEntityTypeTable;

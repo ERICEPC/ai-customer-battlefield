@@ -38,11 +38,11 @@
 - [x] Add strict contracts and capability-protected list/create/release endpoints.
 - [x] Add the independently loaded “作战规则” card with current release, bounded editor, version list, mandatory reason, publish, and rollback.
 - [x] Serve and display stage labels from the released rule projection.
-- [ ] Verify the real leader browser experience and permission-limited account behavior.
+- [x] Verify the real leader browser experience and permission-limited account behavior.
 
 ### Task 5: Real cutover and handoff
 
 - [x] Apply migrations to the real PostgreSQL 16 database and verify one default release per existing tenant.
 - [x] Run one real confirmed-follow-up automation and one manual analysis; verify matching receipts and visible map/list labels.
-- [ ] Run affected typechecks, focused tests, public-boundary/staged-diff checks.
-- [ ] Commit and push each safe vertical slice to `main`; update persistent progress files and publish visible acceptance steps.
+- [x] Run affected typechecks, focused tests, public-boundary/staged-diff checks.
+- [x] Commit and push each safe vertical slice to `main`; update persistent progress files and publish visible acceptance steps.

@@ -106,6 +106,7 @@ export type {
   UserMembershipTable,
   UserSessionTable,
   UserTable,
+  WorkerExecutionLeaseTable,
   WorkerHeartbeatTable,
 } from "./database-types.js";
 export { KyselyFollowupConfirmationStore } from "./followup-confirmation/kysely-followup-confirmation-store.js";
@@ -142,6 +143,7 @@ export {
   withTenantTransaction,
 } from "./tenant-session.js";
 export * from "./weekly-reports/index.js";
+export { KyselyWorkerExecutionLeaseStore } from "./worker-operations/kysely-worker-execution-lease-store.js";
 export {
   KyselyWorkerHeartbeatStore,
   WorkerHeartbeatInstanceLostError,

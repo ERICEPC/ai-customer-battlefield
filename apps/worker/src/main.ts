@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import {
   type BattlefieldDatabase,
   createPostgresDatabase,
+  KyselyWorkerExecutionLeaseStore,
   KyselyWorkerHeartbeatStore,
 } from "@battlefield/database";
 import { createNotificationChannels } from "./channels/channel-registry.js";
@@ -29,6 +30,8 @@ const worker = createReminderWorker({
   channels,
 });
 const heartbeat = new KyselyWorkerHeartbeatStore(database.db);
+const executionLease = new KyselyWorkerExecutionLeaseStore(database.db);
+const instanceId = randomUUID();
 
 process.once("SIGINT", () => controller.abort());
 process.once("SIGTERM", () => controller.abort());
@@ -42,7 +45,14 @@ try {
       reporter: heartbeat,
       actor: config.actor,
       workerKey: "reminder_worker",
-      instanceId: randomUUID(),
+      instanceId,
+      leaseMs: config.leaseMs,
+    },
+    executionLease: {
+      store: executionLease,
+      actor: config.actor,
+      workerKey: "reminder_worker",
+      instanceId,
       leaseMs: config.leaseMs,
     },
   });

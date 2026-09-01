@@ -109,6 +109,28 @@ export interface WorkerHeartbeatReporter {
   }): Promise<void>;
 }
 
+export interface WorkerExecutionLeaseStore {
+  acquire(input: {
+    actor: ActorScope;
+    workerKey: string;
+    instanceId: string;
+    observedAt: string;
+    leaseMs: number;
+  }): Promise<boolean>;
+  renew(input: {
+    actor: ActorScope;
+    workerKey: string;
+    instanceId: string;
+    observedAt: string;
+    leaseMs: number;
+  }): Promise<boolean>;
+  release(input: {
+    actor: ActorScope;
+    workerKey: string;
+    instanceId: string;
+  }): Promise<void>;
+}
+
 export class GetWorkerOperationsHealth {
   constructor(private readonly repository: WorkerOperationsRepository) {}
 

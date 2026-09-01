@@ -328,6 +328,114 @@ describe("reminder worker", () => {
     expect({ ticks, maximumActive }).toEqual({ ticks: 2, maximumActive: 1 });
   });
 
+  test("does not tick when another instance holds the execution lease", async () => {
+    let ticks = 0;
+    const worker = {
+      async tick() {
+        ticks += 1;
+        return { recovered: 0, claimed: 0, completed: 0, failed: 0 };
+      },
+    };
+
+    await expect(
+      runWorkerLoop(worker, {
+        signal: new AbortController().signal,
+        idlePollMs: 1,
+        busyPollMs: 1,
+        executionLease: {
+          store: {
+            acquire: async () => false,
+            renew: async () => false,
+            release: async () => undefined,
+          },
+          actor,
+          workerKey: "reminder_worker",
+          instanceId: "d3000000-0000-4000-8000-000000000002",
+          leaseMs: 60_000,
+          clock: { now: () => new Date("2026-09-01T06:00:00.000Z") },
+        },
+      }),
+    ).rejects.toThrow("another instance holds its execution lease");
+    expect(ticks).toBe(0);
+  });
+
+  test("releases its execution lease after a graceful stop", async () => {
+    const controller = new AbortController();
+    const leaseEvents: string[] = [];
+
+    await runWorkerLoop(
+      {
+        async tick() {
+          controller.abort();
+          return { recovered: 0, claimed: 0, completed: 0, failed: 0 };
+        },
+      },
+      {
+        signal: controller.signal,
+        idlePollMs: 1,
+        busyPollMs: 1,
+        executionLease: {
+          store: {
+            acquire: async () => {
+              leaseEvents.push("acquired");
+              return true;
+            },
+            renew: async () => {
+              leaseEvents.push("renewed");
+              return true;
+            },
+            release: async () => {
+              leaseEvents.push("released");
+            },
+          },
+          actor,
+          workerKey: "reminder_worker",
+          instanceId: "d3000000-0000-4000-8000-000000000002",
+          leaseMs: 60_000,
+          clock: { now: () => new Date("2026-09-01T06:00:00.000Z") },
+        },
+      },
+    );
+
+    expect(leaseEvents).toEqual(["acquired", "renewed", "released"]);
+  });
+
+  test("stops before ticking when it loses its execution lease", async () => {
+    let ticks = 0;
+    let releases = 0;
+
+    await expect(
+      runWorkerLoop(
+        {
+          async tick() {
+            ticks += 1;
+            return { recovered: 0, claimed: 0, completed: 0, failed: 0 };
+          },
+        },
+        {
+          signal: new AbortController().signal,
+          idlePollMs: 1,
+          busyPollMs: 1,
+          executionLease: {
+            store: {
+              acquire: async () => true,
+              renew: async () => false,
+              release: async () => {
+                releases += 1;
+              },
+            },
+            actor,
+            workerKey: "reminder_worker",
+            instanceId: "d3000000-0000-4000-8000-000000000002",
+            leaseMs: 60_000,
+            clock: { now: () => new Date("2026-09-01T06:00:00.000Z") },
+          },
+        },
+      ),
+    ).rejects.toThrow("lost its execution lease");
+    expect({ releases, ticks }).toEqual({ releases: 1, ticks: 0 });
+  });
+
   test("records heartbeat transitions and continues after one failed tick", async () => {
     const controller = new AbortController();
     const heartbeatEvents: string[] = [];

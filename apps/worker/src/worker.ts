@@ -14,6 +14,7 @@ import {
   PublishedWeeklyReportNotFoundError,
   RequestBattleAnalysis,
   ScheduleActionReminders,
+  type WorkerExecutionLeaseStore,
   type WorkerHeartbeatReporter,
 } from "@battlefield/core";
 import {
@@ -364,62 +365,122 @@ export async function runWorkerLoop(
       leaseMs: number;
       clock?: { now(): Date };
     };
+    executionLease?: {
+      store: WorkerExecutionLeaseStore;
+      actor: { tenantId: string; userId: string };
+      workerKey: string;
+      instanceId: string;
+      leaseMs: number;
+      clock?: { now(): Date };
+    };
   },
 ): Promise<void> {
   const heartbeatClock = input.heartbeat?.clock ?? { now: () => new Date() };
-  if (input.heartbeat) {
-    await input.heartbeat.reporter.register({
-      actor: input.heartbeat.actor,
-      workerKey: input.heartbeat.workerKey,
-      instanceId: input.heartbeat.instanceId,
-      startedAt: heartbeatClock.now().toISOString(),
-      expectedIntervalMs: Math.max(input.idlePollMs, input.busyPollMs),
-      leaseMs: input.heartbeat.leaseMs,
+  const executionLeaseClock = input.executionLease?.clock ?? {
+    now: () => new Date(),
+  };
+  let leaseAcquired = false;
+  if (input.executionLease) {
+    leaseAcquired = await input.executionLease.store.acquire({
+      actor: input.executionLease.actor,
+      workerKey: input.executionLease.workerKey,
+      instanceId: input.executionLease.instanceId,
+      observedAt: executionLeaseClock.now().toISOString(),
+      leaseMs: input.executionLease.leaseMs,
     });
+    if (!leaseAcquired) throw new WorkerExecutionLeaseHeldError();
   }
-  while (!input.signal.aborted) {
-    let result: WorkerTickResult;
-    try {
-      if (input.heartbeat) {
-        await input.heartbeat.reporter.markTickStarted({
-          actor: input.heartbeat.actor,
-          workerKey: input.heartbeat.workerKey,
-          instanceId: input.heartbeat.instanceId,
-          startedAt: heartbeatClock.now().toISOString(),
-        });
-      }
-      result = await worker.tick();
-      if (input.heartbeat) {
-        await input.heartbeat.reporter.markTickSucceeded({
-          actor: input.heartbeat.actor,
-          workerKey: input.heartbeat.workerKey,
-          instanceId: input.heartbeat.instanceId,
-          completedAt: heartbeatClock.now().toISOString(),
-          summary: result,
-        });
-      }
-    } catch {
-      if (input.heartbeat) {
-        await input.heartbeat.reporter.markTickFailed({
-          actor: input.heartbeat.actor,
-          workerKey: input.heartbeat.workerKey,
-          instanceId: input.heartbeat.instanceId,
-          failedAt: heartbeatClock.now().toISOString(),
-          errorCode: "WORKER_TICK_FAILED",
-          errorMessage: "Worker tick failed.",
-        });
-      }
-      if (input.signal.aborted) break;
-      await wait(input.idlePollMs, input.signal);
-      continue;
+  try {
+    if (input.heartbeat) {
+      await input.heartbeat.reporter.register({
+        actor: input.heartbeat.actor,
+        workerKey: input.heartbeat.workerKey,
+        instanceId: input.heartbeat.instanceId,
+        startedAt: heartbeatClock.now().toISOString(),
+        expectedIntervalMs: Math.max(input.idlePollMs, input.busyPollMs),
+        leaseMs: input.heartbeat.leaseMs,
+      });
     }
-    if (input.signal.aborted) {
-      break;
+    while (!input.signal.aborted) {
+      if (
+        input.executionLease &&
+        !(await input.executionLease.store.renew({
+          actor: input.executionLease.actor,
+          workerKey: input.executionLease.workerKey,
+          instanceId: input.executionLease.instanceId,
+          observedAt: executionLeaseClock.now().toISOString(),
+          leaseMs: input.executionLease.leaseMs,
+        }))
+      ) {
+        throw new WorkerExecutionLeaseLostError();
+      }
+      let result: WorkerTickResult;
+      try {
+        if (input.heartbeat) {
+          await input.heartbeat.reporter.markTickStarted({
+            actor: input.heartbeat.actor,
+            workerKey: input.heartbeat.workerKey,
+            instanceId: input.heartbeat.instanceId,
+            startedAt: heartbeatClock.now().toISOString(),
+          });
+        }
+        result = await worker.tick();
+        if (input.heartbeat) {
+          await input.heartbeat.reporter.markTickSucceeded({
+            actor: input.heartbeat.actor,
+            workerKey: input.heartbeat.workerKey,
+            instanceId: input.heartbeat.instanceId,
+            completedAt: heartbeatClock.now().toISOString(),
+            summary: result,
+          });
+        }
+      } catch {
+        if (input.heartbeat) {
+          await input.heartbeat.reporter.markTickFailed({
+            actor: input.heartbeat.actor,
+            workerKey: input.heartbeat.workerKey,
+            instanceId: input.heartbeat.instanceId,
+            failedAt: heartbeatClock.now().toISOString(),
+            errorCode: "WORKER_TICK_FAILED",
+            errorMessage: "Worker tick failed.",
+          });
+        }
+        if (input.signal.aborted) break;
+        await wait(input.idlePollMs, input.signal);
+        continue;
+      }
+      if (input.signal.aborted) {
+        break;
+      }
+      await wait(
+        result.claimed === 0 ? input.idlePollMs : input.busyPollMs,
+        input.signal,
+      );
     }
-    await wait(
-      result.claimed === 0 ? input.idlePollMs : input.busyPollMs,
-      input.signal,
+  } finally {
+    if (leaseAcquired && input.executionLease) {
+      await input.executionLease.store.release({
+        actor: input.executionLease.actor,
+        workerKey: input.executionLease.workerKey,
+        instanceId: input.executionLease.instanceId,
+      });
+    }
+  }
+}
+
+export class WorkerExecutionLeaseHeldError extends Error {
+  constructor() {
+    super(
+      "Worker did not start because another instance holds its execution lease.",
     );
+    this.name = "WorkerExecutionLeaseHeldError";
+  }
+}
+
+export class WorkerExecutionLeaseLostError extends Error {
+  constructor() {
+    super("Worker stopped because it lost its execution lease.");
+    this.name = "WorkerExecutionLeaseLostError";
   }
 }
 
