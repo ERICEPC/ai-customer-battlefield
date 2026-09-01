@@ -3,9 +3,14 @@ import type {
   BattleAnalysisStore,
   BattleAnalyzer,
   BattleQueryReader,
+  BattleRuleResolver,
   ConfirmedFactSnapshotReader,
 } from "@battlefield/core";
-import { RequestBattleAnalysis } from "@battlefield/core";
+import {
+  defaultBattleRuleSet,
+  RequestBattleAnalysis,
+  StaticBattleRuleResolver,
+} from "@battlefield/core";
 import {
   KyselyBattleAnalysisStore,
   KyselyBattleQueryReader,
@@ -23,6 +28,7 @@ export const CONFIRMED_FACT_SNAPSHOT_READER = Symbol(
 export const BATTLE_ANALYZER = Symbol("BATTLE_ANALYZER");
 export const BATTLE_ANALYSIS_STORE = Symbol("BATTLE_ANALYSIS_STORE");
 export const BATTLE_QUERY_READER = Symbol("BATTLE_QUERY_READER");
+export const BATTLE_RULE_RESOLVER = Symbol("BATTLE_RULE_RESOLVER");
 export const REQUEST_BATTLE_ANALYSIS = Symbol("REQUEST_BATTLE_ANALYSIS");
 
 async function unavailable(): Promise<never> {
@@ -45,7 +51,10 @@ const unavailableQueryReader: BattleQueryReader = {
   getVersion: unavailable,
   listMap: unavailable,
 };
-const unavailableAnalyzer: BattleAnalyzer = { analyze: unavailable };
+const unavailableAnalyzer: BattleAnalyzer = {
+  configurationVersion: "unavailable-v1",
+  analyze: unavailable,
+};
 
 export const battleAnalysisProviders: Provider[] = [
   {
@@ -82,16 +91,26 @@ export const battleAnalysisProviders: Provider[] = [
         : new DeterministicBattleAnalyzer(),
   },
   {
+    provide: BATTLE_RULE_RESOLVER,
+    useFactory: (): BattleRuleResolver =>
+      new StaticBattleRuleResolver({
+        ruleVersion: "deterministic-battle-rules-v1",
+        rules: defaultBattleRuleSet,
+      }),
+  },
+  {
     provide: REQUEST_BATTLE_ANALYSIS,
     inject: [
       CONFIRMED_FACT_SNAPSHOT_READER,
       BATTLE_ANALYZER,
       BATTLE_ANALYSIS_STORE,
+      BATTLE_RULE_RESOLVER,
     ],
     useFactory: (
       reader: ConfirmedFactSnapshotReader,
       analyzer: BattleAnalyzer,
       store: BattleAnalysisStore,
+      ruleResolver: BattleRuleResolver,
     ) =>
       new RequestBattleAnalysis({
         reader,
@@ -99,8 +118,7 @@ export const battleAnalysisProviders: Provider[] = [
         store,
         idGenerator: { next: () => randomUUID() },
         clock: { now: () => new Date() },
-        ruleVersion: "deterministic-battle-rules-v1",
-        analyzerConfigVersion: "deterministic-development-v1",
+        ruleResolver,
       }),
   },
 ];

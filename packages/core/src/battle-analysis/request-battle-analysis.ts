@@ -11,6 +11,7 @@ import type {
   ConfirmedFactSnapshot,
   ConfirmedFactSnapshotReader,
 } from "./battle-analysis-store.js";
+import type { BattleRuleResolver } from "./battle-rule.js";
 
 const SCORE_PATTERN = /^(?:(?:0|[1-9]\d?)(?:\.\d{1,2})?|100(?:\.0{1,2})?)$/;
 const CODE_PATTERN = /^[a-z][a-z0-9_]{0,99}$/;
@@ -58,8 +59,7 @@ export class RequestBattleAnalysis {
       store: BattleAnalysisStore;
       idGenerator: DraftIdGenerator;
       clock: Clock;
-      ruleVersion: string;
-      analyzerConfigVersion: string;
+      ruleResolver: BattleRuleResolver;
     },
   ) {}
 
@@ -87,6 +87,9 @@ export class RequestBattleAnalysis {
     ) {
       throw new BattleAnalysisInputChangedError(snapshot.inputVersion);
     }
+    const resolvedRule = await this.dependencies.ruleResolver.resolve({
+      actor: input.actor,
+    });
 
     const analysisRunId = this.dependencies.idGenerator.next();
     const startedAt = this.dependencies.clock.now().toISOString();
@@ -95,8 +98,8 @@ export class RequestBattleAnalysis {
       analysisRunId,
       entityId: input.entityId,
       inputVersion: snapshot.inputVersion,
-      ruleVersion: this.dependencies.ruleVersion,
-      analyzerConfigVersion: this.dependencies.analyzerConfigVersion,
+      ruleVersion: resolvedRule.ruleVersion,
+      analyzerConfigVersion: this.dependencies.analyzer.configurationVersion,
       startedAt,
       ...(input.triggerEventId ? { triggerEventId: input.triggerEventId } : {}),
     });
@@ -106,8 +109,8 @@ export class RequestBattleAnalysis {
       const proposed = await this.dependencies.analyzer.analyze({
         actor: input.actor,
         snapshot,
-        ruleVersion: this.dependencies.ruleVersion,
-        analyzerConfigVersion: this.dependencies.analyzerConfigVersion,
+        ruleVersion: resolvedRule.ruleVersion,
+        rules: resolvedRule.rules,
       });
       candidate = normalizeCandidate(proposed, snapshot);
     } catch (error) {

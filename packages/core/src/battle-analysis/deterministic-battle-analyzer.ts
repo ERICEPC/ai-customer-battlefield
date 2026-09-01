@@ -1,55 +1,71 @@
 import type { BattleAnalyzer } from "./battle-analysis-store.js";
 
 export class DeterministicBattleAnalyzer implements BattleAnalyzer {
+  readonly configurationVersion = "deterministic-v1";
+
   async analyze(input: Parameters<BattleAnalyzer["analyze"]>[0]) {
     const { facts } = input.snapshot;
-    if (facts.length === 0) {
+    const { rules } = input;
+    if (facts.length < rules.minimumFactCount) {
       return {
         relationshipScore: null,
         potentialScore: null,
         quadrantCode: null,
         primaryOpportunityId: null,
-        riskLevel: "medium" as const,
+        riskLevel: rules.insufficientResult.riskLevel,
         dataSufficiency: "insufficient" as const,
-        dataGaps: ["缺少已确认的正式经营事实"],
-        summary: "当前正式事实不足，暂不生成精确作战坐标。",
+        dataGaps: [rules.insufficientResult.dataGap],
+        summary: rules.insufficientResult.summary,
         signals: [],
         evidenceFactIds: [],
         actionProposals: [],
       };
     }
 
-    const relationshipScore = Math.min(90, 60 + facts.length * 5);
-    const potentialScore = Math.min(95, 70 + facts.length * 5);
+    const relationshipScore = calculateScore(
+      facts.length,
+      rules.relationshipScore,
+    );
+    const potentialScore = calculateScore(facts.length, rules.potentialScore);
     const primaryOpportunityId =
       facts.findLast((fact) => fact.opportunityId !== null)?.opportunityId ??
       null;
     return {
       relationshipScore: relationshipScore.toFixed(2),
       potentialScore: potentialScore.toFixed(2),
-      quadrantCode: "high_relationship_high_potential",
+      quadrantCode: rules.sufficientResult.quadrantCode,
       primaryOpportunityId,
-      riskLevel: "low" as const,
+      riskLevel: rules.sufficientResult.riskLevel,
       dataSufficiency: "sufficient" as const,
       dataGaps: [],
-      summary: `已基于 ${facts.length} 条正式事实生成可回放的确定性分析。`,
+      summary: rules.sufficientResult.summaryTemplate.replace(
+        /\{factCount\}/g,
+        String(facts.length),
+      ),
       signals: facts.map((fact) => ({
         factId: fact.factId,
-        dimension: "potential" as const,
+        dimension: rules.sufficientResult.signalDimension,
         direction: "positive" as const,
-        strength: 70,
+        strength: rules.sufficientResult.signalStrength,
         reason: `${fact.factType} 已由人工确认。`,
       })),
       evidenceFactIds: facts.map((fact) => fact.factId),
       actionProposals: [
         {
-          title: "确认下一步客户经营动作",
-          description: "结合最新正式事实，与客户确认负责人、时间和预期结果。",
+          title: rules.actionProposal.title,
+          description: rules.actionProposal.description,
           suggestedOwnerId: input.actor.userId,
-          suggestedPriority: "high" as const,
+          suggestedPriority: rules.actionProposal.priority,
           suggestedPlannedAt: null,
         },
       ],
     };
   }
+}
+
+function calculateScore(
+  factCount: number,
+  rule: { base: number; perFact: number; maximum: number },
+) {
+  return Math.min(rule.maximum, rule.base + factCount * rule.perFact);
 }

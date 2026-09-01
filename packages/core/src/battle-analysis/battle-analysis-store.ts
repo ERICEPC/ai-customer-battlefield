@@ -1,4 +1,5 @@
 import type { ActorScope } from "../followup-drafts/followup-draft-agent.js";
+import type { BattleRuleSet } from "./battle-rule.js";
 
 export type BattleDimension = "relationship" | "potential" | "risk" | "stage";
 export type BattleSignalDirection = "positive" | "negative" | "neutral";
@@ -76,11 +77,12 @@ export interface ConfirmedFactSnapshotReader {
 }
 
 export interface BattleAnalyzer {
+  readonly configurationVersion: string;
   analyze(input: {
     actor: ActorScope;
     snapshot: ConfirmedFactSnapshot;
     ruleVersion: string;
-    analyzerConfigVersion: string;
+    rules: BattleRuleSet;
   }): Promise<BattleAnalysisCandidate>;
 }
 

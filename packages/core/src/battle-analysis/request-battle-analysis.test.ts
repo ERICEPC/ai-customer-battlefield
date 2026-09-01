@@ -5,6 +5,8 @@ import type {
   BattleAnalyzer,
   ConfirmedFactSnapshotReader,
 } from "./battle-analysis-store.js";
+import type { BattleRuleResolver } from "./battle-rule.js";
+import { defaultBattleRuleSet } from "./battle-rule.js";
 import {
   type BattleAnalysisInputChangedError,
   type BattleAnalyzerExecutionError,
@@ -73,6 +75,7 @@ function dependencies(
     reader?: Partial<ConfirmedFactSnapshotReader>;
     analyzer?: Partial<BattleAnalyzer>;
     store?: Partial<BattleAnalysisStore>;
+    ruleResolver?: Partial<BattleRuleResolver>;
   } = {},
 ) {
   const reader = {
@@ -80,6 +83,7 @@ function dependencies(
     ...overrides.reader,
   } satisfies ConfirmedFactSnapshotReader;
   const analyzer = {
+    configurationVersion: "deterministic-v1",
     analyze: vi.fn().mockResolvedValue(candidate),
     ...overrides.analyzer,
   } satisfies BattleAnalyzer;
@@ -100,7 +104,14 @@ function dependencies(
     fail: vi.fn().mockResolvedValue(undefined),
     ...overrides.store,
   } satisfies BattleAnalysisStore;
-  return { reader, analyzer, store };
+  const ruleResolver = {
+    resolve: vi.fn().mockResolvedValue({
+      ruleVersion: "battle-rules-v3-release-7",
+      rules: defaultBattleRuleSet,
+    }),
+    ...overrides.ruleResolver,
+  } satisfies BattleRuleResolver;
+  return { reader, analyzer, store, ruleResolver };
 }
 
 function useCase(parts = dependencies()) {
@@ -115,8 +126,6 @@ function useCase(parts = dependencies()) {
           .mockReturnValueOnce(startedAt)
           .mockReturnValueOnce(finishedAt),
       },
-      ruleVersion: "battle-rules-v1",
-      analyzerConfigVersion: "deterministic-v1",
     }),
   };
 }
@@ -132,20 +141,22 @@ describe("RequestBattleAnalysis", () => {
     });
 
     expect(parts.reader.read).toHaveBeenCalledWith({ actor, entityId });
+    expect(parts.ruleResolver.resolve).toHaveBeenCalledOnce();
+    expect(parts.ruleResolver.resolve).toHaveBeenCalledWith({ actor });
     expect(parts.store.start).toHaveBeenCalledWith({
       actor,
       analysisRunId,
       entityId,
       inputVersion,
-      ruleVersion: "battle-rules-v1",
+      ruleVersion: "battle-rules-v3-release-7",
       analyzerConfigVersion: "deterministic-v1",
       startedAt: startedAt.toISOString(),
     });
     expect(parts.analyzer.analyze).toHaveBeenCalledWith({
       actor,
       snapshot,
-      ruleVersion: "battle-rules-v1",
-      analyzerConfigVersion: "deterministic-v1",
+      ruleVersion: "battle-rules-v3-release-7",
+      rules: defaultBattleRuleSet,
     });
     expect(parts.store.complete).toHaveBeenCalledWith({
       actor,
@@ -185,6 +196,21 @@ describe("RequestBattleAnalysis", () => {
     ).rejects.toMatchObject<BattleAnalysisInputChangedError>({
       latestInputVersion: inputVersion,
     });
+    expect(parts.store.start).not.toHaveBeenCalled();
+    expect(parts.ruleResolver.resolve).not.toHaveBeenCalled();
+    expect(parts.analyzer.analyze).not.toHaveBeenCalled();
+  });
+
+  it("fails before creating a run when no released rule can be resolved", async () => {
+    const ruleFailure = new Error("no released rule");
+    const parts = dependencies({
+      ruleResolver: { resolve: vi.fn().mockRejectedValue(ruleFailure) },
+    });
+    const { subject } = useCase(parts);
+
+    await expect(subject.execute({ actor, entityId })).rejects.toBe(
+      ruleFailure,
+    );
     expect(parts.store.start).not.toHaveBeenCalled();
     expect(parts.analyzer.analyze).not.toHaveBeenCalled();
   });

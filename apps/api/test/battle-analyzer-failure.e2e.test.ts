@@ -39,6 +39,7 @@ describe("battle analyzer failure API", () => {
       .useValue(database)
       .overrideProvider(BATTLE_ANALYZER)
       .useValue({
+        configurationVersion: "failing-test-analyzer-v1",
         async analyze() {
           throw new Error("provider detail that must not cross the API");
         },
