@@ -294,11 +294,13 @@ export class KyselyFollowupConfirmationStore
             "event.aggregate_id as followup_id",
             "followup.entity_id",
             "event.occurred_at",
+            "outbox.id as outbox_message_id",
             "outbox.status as outbox_status",
             "outbox.attempt_count",
             "outbox.last_error",
             "outbox.claimed_at",
             "outbox.published_at",
+            "analysis.id as analysis_run_id",
             "analysis.status as analysis_status",
             "analysis.error_message as analysis_error_message",
             "analysis.started_at",
@@ -326,6 +328,12 @@ export class KyselyFollowupConfirmationStore
           .select((expression) => [
             expression.fn.count<number>("id").as("count"),
             expression.fn.max("created_at").as("latest_created_at"),
+            sql<string[]>`
+              coalesce(
+                array_agg(id::text order by created_at, id),
+                array[]::text[]
+              )
+            `.as("notification_ids"),
           ])
           .where("tenant_id", "=", input.actor.tenantId)
           .where("followup_id", "=", input.followupId)
@@ -375,7 +383,10 @@ export class KyselyFollowupConfirmationStore
           battleMapStatus,
           leaderNotificationStatus,
           outboxStatus: pipeline.outbox_status,
+          outboxMessageId: pipeline.outbox_message_id,
+          analysisRunId: pipeline.analysis_run_id,
           battleStateVersionId: pipeline.battle_state_version_id,
+          leaderNotificationIds: notification.notification_ids,
           leaderNotificationCount,
           attemptCount: pipeline.attempt_count,
           errorMessage:

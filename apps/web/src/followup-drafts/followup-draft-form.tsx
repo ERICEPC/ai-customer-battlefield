@@ -754,6 +754,49 @@ function ConfirmationReceipt({
               </a>
             </div>
           ) : null}
+          {automationStatus ? (
+            <details className="automation-trace">
+              <summary>查看处理凭证</summary>
+              <dl>
+                <div>
+                  <dt>业务事件</dt>
+                  <dd>
+                    <code>{automationStatus.eventId}</code>
+                  </dd>
+                </div>
+                <div>
+                  <dt>异步消息</dt>
+                  <dd>
+                    <code>{automationStatus.outboxMessageId}</code>
+                  </dd>
+                </div>
+                <div>
+                  <dt>分析运行</dt>
+                  <dd>
+                    <code>{automationStatus.analysisRunId ?? "尚未生成"}</code>
+                  </dd>
+                </div>
+                <div>
+                  <dt>地图版本</dt>
+                  <dd>
+                    <code>
+                      {automationStatus.battleStateVersionId ?? "尚未生成"}
+                    </code>
+                  </dd>
+                </div>
+                <div>
+                  <dt>领导消息事件</dt>
+                  <dd>
+                    {automationStatus.leaderNotificationIds.length > 0
+                      ? automationStatus.leaderNotificationIds.map((id) => (
+                          <code key={id}>{id}</code>
+                        ))
+                      : "尚未生成"}
+                  </dd>
+                </div>
+              </dl>
+            </details>
+          ) : null}
         </section>
         <p className="boundary-note">
           经营事实已留痕；风险、提醒和建议动作仍需单独确认。

@@ -186,7 +186,10 @@ describe("follow-up draft responses", () => {
         battleMapStatus: "completed",
         leaderNotificationStatus: "completed",
         outboxStatus: "published",
+        outboxMessageId: "a0000000-0000-4000-8000-000000000001",
+        analysisRunId: "c0000000-0000-4000-8000-000000000001",
         battleStateVersionId: "b0000000-0000-4000-8000-000000000001",
+        leaderNotificationIds: ["d0000000-0000-4000-8000-000000000001"],
         leaderNotificationCount: 1,
         attemptCount: 1,
         errorMessage: null,
@@ -194,6 +197,7 @@ describe("follow-up draft responses", () => {
       }),
     ).toMatchObject({
       overallStatus: "completed",
+      analysisRunId: "c0000000-0000-4000-8000-000000000001",
       leaderNotificationCount: 1,
     });
   });

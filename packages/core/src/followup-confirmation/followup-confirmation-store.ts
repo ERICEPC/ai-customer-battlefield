@@ -64,7 +64,10 @@ export interface FollowupAutomationStatus {
     | "failed"
     | "cancelled"
     | "dead_lettered";
+  outboxMessageId: string;
+  analysisRunId: string | null;
   battleStateVersionId: string | null;
+  leaderNotificationIds: string[];
   leaderNotificationCount: number;
   attemptCount: number;
   errorMessage: string | null;

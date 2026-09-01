@@ -1481,6 +1481,50 @@ button:disabled {
   text-decoration: none;
 }
 
+.automation-trace {
+  margin-top: 14px;
+  border-top: 1px solid var(--line);
+  padding-top: 12px;
+}
+
+.automation-trace summary {
+  width: fit-content;
+  cursor: pointer;
+  color: var(--ink-strong);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.automation-trace dl {
+  display: grid;
+  gap: 8px;
+  margin: 12px 0 0;
+}
+
+.automation-trace dl div {
+  display: grid;
+  grid-template-columns: 88px minmax(0, 1fr);
+  gap: 10px;
+  align-items: start;
+}
+
+.automation-trace dt {
+  color: var(--ink-muted);
+  font-size: 12px;
+}
+
+.automation-trace dd {
+  min-width: 0;
+  margin: 0;
+}
+
+.automation-trace code {
+  display: block;
+  overflow-wrap: anywhere;
+  color: var(--ink-strong);
+  font-size: 12px;
+}
+
 .confirmation-receipt .boundary-note {
   margin: 14px 0 0;
 }

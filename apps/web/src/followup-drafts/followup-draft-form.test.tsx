@@ -112,7 +112,10 @@ const automationStatus: FollowupAutomationStatus = {
   battleMapStatus: "completed",
   leaderNotificationStatus: "completed",
   outboxStatus: "published",
+  outboxMessageId: "a0000000-0000-4000-8000-000000000001",
+  analysisRunId: "c0000000-0000-4000-8000-000000000001",
   battleStateVersionId: "b0000000-0000-4000-8000-000000000001",
+  leaderNotificationIds: ["d0000000-0000-4000-8000-000000000001"],
   leaderNotificationCount: 1,
   attemptCount: 1,
   errorMessage: null,
@@ -268,6 +271,17 @@ describe("FollowupDraftForm", () => {
     expect(await screen.findByText("全部完成")).toBeVisible();
     expect(screen.getByText("作战地图已自动更新")).toBeVisible();
     expect(screen.getByText("领导消息已送达")).toBeVisible();
+    fireEvent.click(screen.getByText("查看处理凭证"));
+    expect(screen.getByText("异步消息")).toBeVisible();
+    expect(screen.getByText(automationStatus.outboxMessageId)).toBeVisible();
+    expect(screen.getByText("分析运行")).toBeVisible();
+    expect(
+      screen.getByText("c0000000-0000-4000-8000-000000000001"),
+    ).toBeVisible();
+    expect(screen.getByText("领导消息事件")).toBeVisible();
+    expect(
+      screen.getByText("d0000000-0000-4000-8000-000000000001"),
+    ).toBeVisible();
     expect(screen.getByText(/建议动作仍需单独确认/)).toBeVisible();
   });
 

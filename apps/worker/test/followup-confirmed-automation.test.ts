@@ -118,11 +118,11 @@ describe("confirmed follow-up automation", () => {
       (transaction) =>
         transaction
           .selectFrom("app.analysis_runs")
-          .select(["rule_version", "analyzer_config_version"])
+          .select(["id", "rule_version", "analyzer_config_version"])
           .where("entity_id", "=", SYNTHETIC_ENTITY_ID)
           .executeTakeFirstOrThrow(),
     );
-    expect(analysisRun).toEqual({
+    expect(analysisRun).toMatchObject({
       rule_version: "battle-rules-v1-r1",
       analyzer_config_version: "deterministic-v1",
     });
@@ -153,6 +153,8 @@ describe("confirmed follow-up automation", () => {
         readAt: null,
       }),
     ]);
+    const leaderNotificationId = leaderInbox.items[0]?.notificationId;
+    expect(leaderNotificationId).toBeDefined();
     await expect(
       followups.getAutomationStatus({
         actor,
@@ -164,7 +166,10 @@ describe("confirmed follow-up automation", () => {
       battleMapStatus: "completed",
       leaderNotificationStatus: "completed",
       outboxStatus: "published",
+      outboxMessageId: expect.any(String),
+      analysisRunId: analysisRun.id,
       leaderNotificationCount: 1,
+      leaderNotificationIds: [leaderNotificationId],
       battleStateVersionId: state?.stateId,
     });
     await withTenantTransaction(
