@@ -1,5 +1,10 @@
 # AI 客户作战系统文档
 
+## 最新交接
+
+- [2026-09-01 设备迁移交接包](handoff/2026-09-01-device-transfer/README.md)
+- [发给新 Codex 会话的指令](handoff/2026-09-01-device-transfer/NEW_SESSION_PROMPT.md)
+
 ## 主文档
 
 1. [V1 产品设计总纲](01-V1产品设计总纲.md)
