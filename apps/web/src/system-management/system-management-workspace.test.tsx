@@ -15,6 +15,7 @@ import {
   fireEvent,
   render,
   screen,
+  waitFor,
   within,
 } from "@testing-library/react";
 import { afterEach, describe, expect, test, vi } from "vitest";
@@ -257,6 +258,58 @@ describe("SystemManagementWorkspace", () => {
     expect(managementApi.getAccessControl).not.toHaveBeenCalled();
     expect(managementApi.listVersions).not.toHaveBeenCalled();
     expect(managementApi.listAudits).not.toHaveBeenCalled();
+  });
+
+  test("filters the visible audit trail with the existing controlled query", async () => {
+    const managementApi = api();
+    render(<SystemManagementWorkspace api={managementApi} />);
+    await screen.findByText("最近操作留痕");
+
+    fireEvent.change(screen.getByLabelText("审计动作"), {
+      target: { value: "access_control.role_capabilities_updated" },
+    });
+    fireEvent.change(screen.getByLabelText("业务对象类型"), {
+      target: { value: "role_capability_grant" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "查询审计记录" }));
+
+    await waitFor(() =>
+      expect(managementApi.listAudits).toHaveBeenLastCalledWith({
+        limit: 20,
+        action: "access_control.role_capabilities_updated",
+        aggregateType: "role_capability_grant",
+      }),
+    );
+  });
+
+  test("loads older audit entries from the stable cursor", async () => {
+    const managementApi = api();
+    const firstAudit = audits.items[0];
+    if (!firstAudit) throw new Error("Expected an audit fixture.");
+    managementApi.listAudits = vi
+      .fn()
+      .mockResolvedValueOnce({ ...audits, nextCursor: "older-page" })
+      .mockResolvedValueOnce({
+        items: [
+          {
+            ...firstAudit,
+            entryId: "a2000000-0000-4000-8000-000000000001",
+            action: "followup.viewed",
+          },
+        ],
+        nextCursor: null,
+      });
+    render(<SystemManagementWorkspace api={managementApi} />);
+
+    fireEvent.click(
+      await screen.findByRole("button", { name: "加载更早审计记录" }),
+    );
+
+    expect(await screen.findByText("followup.viewed")).toBeVisible();
+    expect(managementApi.listAudits).toHaveBeenLastCalledWith({
+      limit: 20,
+      cursor: "older-page",
+    });
   });
 
   test("creates an immutable version before allowing a separate release", async () => {

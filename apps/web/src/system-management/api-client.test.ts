@@ -9,6 +9,7 @@ import {
   createAiRuntimeConfigVersion,
   getAccessControlSnapshot,
   listAiRuntimeConfigVersions,
+  listRecentAuditEntries,
   releaseAiRuntimeConfigVersion,
   replaceRoleCapabilities,
   replayAsyncWorkItem,
@@ -169,6 +170,36 @@ describe("system-management API client", () => {
         }),
       }),
     );
+  });
+
+  test("encodes strict audit filters and cursors", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      response({
+        items: [],
+        nextCursor: null,
+      }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await listRecentAuditEntries({
+      limit: 20,
+      action: "access_control.role_capabilities_updated",
+      aggregateType: "role_capability_grant",
+      actorUserId: "30000000-0000-4000-8000-000000000072",
+      occurredFrom: "2026-09-01T00:00:00.000Z",
+      cursor: "older-page",
+    });
+
+    const requestedUrl = new URL(String(fetchMock.mock.calls[0]?.[0]));
+    expect(requestedUrl.pathname).toBe("/api/v1/audit-entries");
+    expect(Object.fromEntries(requestedUrl.searchParams)).toEqual({
+      limit: "20",
+      cursor: "older-page",
+      actorUserId: "30000000-0000-4000-8000-000000000072",
+      aggregateType: "role_capability_grant",
+      action: "access_control.role_capabilities_updated",
+      occurredFrom: "2026-09-01T00:00:00.000Z",
+    });
   });
 
   test("preserves stable server errors", async () => {

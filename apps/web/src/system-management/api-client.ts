@@ -5,6 +5,7 @@ import {
   type AsyncWorkFailurePage,
   type AsyncWorkKind,
   type AsyncWorkReplayResponse,
+  type AuditEntryListQuery,
   type AuditEntryPage,
   accessControlApiErrorSchema,
   accessControlRoleCodeSchema,
@@ -14,6 +15,7 @@ import {
   aiRuntimeConfigVersionSchema,
   asyncWorkFailurePageSchema,
   asyncWorkReplayResponseSchema,
+  auditEntryListQuerySchema,
   auditEntryPageSchema,
   auditLogApiErrorSchema,
   type CreateAiRuntimeConfigVersionRequest,
@@ -121,8 +123,28 @@ export function replayAsyncWorkItem(
   );
 }
 
-export function listRecentAuditEntries(): Promise<AuditEntryPage> {
-  return request("/audit-entries?limit=20", auditEntryPageSchema);
+export function listRecentAuditEntries(
+  input: AuditEntryListQuery = {},
+): Promise<AuditEntryPage> {
+  const query = auditEntryListQuerySchema.parse({
+    limit: input.limit ?? 20,
+    ...input,
+  });
+  const search = new URLSearchParams();
+  for (const key of [
+    "limit",
+    "cursor",
+    "actorUserId",
+    "aggregateType",
+    "aggregateId",
+    "action",
+    "occurredFrom",
+    "occurredBefore",
+  ] as const) {
+    const value = query[key];
+    if (value !== undefined) search.set(key, String(value));
+  }
+  return request(`/audit-entries?${search}`, auditEntryPageSchema);
 }
 
 export function getAccessControlSnapshot(): Promise<AccessControlSnapshot> {

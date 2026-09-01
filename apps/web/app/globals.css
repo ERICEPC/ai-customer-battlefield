@@ -6888,6 +6888,54 @@ section.workspace-attention a:hover {
   cursor: not-allowed;
 }
 
+.admin-audit-filter {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid #dbe2ec;
+  border-radius: 14px;
+  background: #f8fafc;
+}
+
+.admin-audit-filter fieldset {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.admin-audit-filter label {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+  color: #344054;
+  font-size: 11px;
+  font-weight: 750;
+}
+
+.admin-audit-filter input {
+  width: 100%;
+  min-height: 40px;
+  padding: 0 10px;
+  color: var(--ink);
+  border: 1px solid #cfd7e5;
+  border-radius: 9px;
+  background: #ffffff;
+}
+
+.admin-audit-filter > div {
+  display: flex;
+  gap: 9px;
+  justify-content: flex-end;
+}
+
+.admin-audit-filter button {
+  min-height: 40px;
+}
+
 .admin-audit-list {
   display: grid;
   gap: 0;
@@ -6942,7 +6990,15 @@ section.workspace-attention a:hover {
   background: var(--gold-soft);
 }
 
+.admin-audit-more {
+  justify-self: center;
+}
+
 @media (max-width: 980px) {
+  .admin-audit-filter fieldset {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .admin-form-grid,
   .queue-health-grid,
   .role-capability-grid {
@@ -6955,6 +7011,15 @@ section.workspace-attention a:hover {
 }
 
 @media (max-width: 720px) {
+  .admin-audit-filter fieldset {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-audit-filter > div {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
   .admin-page {
     width: calc(100% - 28px);
   }

@@ -126,3 +126,20 @@
 - [x] Load and render the card only when the signed-in session has `access_control.manage`, so independently delegated runtime operators can still use the rest of system management.
 - [x] Allow entry when an account has any system-management capability, then load only its granted access-control, Agent runtime, audit, or Worker sections; do not require unrelated capabilities as a bundle.
 - [x] Verify the real leader view without mutating real grants; run the two focused Web specs and Web typecheck.
+
+### Task 7: Visible controlled audit search
+
+**Files:**
+- Modify: `apps/web/src/system-management/api-client.ts`
+- Modify: `apps/web/src/system-management/system-management-workspace.tsx`
+- Modify: `apps/web/app/globals.css`
+- Modify: focused Web tests.
+
+**Interfaces:**
+- Produces: a visible filter and stable-cursor history view over the existing responsibility-scoped audit query.
+
+- [x] Encode strict action, aggregate type/ID, actor, half-open time interval, limit, and cursor parameters in the Web API client.
+- [x] Add desktop/mobile audit filters without exposing before/after business snapshots.
+- [x] Preserve current filters while loading older entries from the server cursor and while refreshing after a privileged mutation.
+- [x] Keep the audit section behind `audit.read`; other delegated operators do not call the audit endpoint.
+- [x] Verify the real leader page layout and run focused client/workspace tests plus Web typecheck.

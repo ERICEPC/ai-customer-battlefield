@@ -6,6 +6,7 @@ import {
   type AiRuntimeConfigVersionPage,
   type AsyncWorkFailurePage,
   type AsyncWorkFailureRecord,
+  type AuditEntryListQuery,
   type AuditEntryPage,
   type CreateAiRuntimeConfigVersionRequest,
   type ManagementCapability,
@@ -61,7 +62,7 @@ export interface SystemManagementWorkspaceApi {
     reason: string,
     idempotencyKey: string,
   ): Promise<unknown>;
-  listAudits(): Promise<AuditEntryPage>;
+  listAudits(query?: AuditEntryListQuery): Promise<AuditEntryPage>;
 }
 
 const defaultApi: SystemManagementWorkspaceApi = {
@@ -97,6 +98,8 @@ const initialReloadTokens: Record<ManagementLoadSection, number> = {
   audits: 0,
 };
 
+const initialAuditQuery: AuditEntryListQuery = { limit: 20 };
+
 export function SystemManagementWorkspace({
   api = defaultApi,
 }: {
@@ -117,6 +120,15 @@ export function SystemManagementWorkspace({
   const [health, setHealth] = useState<WorkerOperationsHealth | null>(null);
   const [failures, setFailures] = useState<AsyncWorkFailurePage | null>(null);
   const [audits, setAudits] = useState<AuditEntryPage | null>(null);
+  const [auditQuery, setAuditQuery] =
+    useState<AuditEntryListQuery>(initialAuditQuery);
+  const [auditAction, setAuditAction] = useState("");
+  const [auditAggregateType, setAuditAggregateType] = useState("");
+  const [auditAggregateId, setAuditAggregateId] = useState("");
+  const [auditActorUserId, setAuditActorUserId] = useState("");
+  const [auditOccurredFrom, setAuditOccurredFrom] = useState("");
+  const [auditOccurredBefore, setAuditOccurredBefore] = useState("");
+  const [isLoadingOlderAudits, setIsLoadingOlderAudits] = useState(false);
   const [accessControl, setAccessControl] =
     useState<AccessControlSnapshot | null>(null);
   const [loadErrors, setLoadErrors] = useState<
@@ -281,7 +293,7 @@ export function SystemManagementWorkspace({
     setAudits(null);
     clearLoadError(setLoadErrors, "audits");
     void api
-      .listAudits()
+      .listAudits(auditQuery)
       .then((loadedAudits) => {
         if (active && requestToken === reloadTokensRef.current.audits) {
           setAudits(loadedAudits);
@@ -295,7 +307,7 @@ export function SystemManagementWorkspace({
     return () => {
       active = false;
     };
-  }, [api, canReadAudits, reloadTokens.audits]);
+  }, [api, auditQuery, canReadAudits, reloadTokens.audits]);
 
   const currentVersion = useMemo(
     () =>
@@ -321,7 +333,7 @@ export function SystemManagementWorkspace({
     ]);
     setHealth(loadedHealth);
     setFailures(loadedFailures);
-    if (canReadAudits) setAudits(await api.listAudits());
+    if (canReadAudits) setAudits(await api.listAudits(auditQuery));
   }
 
   function retrySection(section: ManagementLoadSection) {
@@ -329,6 +341,63 @@ export function SystemManagementWorkspace({
       ...current,
       [section]: current[section] + 1,
     }));
+  }
+
+  function applyAuditFilters(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setAuditQuery({
+      limit: 20,
+      ...(auditAction.trim() ? { action: auditAction.trim() } : {}),
+      ...(auditAggregateType.trim()
+        ? { aggregateType: auditAggregateType.trim() }
+        : {}),
+      ...(auditAggregateId.trim()
+        ? { aggregateId: auditAggregateId.trim() }
+        : {}),
+      ...(auditActorUserId.trim()
+        ? { actorUserId: auditActorUserId.trim() }
+        : {}),
+      ...(auditOccurredFrom
+        ? { occurredFrom: localDateTimeToIso(auditOccurredFrom) }
+        : {}),
+      ...(auditOccurredBefore
+        ? { occurredBefore: localDateTimeToIso(auditOccurredBefore) }
+        : {}),
+    });
+  }
+
+  function clearAuditFilters() {
+    setAuditAction("");
+    setAuditAggregateType("");
+    setAuditAggregateId("");
+    setAuditActorUserId("");
+    setAuditOccurredFrom("");
+    setAuditOccurredBefore("");
+    setAuditQuery({ ...initialAuditQuery });
+  }
+
+  async function loadOlderAudits() {
+    if (!audits?.nextCursor || isLoadingOlderAudits) return;
+    setIsLoadingOlderAudits(true);
+    setError(null);
+    try {
+      const older = await api.listAudits({
+        ...auditQuery,
+        cursor: audits.nextCursor,
+      });
+      setAudits((current) =>
+        current
+          ? {
+              items: [...current.items, ...older.items],
+              nextCursor: older.nextCursor,
+            }
+          : older,
+      );
+    } catch (cause) {
+      setError(errorMessage(cause));
+    } finally {
+      setIsLoadingOlderAudits(false);
+    }
   }
 
   async function createVersion(event: FormEvent<HTMLFormElement>) {
@@ -351,7 +420,7 @@ export function SystemManagementWorkspace({
       setVersions(next);
       setReleaseVersionId(created.versionId);
       setMessage(`版本 ${created.versionNo} 已创建，尚未影响线上 Agent。`);
-      if (canReadAudits) setAudits(await api.listAudits());
+      if (canReadAudits) setAudits(await api.listAudits(auditQuery));
     } catch (cause) {
       setError(errorMessage(cause));
     } finally {
@@ -377,7 +446,7 @@ export function SystemManagementWorkspace({
         releaseReason,
       );
       setVersions(await api.listVersions());
-      if (canReadAudits) setAudits(await api.listAudits());
+      if (canReadAudits) setAudits(await api.listAudits(auditQuery));
       setReleaseReason("");
       setMessage(
         `${releaseIsRollback ? "回滚" : "发布"}完成：版本 ${released.versionNo}，发布序号 ${released.releaseNo}。`,
@@ -463,7 +532,7 @@ export function SystemManagementWorkspace({
       );
       if (canReadAudits) {
         try {
-          setAudits(await api.listAudits());
+          setAudits(await api.listAudits(auditQuery));
         } catch {
           // The change itself succeeded. A simultaneous audit-capability revoke
           // may make this optional refresh unavailable on the same screen.
@@ -950,26 +1019,118 @@ export function SystemManagementWorkspace({
             </div>
             <p>仅展示当前管理范围内的审计元数据，不暴露业务快照。</p>
           </div>
-          {audits ? (
-            <div className="admin-audit-list">
-              {audits.items.length === 0 ? (
-                <p>暂无可见审计记录。</p>
-              ) : (
-                audits.items.map((entry) => (
-                  <article key={entry.entryId}>
-                    <span>{entry.action}</span>
-                    <strong>{entry.actor.displayName}</strong>
-                    <p>
-                      {entry.aggregateType} · {entry.aggregateId.slice(0, 8)}
-                    </p>
-                    <time dateTime={entry.occurredAt}>
-                      {formatDateTime(entry.occurredAt)}
-                    </time>
-                    {entry.reason ? <em>{entry.reason}</em> : null}
-                  </article>
-                ))
-              )}
+          <form className="admin-audit-filter" onSubmit={applyAuditFilters}>
+            <fieldset disabled={isLoadingOlderAudits}>
+              <label>
+                审计动作
+                <input
+                  aria-label="审计动作"
+                  value={auditAction}
+                  onChange={(event) => setAuditAction(event.target.value)}
+                  placeholder="例如 followup.viewed"
+                />
+              </label>
+              <label>
+                业务对象类型
+                <input
+                  aria-label="业务对象类型"
+                  value={auditAggregateType}
+                  onChange={(event) =>
+                    setAuditAggregateType(event.target.value)
+                  }
+                  placeholder="例如 followup"
+                />
+              </label>
+              <label>
+                对象 ID
+                <input
+                  aria-label="审计业务对象 ID"
+                  value={auditAggregateId}
+                  onChange={(event) => setAuditAggregateId(event.target.value)}
+                  placeholder="UUID，可选"
+                />
+              </label>
+              <label>
+                操作者 ID
+                <input
+                  aria-label="审计操作者 ID"
+                  value={auditActorUserId}
+                  onChange={(event) => setAuditActorUserId(event.target.value)}
+                  placeholder="UUID，可选"
+                />
+              </label>
+              <label>
+                开始时间
+                <input
+                  aria-label="审计开始时间"
+                  type="datetime-local"
+                  value={auditOccurredFrom}
+                  onChange={(event) => setAuditOccurredFrom(event.target.value)}
+                />
+              </label>
+              <label>
+                结束时间（不含）
+                <input
+                  aria-label="审计结束时间"
+                  type="datetime-local"
+                  value={auditOccurredBefore}
+                  onChange={(event) =>
+                    setAuditOccurredBefore(event.target.value)
+                  }
+                />
+              </label>
+            </fieldset>
+            <div>
+              <button
+                className="primary-button"
+                type="submit"
+                disabled={isLoadingOlderAudits}
+              >
+                查询审计记录
+              </button>
+              <button
+                className="secondary-button"
+                type="button"
+                disabled={isLoadingOlderAudits}
+                onClick={clearAuditFilters}
+              >
+                清空筛选
+              </button>
             </div>
+          </form>
+          {audits ? (
+            <>
+              <div className="admin-audit-list">
+                {audits.items.length === 0 ? (
+                  <p>当前筛选条件下暂无可见审计记录。</p>
+                ) : (
+                  audits.items.map((entry) => (
+                    <article key={entry.entryId}>
+                      <span>{entry.action}</span>
+                      <strong>{entry.actor.displayName}</strong>
+                      <p>
+                        {entry.aggregateType} · {entry.aggregateId.slice(0, 8)}
+                      </p>
+                      <time dateTime={entry.occurredAt}>
+                        {formatDateTime(entry.occurredAt)}
+                      </time>
+                      {entry.reason ? <em>{entry.reason}</em> : null}
+                    </article>
+                  ))
+                )}
+              </div>
+              {audits.nextCursor ? (
+                <button
+                  className="secondary-button admin-audit-more"
+                  type="button"
+                  disabled={isLoadingOlderAudits}
+                  aria-label="加载更早审计记录"
+                  onClick={() => void loadOlderAudits()}
+                >
+                  {isLoadingOlderAudits ? "正在加载…" : "加载更早记录"}
+                </button>
+              ) : null}
+            </>
           ) : (
             <ManagementSectionState
               label="最近审计记录"
@@ -1041,6 +1202,10 @@ function formatDateTime(value: string): string {
     minute: "2-digit",
     hour12: false,
   }).format(new Date(value));
+}
+
+function localDateTimeToIso(value: string): string {
+  return new Date(value).toISOString();
 }
 
 function errorMessage(error: unknown): string {
